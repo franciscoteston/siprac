@@ -1,8 +1,8 @@
-Diagrama Entidade-Relacionamento — SGBD DAI
+#Diagrama Entidade-Relacionamento — SGBD DAI
 O diagrama está dividido em três blocos temáticos para facilitar a leitura.
 O GitHub renderiza os blocos abaixo automaticamente.
 ---
-Bloco A — Estrutura organizacional e segurança
+##Bloco A — Estrutura organizacional e segurança
 ```mermaid
 erDiagram
   SERVIDOR {
@@ -57,7 +57,7 @@ erDiagram
   SERVIDOR        ||--o{ PERMISSAO_ESPECIAL : "concede"
 ```
 ---
-Bloco B — OS, classificação, ciclo de vida, imóveis e produção
+##Bloco B — OS, classificação, ciclo de vida, imóveis e produção
 ```mermaid
 erDiagram
   OS {
@@ -233,7 +233,7 @@ erDiagram
   PRODUCAO        ||--o{ PRODUCAO_ATRIBUTO     : "tem atributos"
 ```
 ---
-Bloco C — Referências cruzadas, pesquisa e auditoria
+##Bloco C — Referências cruzadas, pesquisa e auditoria
 ```mermaid
 erDiagram
   SERVIDOR {
@@ -362,3 +362,4 @@ erDiagram
   UNIDADE_INTERNA  ||--o{ META_PESQUISA          : "meta coletiva"
   UNIDADE_EXTERNA  ||--o{ ENCAMINHAMENTO         : "destino externo"
   IMOVEL           ||--o{ REGISTRO_PESQUISA      : "objeto de pesquisa"
+```
