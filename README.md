@@ -28,7 +28,7 @@ O SEI trata o número do processo como entidade central. Quando um trabalho téc
 | Componente | Tecnologia |
 |---|---|
 | Banco de dados | PostgreSQL |
-| Backend | Python 3.12+ / Django 5+ |
+| Backend | Python 3.12+ / Django 6+ |
 | Servidor web | Nginx + Gunicorn |
 | Protótipo / homologação | Railway |
 | Produção | Servidor PROCEMPA (a definir) |
@@ -40,7 +40,7 @@ O SEI trata o número do processo como entidade central. Quando um trabalho téc
 
 ## Arquitetura
 
-O modelo de dados é composto por **25 entidades** organizadas em cinco domínios:
+O modelo de dados é composto por **26 entidades** organizadas em cinco domínios:
 
 | Domínio | Entidades |
 |---|---|
@@ -48,7 +48,7 @@ O modelo de dados é composto por **25 entidades** organizadas em cinco domínio
 | Externo | UNIDADE_EXTERNA |
 | Classificação | NATUREZA, TIPO_DEMANDA, FINALIDADE, COMBINACAO_VALIDA |
 | Imóveis | IMOVEL, OS_IMOVEL, PRODUCAO_IMOVEL, PRODUCAO_IMOVEL_DADOS |
-| OS e ciclo de vida | OS, OS_PROCESSO, MACROETAPA_LOG, ENCAMINHAMENTO, TAREFA_INTERNA |
+| OS e ciclo de vida | OS, PROCESSO_SEI, OS_PROCESSO, MACROETAPA_LOG, ENCAMINHAMENTO, TAREFA_INTERNA |
 | Produção | PRODUCAO, PRODUCAO_ATRIBUTO, TIPO_PRODUCAO |
 | Pesquisa | REGISTRO_PESQUISA, META_PESQUISA |
 | Auditoria | LOG_AUDITORIA |
@@ -72,7 +72,7 @@ Documentação detalhada:
 
 ## Roadmap de desenvolvimento
 
-- [ ] **Fase 1 — Fundação:** configuração do ambiente, modelagem Django ORM, Django Admin para entidades de domínio
+- [x] **Fase 1 — Fundação:** configuração do ambiente, modelagem Django ORM, Django Admin para entidades de domínio
 - [ ] **Fase 2 — Núcleo operacional:** criação e tramitação de OS, macroetapas, encaminhamentos, controle de acesso
 - [ ] **Fase 3 — Produção e imóveis:** cadastro de imóveis, integração SIAT, registro de produções, agrupamentos
 - [ ] **Fase 4 — Dashboard e relatórios:** painéis gerenciais, produtividade, módulo de pesquisa e metas
