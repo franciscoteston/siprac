@@ -1,0 +1,761 @@
+from django.db import models
+
+
+# ---------------------------------------------------------------------------
+# Bloco A — Estrutura organizacional e segurança
+# ---------------------------------------------------------------------------
+
+
+class Servidor(models.Model):
+    """Servidor público com credenciais e controle de acesso ao SGBD."""
+
+    nome = models.CharField(max_length=255)
+    login = models.CharField(max_length=255, unique=True)
+    senha_hash = models.CharField(max_length=255)
+    salt = models.CharField(max_length=255)
+    data_ultimo_acesso = models.DateField(null=True, blank=True)
+    tentativas_falhas = models.IntegerField(default=0)
+    bloqueado = models.BooleanField(default=False)
+    token_reset_senha = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = "SERVIDOR"
+        verbose_name = "servidor"
+        verbose_name_plural = "servidores"
+
+    def __str__(self):
+        return self.nome
+
+
+class PerfilAcesso(models.Model):
+    """Perfil de permissões vinculado ao cargo do servidor na unidade."""
+
+    nome = models.CharField(max_length=255)
+    pode_criar_os = models.BooleanField(default=False)
+    pode_encerrar_os = models.BooleanField(default=False)
+    pode_criar_os_interna = models.BooleanField(default=False)
+    pode_homologar = models.BooleanField(default=False)
+    visibilidade_total = models.BooleanField(default=False)
+    admin_sistema = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "PERFIL_ACESSO"
+        verbose_name = "perfil de acesso"
+        verbose_name_plural = "perfis de acesso"
+
+    def __str__(self):
+        return self.nome
+
+
+class UnidadeInterna(models.Model):
+    """Unidade interna da DAI (DAI, EAV, ESJL, EPGV)."""
+
+    sigla = models.CharField(max_length=50)
+    nome = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = "UNIDADE_INTERNA"
+        verbose_name = "unidade interna"
+        verbose_name_plural = "unidades internas"
+
+    def __str__(self):
+        return self.sigla
+
+
+class UnidadeExterna(models.Model):
+    """Unidade externa à DAI para encaminhamentos com ou sem retorno."""
+
+    sigla = models.CharField(max_length=50, null=True, blank=True)
+    nome = models.CharField(max_length=255)
+    espera_retorno_padrao = models.BooleanField(default=True)
+    ativa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "UNIDADE_EXTERNA"
+        verbose_name = "unidade externa"
+        verbose_name_plural = "unidades externas"
+
+    def __str__(self):
+        return self.nome
+
+
+class ServidorUnidade(models.Model):
+    """Vínculo de lotação do servidor em uma unidade, com perfil e vigência."""
+
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="vinculos_unidade",
+    )
+    unidade = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        related_name="vinculos_servidor",
+    )
+    perfil = models.ForeignKey(
+        PerfilAcesso,
+        on_delete=models.PROTECT,
+        related_name="vinculos_servidor",
+    )
+    cargo = models.CharField(max_length=255)
+    substituto = models.BooleanField(default=False)
+    data_inicio = models.DateField()
+    data_fim = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "SERVIDOR_UNIDADE"
+        verbose_name = "vínculo servidor-unidade"
+        verbose_name_plural = "vínculos servidor-unidade"
+
+    def __str__(self):
+        return f"{self.servidor} — {self.unidade}"
+
+
+class PermissaoEspecial(models.Model):
+    """Permissão temporária concedida a um servidor (ex.: visibilidade cross-unidade)."""
+
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="permissoes_especiais",
+    )
+    tipo_permissao = models.CharField(max_length=255)
+    data_inicio = models.DateField()
+    data_fim = models.DateField(null=True, blank=True)
+    concedida_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="permissoes_concedidas",
+    )
+
+    class Meta:
+        db_table = "PERMISSAO_ESPECIAL"
+        verbose_name = "permissão especial"
+        verbose_name_plural = "permissões especiais"
+
+    def __str__(self):
+        return f"{self.servidor} — {self.tipo_permissao}"
+
+
+# ---------------------------------------------------------------------------
+# Classificação da OS
+# ---------------------------------------------------------------------------
+
+
+class Natureza(models.Model):
+    """Primeira dimensão de classificação da OS (ex.: Tributário – IPTU)."""
+
+    descricao = models.CharField(max_length=255)
+    ativa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "NATUREZA"
+        verbose_name = "natureza"
+        verbose_name_plural = "naturezas"
+
+    def __str__(self):
+        return self.descricao
+
+
+class TipoDemanda(models.Model):
+    """Segunda dimensão de classificação da OS (ex.: Requerimento IPTU)."""
+
+    descricao = models.CharField(max_length=255)
+    ativa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "TIPO_DEMANDA"
+        verbose_name = "tipo de demanda"
+        verbose_name_plural = "tipos de demanda"
+
+    def __str__(self):
+        return self.descricao
+
+
+class Finalidade(models.Model):
+    """Terceira dimensão de classificação da OS (ex.: Desapropriação Parcial)."""
+
+    descricao = models.CharField(max_length=255)
+    ativa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "FINALIDADE"
+        verbose_name = "finalidade"
+        verbose_name_plural = "finalidades"
+
+    def __str__(self):
+        return self.descricao
+
+
+class CombinacaoValida(models.Model):
+    """Combinação permitida entre natureza, tipo de demanda e finalidade."""
+
+    natureza = models.ForeignKey(
+        Natureza,
+        on_delete=models.PROTECT,
+        related_name="combinacoes_validas",
+    )
+    tipo_demanda = models.ForeignKey(
+        TipoDemanda,
+        on_delete=models.PROTECT,
+        related_name="combinacoes_validas",
+    )
+    finalidade = models.ForeignKey(
+        Finalidade,
+        on_delete=models.PROTECT,
+        related_name="combinacoes_validas",
+    )
+
+    class Meta:
+        db_table = "COMBINACAO_VALIDA"
+        verbose_name = "combinação válida"
+        verbose_name_plural = "combinações válidas"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["natureza", "tipo_demanda", "finalidade"],
+                name="combinacao_valida_unica",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.natureza} / {self.tipo_demanda} / {self.finalidade}"
+
+
+# ---------------------------------------------------------------------------
+# Imóveis e tipos de produção
+# ---------------------------------------------------------------------------
+
+
+class Imovel(models.Model):
+    """Dados de referência do imóvel (inscrição SIAT ou código ISIC)."""
+
+    tipo_identificacao = models.CharField(max_length=255)
+    inscricao_cadastral = models.CharField(max_length=255, null=True, blank=True)
+    codigo_isic = models.CharField(max_length=255, null=True, blank=True)
+    endereco = models.CharField(max_length=255, null=True, blank=True)
+    bairro = models.CharField(max_length=255, null=True, blank=True)
+    area_referencia = models.FloatField(null=True, blank=True)
+    exercicio_referencia = models.IntegerField(null=True, blank=True)
+    origem_dados = models.CharField(max_length=255, null=True, blank=True)
+    editado_manualmente = models.BooleanField(default=False)
+    data_ultima_importacao = models.DateField(null=True, blank=True)
+    observacao_interna = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "IMOVEL"
+        verbose_name = "imóvel"
+        verbose_name_plural = "imóveis"
+
+    def __str__(self):
+        if self.inscricao_cadastral:
+            return self.inscricao_cadastral
+        if self.codigo_isic:
+            return self.codigo_isic
+        return f"Imóvel #{self.pk}"
+
+
+class TipoProducao(models.Model):
+    """Tipo de produção técnica (LA, PT, PF, despacho, etc.)."""
+
+    prefixo = models.CharField(max_length=50)
+    descricao = models.CharField(max_length=255)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "TIPO_PRODUCAO"
+        verbose_name = "tipo de produção"
+        verbose_name_plural = "tipos de produção"
+
+    def __str__(self):
+        return f"{self.prefixo} — {self.descricao}"
+
+
+class ProcessoSei(models.Model):
+    """Processo registrado no SEI, referenciado por uma ou mais OS."""
+
+    numero_processo = models.CharField(max_length=255)
+    data_abertura_sei = models.DateField(null=True, blank=True)
+    situacao = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        db_table = "PROCESSO_SEI"
+        verbose_name = "processo SEI"
+        verbose_name_plural = "processos SEI"
+
+    def __str__(self):
+        return self.numero_processo
+
+
+# ---------------------------------------------------------------------------
+# OS e ciclo de vida
+# ---------------------------------------------------------------------------
+
+
+class OS(models.Model):
+    """Ordem de Serviço — entidade central do ciclo de vida da demanda na DAI."""
+
+    numero_os = models.CharField(max_length=255, unique=True)
+    data_criacao_sgbd = models.DateField(auto_now_add=True)
+    data_entrada_divisao = models.DateField(null=True, blank=True)
+    os_interna = models.BooleanField(default=False)
+    pendente_confirmacao = models.BooleanField(default=False)
+    prioridade = models.CharField(max_length=255, default="NORMAL")
+    natureza = models.ForeignKey(
+        Natureza,
+        on_delete=models.PROTECT,
+        related_name="ordens_servico",
+    )
+    tipo_demanda = models.ForeignKey(
+        TipoDemanda,
+        on_delete=models.PROTECT,
+        related_name="ordens_servico",
+    )
+    finalidade = models.ForeignKey(
+        Finalidade,
+        on_delete=models.PROTECT,
+        related_name="ordens_servico",
+    )
+    criado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="ordens_servico_criadas",
+    )
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "OS"
+        verbose_name = "ordem de serviço"
+        verbose_name_plural = "ordens de serviço"
+
+    def __str__(self):
+        return self.numero_os
+
+
+class OsProcesso(models.Model):
+    """Vínculo entre uma OS e um processo SEI (principal ou relacionado)."""
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="processos_vinculados",
+    )
+    processo_sei = models.ForeignKey(
+        ProcessoSei,
+        on_delete=models.PROTECT,
+        related_name="vinculos_os",
+    )
+    tipo_vinculo = models.CharField(max_length=255)
+    data_entrada_divisao = models.DateField(null=True, blank=True)
+    data_encerramento = models.DateField(null=True, blank=True)
+    motivo_encerramento = models.TextField(null=True, blank=True)
+    encerrado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="processos_encerrados",
+    )
+
+    class Meta:
+        db_table = "OS_PROCESSO"
+        verbose_name = "vínculo OS-processo SEI"
+        verbose_name_plural = "vínculos OS-processo SEI"
+
+    def __str__(self):
+        return f"{self.os} — {self.processo_sei}"
+
+
+class MacroetapaLog(models.Model):
+    """Histórico de transições de macroetapa da OS."""
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="macroetapas",
+    )
+    macroetapa = models.CharField(max_length=255)
+    data_hora = models.DateTimeField(auto_now_add=True)
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="macroetapas_registradas",
+    )
+    automatico = models.BooleanField(default=False)
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "MACROETAPA_LOG"
+        verbose_name = "registro de macroetapa"
+        verbose_name_plural = "registros de macroetapa"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"{self.os} — {self.macroetapa}"
+
+
+class Encaminhamento(models.Model):
+    """Tramitação da OS entre unidades, servidores ou destinos externos."""
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="encaminhamentos",
+    )
+    unidade_interna_origem = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        related_name="encaminhamentos_origem",
+    )
+    servidor_origem = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="encaminhamentos_enviados",
+    )
+    unidade_interna_destino = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="encaminhamentos_destino_interno",
+    )
+    servidor_destino = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="encaminhamentos_recebidos",
+    )
+    unidade_externa_destino = models.ForeignKey(
+        UnidadeExterna,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="encaminhamentos",
+    )
+    etapa_interna = models.CharField(max_length=255, null=True, blank=True)
+    tipo_acao = models.CharField(max_length=255)
+    aguarda_retorno = models.BooleanField(default=False)
+    data_retorno_prevista = models.DateField(null=True, blank=True)
+    data_retorno_efetiva = models.DateField(null=True, blank=True)
+    data_hora = models.DateTimeField(auto_now_add=True)
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "ENCAMINHAMENTO"
+        verbose_name = "encaminhamento"
+        verbose_name_plural = "encaminhamentos"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"{self.os} — {self.tipo_acao} ({self.data_hora})"
+
+
+class TarefaInterna(models.Model):
+    """Tarefa interna da unidade em uma etapa do fluxo (triagem até conclusão)."""
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="tarefas_internas",
+    )
+    encaminhamento = models.ForeignKey(
+        Encaminhamento,
+        on_delete=models.PROTECT,
+        related_name="tarefas",
+    )
+    unidade = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        related_name="tarefas_internas",
+    )
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="tarefas_internas",
+    )
+    etapa_interna = models.CharField(max_length=255)
+    status = models.CharField(max_length=255)
+    data_inicio = models.DateTimeField()
+    data_conclusao = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "TAREFA_INTERNA"
+        verbose_name = "tarefa interna"
+        verbose_name_plural = "tarefas internas"
+
+    def __str__(self):
+        return f"{self.os} — {self.etapa_interna} ({self.status})"
+
+
+class OsImovel(models.Model):
+    """Vínculo entre uma OS e um imóvel de referência."""
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="imoveis_vinculados",
+    )
+    imovel = models.ForeignKey(
+        Imovel,
+        on_delete=models.PROTECT,
+        related_name="vinculos_os",
+    )
+
+    class Meta:
+        db_table = "OS_IMOVEL"
+        verbose_name = "vínculo OS-imóvel"
+        verbose_name_plural = "vínculos OS-imóvel"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["os", "imovel"],
+                name="os_imovel_unico",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.os} — {self.imovel}"
+
+
+# ---------------------------------------------------------------------------
+# Produção
+# ---------------------------------------------------------------------------
+
+
+class Producao(models.Model):
+    """Produto gerado pela OS (laudo, parecer, despacho, etc.)."""
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="producoes",
+    )
+    tipo_producao = models.ForeignKey(
+        TipoProducao,
+        on_delete=models.PROTECT,
+        related_name="producoes",
+    )
+    numero_producao = models.CharField(max_length=255, null=True, blank=True)
+    numero_sei = models.CharField(max_length=255, null=True, blank=True)
+    ano = models.IntegerField()
+    status = models.CharField(max_length=255)
+    criado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="producoes_criadas",
+    )
+    homologado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="producoes_homologadas",
+    )
+    data_homologacao = models.DateField(null=True, blank=True)
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "PRODUCAO"
+        verbose_name = "produção"
+        verbose_name_plural = "produções"
+
+    def __str__(self):
+        if self.numero_producao:
+            return self.numero_producao
+        if self.numero_sei:
+            return self.numero_sei
+        return f"Produção #{self.pk}"
+
+
+class ProducaoImovel(models.Model):
+    """Imóvel abrangido por uma produção, com agrupamento opcional."""
+
+    producao = models.ForeignKey(
+        Producao,
+        on_delete=models.PROTECT,
+        related_name="imoveis",
+    )
+    imovel = models.ForeignKey(
+        Imovel,
+        on_delete=models.PROTECT,
+        related_name="producoes",
+    )
+    grupo_ref = models.CharField(max_length=255, null=True, blank=True)
+    papel_no_grupo = models.CharField(max_length=255, null=True, blank=True)
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "PRODUCAO_IMOVEL"
+        verbose_name = "imóvel na produção"
+        verbose_name_plural = "imóveis na produção"
+
+    def __str__(self):
+        return f"{self.producao} — {self.imovel}"
+
+
+class ProducaoImovelDados(models.Model):
+    """Dados de trabalho do imóvel por exercício, homologados na produção."""
+
+    producao_imovel = models.ForeignKey(
+        ProducaoImovel,
+        on_delete=models.PROTECT,
+        related_name="dados_trabalho",
+    )
+    exercicio = models.IntegerField()
+    area_trabalho = models.FloatField(null=True, blank=True)
+    endereco_trabalho = models.CharField(max_length=255, null=True, blank=True)
+    fonte = models.CharField(max_length=255, null=True, blank=True)
+    data_referencia = models.DateField()
+    observacao_tecnica = models.TextField(null=True, blank=True)
+    editado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="dados_producao_editados",
+    )
+    data_edicao = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "PRODUCAO_IMOVEL_DADOS"
+        verbose_name = "dados de trabalho do imóvel"
+        verbose_name_plural = "dados de trabalho dos imóveis"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["producao_imovel", "exercicio"],
+                name="producao_imovel_exercicio_unico",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.producao_imovel} — exercício {self.exercicio}"
+
+
+class ProducaoAtributo(models.Model):
+    """Atributo chave-valor adicional de uma produção."""
+
+    producao = models.ForeignKey(
+        Producao,
+        on_delete=models.PROTECT,
+        related_name="atributos",
+    )
+    chave = models.CharField(max_length=255)
+    valor = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = "PRODUCAO_ATRIBUTO"
+        verbose_name = "atributo de produção"
+        verbose_name_plural = "atributos de produção"
+
+    def __str__(self):
+        return f"{self.producao} — {self.chave}"
+
+
+# ---------------------------------------------------------------------------
+# Pesquisa de dados
+# ---------------------------------------------------------------------------
+
+
+class RegistroPesquisa(models.Model):
+    """Registro de pesquisa de dados (ITBI, ofertas) pelo perfil de pesquisa."""
+
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="registros_pesquisa",
+    )
+    imovel = models.ForeignKey(
+        Imovel,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="registros_pesquisa",
+    )
+    numero_registro = models.CharField(max_length=255)
+    tipo_fonte = models.CharField(max_length=255)
+    data_registro = models.DateField()
+    data_encaminhamento = models.DateField(null=True, blank=True)
+    tipo_pesquisa = models.CharField(max_length=255)
+    semana_referencia = models.IntegerField(null=True, blank=True)
+    mes_referencia = models.IntegerField()
+    ano_referencia = models.IntegerField()
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "REGISTRO_PESQUISA"
+        verbose_name = "registro de pesquisa"
+        verbose_name_plural = "registros de pesquisa"
+
+    def __str__(self):
+        return self.numero_registro
+
+
+class MetaPesquisa(models.Model):
+    """Meta de produção de pesquisa (individual ou coletiva por unidade)."""
+
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="metas_pesquisa",
+    )
+    unidade = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="metas_pesquisa",
+    )
+    criado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="metas_pesquisa_criadas",
+    )
+    tipo_meta = models.CharField(max_length=255)
+    tipo_pesquisa = models.CharField(max_length=255, null=True, blank=True)
+    mes = models.IntegerField()
+    ano = models.IntegerField()
+    quantidade_meta = models.IntegerField()
+
+    class Meta:
+        db_table = "META_PESQUISA"
+        verbose_name = "meta de pesquisa"
+        verbose_name_plural = "metas de pesquisa"
+
+    def __str__(self):
+        alvo = self.servidor or self.unidade
+        return f"{alvo} — {self.mes}/{self.ano}: {self.quantidade_meta}"
+
+
+# ---------------------------------------------------------------------------
+# Auditoria
+# ---------------------------------------------------------------------------
+
+
+class LogAuditoria(models.Model):
+    """Registro imutável de alterações relevantes para auditoria."""
+
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="logs_auditoria",
+    )
+    entidade = models.CharField(max_length=255)
+    entidade_id = models.IntegerField()
+    operacao = models.CharField(max_length=255)
+    campo_alterado = models.CharField(max_length=255, null=True, blank=True)
+    valor_anterior = models.TextField(null=True, blank=True)
+    valor_novo = models.TextField(null=True, blank=True)
+    data_hora = models.DateTimeField(auto_now_add=True)
+    justificativa = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "LOG_AUDITORIA"
+        verbose_name = "log de auditoria"
+        verbose_name_plural = "logs de auditoria"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"{self.entidade}#{self.entidade_id} — {self.operacao}"
