@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -17,6 +18,13 @@ class Servidor(models.Model):
     tentativas_falhas = models.IntegerField(default=0)
     bloqueado = models.BooleanField(default=False)
     token_reset_senha = models.CharField(max_length=255, null=True, blank=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="servidor",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         db_table = "SERVIDOR"
