@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 
-from core.forms import EncaminhamentoForm, OSForm
+from core.forms import DESPACHO_VALUE, EncaminhamentoForm, OSForm, ProducaoForm
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerCriarOSMixin, RequerLoginJSONMixin, RequerLoginMixin
 from core.models import (
@@ -25,6 +25,7 @@ from core.models import (
     Servidor,
     TarefaInterna,
     TipoDemanda,
+    TipoProducao,
 )
 
 
@@ -138,6 +139,36 @@ def _gerar_numero_os():
                 continue
 
     return f"OS_{maior_sequencia + 1:05d}_{ano}"
+
+
+def _obter_tipo_producao_despacho():
+    tipo, _ = TipoProducao.objects.get_or_create(
+        prefixo="Despacho",
+        defaults={"descricao": "Despacho", "ativo": True},
+    )
+    return tipo
+
+
+def _gerar_numero_producao(tipo_producao):
+    ano = timezone.localdate().year
+    prefixo = tipo_producao.prefixo
+    maior_sequencia = 0
+
+    for numero in Producao.objects.filter(
+        tipo_producao=tipo_producao,
+        ano=ano,
+    ).exclude(numero_producao__isnull=True).exclude(numero_producao="").values_list(
+        "numero_producao",
+        flat=True,
+    ):
+        partes = numero.split("_")
+        if len(partes) == 3 and partes[0] == prefixo and partes[2] == str(ano):
+            try:
+                maior_sequencia = max(maior_sequencia, int(partes[1]))
+            except ValueError:
+                continue
+
+    return f"{prefixo}_{maior_sequencia + 1:03d}_{ano}"
 
 
 def _queryset_os_anotado():
@@ -432,6 +463,64 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 )
 
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class ProducaoCreateView(RequerLoginMixin, FormView):
+    template_name = "producao_form.html"
+    form_class = ProducaoForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["os"] = self.os_obj
+        return context
+
+    def form_valid(self, form):
+        servidor = _obter_servidor(self.request.user)
+        if servidor is None:
+            raise PermissionDenied
+
+        dados = form.cleaned_data
+        ano = timezone.localdate().year
+
+        if dados.get("is_despacho"):
+            tipo_producao = _obter_tipo_producao_despacho()
+            numero_producao = None
+            numero_sei = dados["numero_sei"]
+        else:
+            tipo_producao = dados["tipo_producao_obj"]
+            numero_producao = _gerar_numero_producao(tipo_producao)
+            numero_sei = dados.get("numero_sei") or None
+
+        Producao.objects.create(
+            os=self.os_obj,
+            tipo_producao=tipo_producao,
+            numero_producao=numero_producao,
+            numero_sei=numero_sei,
+            ano=ano,
+            status="EM_ELABORACAO",
+            criado_por=servidor,
+            observacao=dados.get("observacao") or None,
+        )
+
+        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class ProximoNumeroAPIView(RequerLoginJSONMixin, View):
+    def get(self, request):
+        tipo_id = request.GET.get("tipo_id")
+        if not tipo_id or tipo_id == DESPACHO_VALUE:
+            return JsonResponse({"numero": None})
+
+        try:
+            tipo_producao = TipoProducao.objects.get(pk=tipo_id, ativo=True)
+        except (TipoProducao.DoesNotExist, ValueError, TypeError):
+            return JsonResponse({"error": "Tipo de produção inválido."}, status=404)
+
+        return JsonResponse({"numero": _gerar_numero_producao(tipo_producao)})
 
 
 class TiposDemandaAPIView(RequerLoginJSONMixin, View):

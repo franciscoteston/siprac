@@ -7,6 +7,7 @@ from core.models import (
     Natureza,
     Servidor,
     TipoDemanda,
+    TipoProducao,
     UnidadeExterna,
     UnidadeInterna,
 )
@@ -178,5 +179,61 @@ class EncaminhamentoForm(forms.Form):
                 )
             cleaned_data["unidade_interna_destino"] = None
             cleaned_data["servidor_destino"] = None
+
+        return cleaned_data
+
+
+DESPACHO_VALUE = "DESPACHO"
+
+
+class ProducaoForm(forms.Form):
+    tipo_producao = forms.ChoiceField(
+        label="Tipo de produção",
+        choices=[],
+    )
+    numero_sei = forms.CharField(
+        label="Número SEI",
+        max_length=255,
+        required=False,
+    )
+    observacao = forms.CharField(
+        label="Observação",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [
+            (str(tipo.pk), f"{tipo.prefixo} — {tipo.descricao}")
+            for tipo in TipoProducao.objects.filter(ativo=True)
+            .exclude(prefixo="Despacho")
+            .order_by("prefixo")
+        ]
+        choices.append((DESPACHO_VALUE, "Despacho"))
+        self.fields["tipo_producao"].choices = [("", "---------")] + choices
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_valor = cleaned_data.get("tipo_producao")
+        numero_sei = cleaned_data.get("numero_sei")
+
+        if not tipo_valor:
+            return cleaned_data
+
+        if tipo_valor == DESPACHO_VALUE:
+            cleaned_data["is_despacho"] = True
+            cleaned_data["tipo_producao_obj"] = None
+            if not numero_sei:
+                self.add_error("numero_sei", "Obrigatório para despacho.")
+        else:
+            cleaned_data["is_despacho"] = False
+            try:
+                cleaned_data["tipo_producao_obj"] = TipoProducao.objects.get(
+                    pk=int(tipo_valor),
+                    ativo=True,
+                )
+            except (TipoProducao.DoesNotExist, TypeError, ValueError):
+                self.add_error("tipo_producao", "Tipo de produção inválido.")
 
         return cleaned_data

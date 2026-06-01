@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Registrar produção — {{ os.numero_os }} — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1 text-dark">Registrar produção</h1>
+<p class="text-muted mb-4">{{ os.numero_os }}</p>
+
+<form method="post" id="producao-form" novalidate>
+  {% csrf_token %}
+
+  <div class="card siprac-card mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.tipo_producao|as_crispy_field }}</div>
+        <div class="col-md-6">
+          <div id="preview-numero" class="alert alert-light border mb-0 d-none" role="status">
+            <span class="text-muted">Será gerado:</span>
+            <strong id="preview-numero-valor"></strong>
+          </div>
+        </div>
+        <div class="col-md-6">{{ form.numero_sei|as_crispy_field }}</div>
+        <div class="col-12">{{ form.observacao|as_crispy_field }}</div>
+      </div>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary siprac-btn-primary">Salvar</button>
+    <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tipoSelect = document.getElementById('id_tipo_producao');
+  const previewBox = document.getElementById('preview-numero');
+  const previewValor = document.getElementById('preview-numero-valor');
+  const urlProximoNumero = '{% url "api_proximo_numero" %}';
+  const despachoValue = 'DESPACHO';
+
+  function atualizarPreview() {
+    const tipoId = tipoSelect.value;
+    if (!tipoId) {
+      previewBox.classList.add('d-none');
+      return;
+    }
+    if (tipoId === despachoValue) {
+      previewValor.textContent = 'Despacho (sem numeração própria — use o número SEI)';
+      previewBox.classList.remove('d-none');
+      return;
+    }
+    fetch(urlProximoNumero + '?tipo_id=' + encodeURIComponent(tipoId), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.numero) {
+          previewValor.textContent = data.numero;
+          previewBox.classList.remove('d-none');
+        } else {
+          previewBox.classList.add('d-none');
+        }
+      })
+      .catch(function () {
+        previewBox.classList.add('d-none');
+      });
+  }
+
+  tipoSelect.addEventListener('change', atualizarPreview);
+  atualizarPreview();
+});
+</script>
+{% endblock %}
