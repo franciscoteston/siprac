@@ -3,7 +3,10 @@
 {% block title %}Dashboard — SIPRAC{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4 text-dark">Dashboard</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0 text-dark">Dashboard</h1>
+  <a href="{% url 'os_nova' %}" class="btn btn-primary siprac-btn-primary">+ Nova OS</a>
+</div>
 
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
@@ -56,10 +59,16 @@
     </thead>
     <tbody>
       {% for item in fila_os %}
-      <tr data-bs-toggle="collapse" data-bs-target="#fila-detalhe-{{ item.pk }}" role="button"
-          aria-expanded="false" aria-controls="fila-detalhe-{{ item.pk }}">
-        <td><span class="text-muted">▸</span></td>
-        <td>{{ item.numero_os }}</td>
+      <tr class="siprac-fila-row" data-href="{% url 'os_detalhe' item.pk %}" style="cursor: pointer;">
+        <td onclick="event.stopPropagation();" data-bs-toggle="collapse"
+            data-bs-target="#fila-detalhe-{{ item.pk }}" role="button"
+            aria-expanded="false" aria-controls="fila-detalhe-{{ item.pk }}">
+          <span class="text-muted">▸</span>
+        </td>
+        <td>
+          <a href="{% url 'os_detalhe' item.pk %}" class="text-decoration-none fw-semibold"
+             onclick="event.stopPropagation();">{{ item.numero_os }}</a>
+        </td>
         <td>{{ item.processo_sei }}</td>
         <td>{{ item.natureza }}</td>
         <td>{{ item.macroetapa }}</td>
@@ -89,4 +98,14 @@
     </tbody>
   </table>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.siprac-fila-row').forEach(function (row) {
+  row.addEventListener('click', function () {
+    window.location.href = row.dataset.href;
+  });
+});
+</script>
 {% endblock %}

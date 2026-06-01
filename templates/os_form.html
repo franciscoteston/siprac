@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Nova OS — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Nova Ordem de Serviço</h1>
+
+<form method="post" id="os-form" novalidate>
+  {% csrf_token %}
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      {{ form.processo_sei_numero|as_crispy_field }}
+    </div>
+    <div class="col-md-6">
+      {{ form.processo_sei_data_entrada|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.natureza|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.tipo_demanda|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.finalidade|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.prioridade|as_crispy_field }}
+    </div>
+    <div class="col-12">
+      {{ form.observacao|as_crispy_field }}
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger mt-3">
+    {{ form.non_field_errors }}
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2 mt-4">
+    <button type="submit" class="btn btn-primary siprac-btn-primary">Salvar</button>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const naturezaSelect = document.getElementById('id_natureza');
+  const tipoSelect = document.getElementById('id_tipo_demanda');
+  const finalidadeSelect = document.getElementById('id_finalidade');
+
+  if (!naturezaSelect || !tipoSelect || !finalidadeSelect) {
+    console.error('SIPRAC cascata: selects não encontrados', {
+      natureza: !!naturezaSelect,
+      tipo_demanda: !!tipoSelect,
+      finalidade: !!finalidadeSelect,
+    });
+    return;
+  }
+
+  const urlTiposDemanda = '{% url "api_tipos_demanda" %}';
+  const urlFinalidades = '{% url "api_finalidades" %}';
+
+  const fetchOptions = {
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  };
+
+  function limparSelect(select, placeholder) {
+    select.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    select.appendChild(option);
+    select.disabled = false;
+  }
+
+  function preencherSelect(select, items, selectedId) {
+    limparSelect(select, '---------');
+    items.forEach(function (item) {
+      const option = document.createElement('option');
+      option.value = String(item.id);
+      option.textContent = item.descricao;
+      if (selectedId && String(item.id) === String(selectedId)) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    });
+  }
+
+  function carregarFinalidades(tipoId, selectedFinalidadeId) {
+    limparSelect(finalidadeSelect, '---------');
+    if (!tipoId) {
+      return Promise.resolve([]);
+    }
+
+    const url = urlFinalidades + '?tipo_demanda_id=' + encodeURIComponent(tipoId);
+    console.log('SIPRAC fetch finalidades:', url);
+
+    return fetch(url, fetchOptions)
+      .then(function (response) {
+        console.log('SIPRAC finalidades status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status);
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        console.log('SIPRAC finalidades JSON:', data);
+        preencherSelect(finalidadeSelect, data, selectedFinalidadeId);
+        return data;
+      })
+      .catch(function (error) {
+        console.error('SIPRAC erro ao carregar finalidades:', error);
+      });
+  }
+
+  function carregarTiposDemanda(naturezaId, selectedTipoId, selectedFinalidadeId) {
+    limparSelect(tipoSelect, '---------');
+    limparSelect(finalidadeSelect, '---------');
+    if (!naturezaId) {
+      return Promise.resolve([]);
+    }
+
+    const url = urlTiposDemanda + '?natureza_id=' + encodeURIComponent(naturezaId);
+    console.log('SIPRAC fetch tipos-demanda:', url);
+
+    return fetch(url, fetchOptions)
+      .then(function (response) {
+        console.log('SIPRAC tipos-demanda status:', response.status);
+        if (!response.ok) {
+          throw new Error('HTTP ' + response.status);
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        console.log('SIPRAC tipos-demanda JSON:', data);
+        preencherSelect(tipoSelect, data, selectedTipoId);
+
+        const tipoId = tipoSelect.value;
+        if (tipoId) {
+          return carregarFinalidades(tipoId, selectedFinalidadeId);
+        }
+        if (data.length === 1) {
+          tipoSelect.value = String(data[0].id);
+          return carregarFinalidades(data[0].id, selectedFinalidadeId);
+        }
+        return data;
+      })
+      .catch(function (error) {
+        console.error('SIPRAC erro ao carregar tipos-demanda:', error);
+      });
+  }
+
+  naturezaSelect.addEventListener('change', function () {
+    carregarTiposDemanda(naturezaSelect.value);
+  });
+
+  tipoSelect.addEventListener('change', function () {
+    carregarFinalidades(tipoSelect.value);
+  });
+
+  if (naturezaSelect.value) {
+    carregarTiposDemanda(
+      naturezaSelect.value,
+      tipoSelect.value,
+      finalidadeSelect.value
+    );
+  }
+});
+</script>
+{% endblock %}

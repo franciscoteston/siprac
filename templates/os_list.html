@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}Ordens de serviço — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0 text-dark">Ordens de serviço</h1>
+  <a href="{% url 'os_nova' %}" class="btn btn-primary siprac-btn-primary">+ Nova OS</a>
+</div>
+
+<form method="get" class="card siprac-card mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label for="macroetapa" class="form-label">Macroetapa</label>
+        <select name="macroetapa" id="macroetapa" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          {% for macro in macroetapas %}
+          <option value="{{ macro }}"{% if filtro_macroetapa == macro %} selected{% endif %}>{{ macro }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="natureza" class="form-label">Natureza</label>
+        <select name="natureza" id="natureza" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          {% for natureza in naturezas %}
+          <option value="{{ natureza.pk }}"{% if filtro_natureza == natureza.pk|stringformat:"s" %} selected{% endif %}>
+            {{ natureza.descricao }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="prioridade" class="form-label">Prioridade</label>
+        <select name="prioridade" id="prioridade" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          {% for prioridade in prioridades %}
+          <option value="{{ prioridade }}"{% if filtro_prioridade == prioridade %} selected{% endif %}>{{ prioridade }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="q" class="form-label">Processo SEI</label>
+        <input type="search" name="q" id="q" class="form-control form-control-sm"
+               value="{{ filtro_q }}" placeholder="Número do processo">
+      </div>
+      <div class="col-md-1">
+        <button type="submit" class="btn btn-primary siprac-btn-primary btn-sm w-100">Filtrar</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover siprac-table align-middle mb-0">
+    <thead>
+      <tr>
+        <th scope="col">Nº OS</th>
+        <th scope="col">Processo SEI</th>
+        <th scope="col">Natureza</th>
+        <th scope="col">Etapa</th>
+        <th scope="col">Prazo</th>
+        <th scope="col">Prioridade</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for os in ordens %}
+      <tr class="siprac-os-row" data-href="{% url 'os_detalhe' os.pk %}" style="cursor: pointer;">
+        <td>
+          <a href="{% url 'os_detalhe' os.pk %}" class="text-decoration-none fw-semibold"
+             onclick="event.stopPropagation();">{{ os.numero_os }}</a>
+        </td>
+        <td>{% if os.processo_sei_numero %}{{ os.processo_sei_numero }}{% else %}—{% endif %}</td>
+        <td>{{ os.natureza.descricao }}</td>
+        <td>{% if os.macroetapa_atual %}{{ os.macroetapa_atual }}{% else %}—{% endif %}</td>
+        <td>{% if os.prazo %}{{ os.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td>
+          {% if os.prioridade == 'URGENTE' %}
+          <span class="badge badge-prioridade-urgente">URGENTE</span>
+          {% elif os.prioridade == 'PRIORITARIO' %}
+          <span class="badge badge-prioridade-prioritario">PRIORITÁRIO</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ os.prioridade }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="text-muted text-center py-4">Nenhuma ordem de serviço encontrada.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4" aria-label="Paginação de OS">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&q={{ filtro_q }}">Anterior</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    </li>
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&q={{ filtro_q }}">Próxima</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.siprac-os-row').forEach(function (row) {
+  row.addEventListener('click', function () {
+    window.location.href = row.dataset.href;
+  });
+});
+</script>
+{% endblock %}

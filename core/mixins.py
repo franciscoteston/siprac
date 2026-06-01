@@ -1,11 +1,19 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 
 
 class RequerLoginMixin(LoginRequiredMixin):
     """Redireciona para login se o usuário não estiver autenticado."""
 
     pass
+
+
+class RequerLoginJSONMixin(LoginRequiredMixin):
+    """Exige login e retorna JSON 401 em vez de redirect (para APIs fetch)."""
+
+    def handle_no_permission(self):
+        return JsonResponse({"error": "Autenticação necessária."}, status=401)
 
 
 def RequerPerfilMixin(perfis_permitidos):

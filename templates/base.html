@@ -40,7 +40,8 @@
       <nav class="nav flex-column">
         <a class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}"
            href="{% url 'dashboard' %}">Dashboard</a>
-        <a class="nav-link" href="#">Ordens de serviço</a>
+        <a class="nav-link{% if request.resolver_match.url_name == 'os_list' %} active{% endif %}"
+           href="{% url 'os_list' %}">Ordens de serviço</a>
         <a class="nav-link" href="#">Imóveis</a>
         <a class="nav-link" href="#">Produções</a>
         <a class="nav-link" href="#">Relatórios</a>
