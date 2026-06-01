@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -9,9 +10,15 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 
-from core.forms import DESPACHO_VALUE, EncaminhamentoForm, OSForm, ProducaoForm
+from core.forms import (
+    DESPACHO_VALUE,
+    EncaminhamentoForm,
+    OSEncerramentoForm,
+    OSForm,
+    ProducaoForm,
+)
 from core.middleware import obter_vinculo_unidade_ativo
-from core.mixins import RequerCriarOSMixin, RequerLoginJSONMixin, RequerLoginMixin
+from core.mixins import RequerLoginJSONMixin, RequerLoginMixin
 from core.models import (
     Encaminhamento,
     Finalidade,
@@ -27,6 +34,9 @@ from core.models import (
     TipoDemanda,
     TipoProducao,
 )
+
+
+MSG_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação."
 
 
 def _contexto_dashboard_vazio():
@@ -271,9 +281,16 @@ class DashboardView(RequerLoginMixin, TemplateView):
         return context
 
 
-class OSCreateView(RequerCriarOSMixin, FormView):
+class OSCreateView(RequerLoginMixin, FormView):
     template_name = "os_form.html"
     form_class = OSForm
+
+    def dispatch(self, request, *args, **kwargs):
+        perfil = getattr(request, "perfil_acesso", None)
+        if perfil is None or not perfil.pode_criar_os:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect("os_list")
+        return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
         servidor = _obter_servidor(self.request.user)
@@ -310,6 +327,10 @@ class OSCreateView(RequerCriarOSMixin, FormView):
                 automatico=True,
             )
 
+        messages.success(
+            self.request,
+            f"{os_obj.numero_os} criada com sucesso.",
+        )
         return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
 
 
@@ -385,6 +406,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
             .order_by("-data_hora", "-id")
             .first()
         )
+        context["tem_servidor"] = _obter_servidor(self.request.user) is not None
         return context
 
 
@@ -394,6 +416,9 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        if _obter_servidor(request.user) is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -404,7 +429,8 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
     def form_valid(self, form):
         servidor = _obter_servidor(self.request.user)
         if servidor is None:
-            raise PermissionDenied
+            messages.error(self.request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
         vinculo = obter_vinculo_unidade_ativo(servidor)
         if vinculo is None:
@@ -462,6 +488,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                     automatico=True,
                 )
 
+        messages.success(self.request, "Encaminhamento registrado.")
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
 
@@ -471,6 +498,9 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        if _obter_servidor(request.user) is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -481,7 +511,8 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
     def form_valid(self, form):
         servidor = _obter_servidor(self.request.user)
         if servidor is None:
-            raise PermissionDenied
+            messages.error(self.request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
         dados = form.cleaned_data
         ano = timezone.localdate().year
@@ -506,6 +537,57 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
             observacao=dados.get("observacao") or None,
         )
 
+        messages.success(self.request, "Produção registrada.")
+        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class OSEncerramentoView(RequerLoginMixin, FormView):
+    template_name = "os_encerramento.html"
+    form_class = OSEncerramentoForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        perfil = getattr(request, "perfil_acesso", None)
+        if perfil is None or not perfil.pode_encerrar_os:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["os"] = self.os_obj
+        context["processos_a_encerrar"] = OsProcesso.objects.filter(
+            os=self.os_obj,
+            data_encerramento__isnull=True,
+        ).select_related("processo_sei")
+        return context
+
+    def form_valid(self, form):
+        servidor = _obter_servidor(self.request.user)
+        if servidor is None:
+            messages.error(self.request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+        hoje = timezone.localdate()
+        motivo = form.cleaned_data["motivo_encerramento"]
+
+        with transaction.atomic():
+            MacroetapaLog.objects.create(
+                os=self.os_obj,
+                macroetapa="ENCERRADO",
+                servidor=servidor,
+                observacao=motivo,
+            )
+            OsProcesso.objects.filter(
+                os=self.os_obj,
+                data_encerramento__isnull=True,
+            ).update(
+                data_encerramento=hoje,
+                motivo_encerramento=motivo,
+                encerrado_por=servidor,
+            )
+
+        messages.success(self.request, "OS encerrada com sucesso.")
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
 

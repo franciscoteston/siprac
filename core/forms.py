@@ -237,3 +237,10 @@ class ProducaoForm(forms.Form):
                 self.add_error("tipo_producao", "Tipo de produção inválido.")
 
         return cleaned_data
+
+
+class OSEncerramentoForm(forms.Form):
+    motivo_encerramento = forms.CharField(
+        label="Motivo do encerramento",
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )

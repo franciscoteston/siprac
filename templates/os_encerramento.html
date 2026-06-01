@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Encerrar {{ os.numero_os }} — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Encerrar ordem de serviço</h1>
+
+<div class="card siprac-card mb-4">
+  <div class="card-body">
+    <p class="mb-3">
+      Confirmar encerramento da <strong>{{ os.numero_os }}</strong>?
+    </p>
+
+    {% if processos_a_encerrar %}
+    <p class="text-muted small mb-2">Processos SEI que serão encerrados:</p>
+    <ul class="mb-4">
+      {% for vinculo in processos_a_encerrar %}
+      <li>{{ vinculo.processo_sei.numero_processo }} ({{ vinculo.tipo_vinculo }})</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted small mb-4">Nenhum processo SEI pendente de encerramento.</p>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.motivo_encerramento|as_crispy_field }}
+
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-danger">Confirmar encerramento</button>
+        <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
