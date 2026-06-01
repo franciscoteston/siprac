@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load siprac_filters %}
 
 {% block title %}Dashboard — SIPRAC{% endblock %}
 
@@ -71,15 +72,15 @@
         </td>
         <td>{{ item.processo_sei }}</td>
         <td>{{ item.natureza }}</td>
-        <td>{{ item.macroetapa }}</td>
+        <td>{{ item.macroetapa|macroetapa_display }}</td>
         <td>{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td>
           {% if item.prioridade == 'URGENTE' %}
-          <span class="badge badge-prioridade-urgente">URGENTE</span>
+          <span class="badge badge-prioridade-urgente">{{ item.prioridade|prioridade_display }}</span>
           {% elif item.prioridade == 'PRIORITARIO' %}
-          <span class="badge badge-prioridade-prioritario">PRIORITÁRIO</span>
+          <span class="badge badge-prioridade-prioritario">{{ item.prioridade|prioridade_display }}</span>
           {% else %}
-          <span class="badge bg-secondary">{{ item.prioridade }}</span>
+          <span class="badge bg-secondary">{{ item.prioridade|prioridade_display }}</span>
           {% endif %}
         </td>
       </tr>

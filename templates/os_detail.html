@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load siprac_filters %}
 
 {% block title %}{{ os.numero_os }} — SIPRAC{% endblock %}
 
@@ -8,14 +9,14 @@
     <h1 class="h3 mb-2 text-dark">{{ os.numero_os }}</h1>
     <div class="d-flex flex-wrap gap-2">
       {% if os.prioridade == 'URGENTE' %}
-      <span class="badge badge-prioridade-urgente">URGENTE</span>
+      <span class="badge badge-prioridade-urgente">{{ os.prioridade|prioridade_display }}</span>
       {% elif os.prioridade == 'PRIORITARIO' %}
-      <span class="badge badge-prioridade-prioritario">PRIORITÁRIO</span>
+      <span class="badge badge-prioridade-prioritario">{{ os.prioridade|prioridade_display }}</span>
       {% else %}
-      <span class="badge bg-secondary">{{ os.prioridade }}</span>
+      <span class="badge bg-secondary">{{ os.prioridade|prioridade_display }}</span>
       {% endif %}
       {% if macroetapa_atual %}
-      <span class="badge text-bg-dark">{{ macroetapa_atual.macroetapa }}</span>
+      <span class="badge text-bg-dark">{{ macroetapa_atual.macroetapa|macroetapa_display }}</span>
       {% else %}
       <span class="badge text-bg-secondary">Sem macroetapa</span>
       {% endif %}
@@ -45,7 +46,7 @@
             {% if os.data_entrada_divisao %}{{ os.data_entrada_divisao|date:"d/m/Y" }}{% else %}—{% endif %}
           </dd>
           <dt class="col-sm-4">Prioridade</dt>
-          <dd class="col-sm-8">{{ os.prioridade }}</dd>
+          <dd class="col-sm-8">{{ os.prioridade|prioridade_display }}</dd>
           <dt class="col-sm-4">Observação</dt>
           <dd class="col-sm-8">{% if os.observacao %}{{ os.observacao }}{% else %}—{% endif %}</dd>
         </dl>
@@ -211,7 +212,7 @@
     <ul class="list-group list-group-flush">
       {% for log in macroetapas %}
       <li class="list-group-item px-0 d-flex justify-content-between align-items-start">
-        <span>{{ log.macroetapa }}</span>
+        <span>{{ log.macroetapa|macroetapa_display }}</span>
         <span class="text-muted small">{{ log.data_hora|date:"d/m/Y H:i" }}</span>
       </li>
       {% endfor %}
