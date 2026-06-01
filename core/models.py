@@ -551,6 +551,7 @@ class Producao(models.Model):
         on_delete=models.PROTECT,
         related_name="producoes_criadas",
     )
+    data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data de criação")
     homologado_por = models.ForeignKey(
         Servidor,
         on_delete=models.PROTECT,

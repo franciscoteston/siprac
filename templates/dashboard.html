@@ -10,7 +10,7 @@
     <div class="card siprac-card h-100">
       <div class="card-body">
         <p class="card-text text-muted mb-1">OSs abertas</p>
-        <p class="card-value mb-0">—</p>
+        <p class="card-value mb-0">{{ os_abertas }}</p>
       </div>
     </div>
   </div>
@@ -18,7 +18,7 @@
     <div class="card siprac-card card-verde h-100">
       <div class="card-body">
         <p class="card-text text-muted mb-1">Na minha fila</p>
-        <p class="card-value mb-0">—</p>
+        <p class="card-value mb-0">{{ na_minha_fila }}</p>
       </div>
     </div>
   </div>
@@ -26,7 +26,7 @@
     <div class="card siprac-card card-laranja h-100">
       <div class="card-body">
         <p class="card-text text-muted mb-1">Aguard. retorno</p>
-        <p class="card-value mb-0">—</p>
+        <p class="card-value mb-0">{{ aguard_retorno }}</p>
       </div>
     </div>
   </div>
@@ -34,7 +34,7 @@
     <div class="card siprac-card h-100">
       <div class="card-body">
         <p class="card-text text-muted mb-1">Produção/mês</p>
-        <p class="card-value mb-0">—</p>
+        <p class="card-value mb-0">{{ producao_mes }}</p>
       </div>
     </div>
   </div>
@@ -55,36 +55,37 @@
       </tr>
     </thead>
     <tbody>
-      <tr data-bs-toggle="collapse" data-bs-target="#fila-detalhe-1" role="button" aria-expanded="false"
-          aria-controls="fila-detalhe-1" class="cursor-pointer">
+      {% for item in fila_os %}
+      <tr data-bs-toggle="collapse" data-bs-target="#fila-detalhe-{{ item.pk }}" role="button"
+          aria-expanded="false" aria-controls="fila-detalhe-{{ item.pk }}">
         <td><span class="text-muted">▸</span></td>
-        <td>OS_00001_2026</td>
-        <td>00000.000000/0000-00</td>
-        <td>Tributário – IPTU</td>
-        <td>Análise</td>
-        <td>—</td>
-        <td><span class="badge bg-secondary">NORMAL</span></td>
+        <td>{{ item.numero_os }}</td>
+        <td>{{ item.processo_sei }}</td>
+        <td>{{ item.natureza }}</td>
+        <td>{{ item.macroetapa }}</td>
+        <td>{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td>
+          {% if item.prioridade == 'URGENTE' %}
+          <span class="badge badge-prioridade-urgente">URGENTE</span>
+          {% elif item.prioridade == 'PRIORITARIO' %}
+          <span class="badge badge-prioridade-prioritario">PRIORITÁRIO</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ item.prioridade }}</span>
+          {% endif %}
+        </td>
       </tr>
-      <tr class="collapse siprac-row-expand" id="fila-detalhe-1">
+      <tr class="collapse siprac-row-expand" id="fila-detalhe-{{ item.pk }}">
         <td colspan="7" class="small text-muted ps-4">
           Detalhes da OS serão exibidos aqui (placeholder).
         </td>
       </tr>
-      <tr data-bs-toggle="collapse" data-bs-target="#fila-detalhe-2" role="button" aria-expanded="false"
-          aria-controls="fila-detalhe-2">
-        <td><span class="text-muted">▸</span></td>
-        <td>OS_00002_2026</td>
-        <td>00000.000001/0000-00</td>
-        <td>Tributário – ITBI</td>
-        <td>Triagem</td>
-        <td>—</td>
-        <td><span class="badge badge-prioridade-prioritario">PRIORITÁRIO</span></td>
-      </tr>
-      <tr class="collapse siprac-row-expand" id="fila-detalhe-2">
-        <td colspan="7" class="small text-muted ps-4">
-          Detalhes da OS serão exibidos aqui (placeholder).
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-muted text-center py-4">
+          Nenhuma OS pendente na fila da sua unidade.
         </td>
       </tr>
+      {% endfor %}
     </tbody>
   </table>
 </div>
