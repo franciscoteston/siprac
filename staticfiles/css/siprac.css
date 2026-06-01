@@ -1,0 +1,152 @@
+:root {
+  --azul-escuro: #1a3a5c;
+  --laranja: #e87722;
+  --verde: #2e8b57;
+  --azul-medio: #4a90c4;
+  --sidebar-width: 180px;
+}
+
+body {
+  background-color: #f4f6f8;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.siprac-navbar {
+  background-color: var(--azul-escuro);
+  border-bottom: 3px solid var(--laranja);
+}
+
+.siprac-navbar .navbar-brand {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.siprac-navbar .navbar-brand span {
+  color: var(--laranja);
+}
+
+.siprac-navbar .nav-user {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+}
+
+.siprac-layout {
+  display: flex;
+  min-height: calc(100vh - 56px);
+}
+
+.siprac-sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--azul-escuro);
+  flex-shrink: 0;
+  padding-top: 1rem;
+}
+
+.siprac-sidebar .nav-link {
+  color: rgba(255, 255, 255, 0.85);
+  padding: 0.65rem 1rem;
+  border-left: 3px solid transparent;
+  font-size: 0.9rem;
+}
+
+.siprac-sidebar .nav-link:hover,
+.siprac-sidebar .nav-link.active {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-left-color: var(--laranja);
+}
+
+.siprac-content {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+.siprac-card {
+  border: none;
+  border-top: 3px solid var(--azul-medio);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.siprac-card .card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--azul-escuro);
+}
+
+.siprac-card.card-verde {
+  border-top-color: var(--verde);
+}
+
+.siprac-card.card-laranja {
+  border-top-color: var(--laranja);
+}
+
+.siprac-table thead {
+  background-color: var(--azul-escuro);
+  color: #fff;
+}
+
+.siprac-table thead th {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.badge-prioridade-urgente {
+  background-color: var(--laranja);
+}
+
+.badge-prioridade-prioritario {
+  background-color: var(--azul-medio);
+}
+
+.siprac-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--azul-escuro) 0%, #0f2438 100%);
+}
+
+.siprac-login-card {
+  width: 100%;
+  max-width: 420px;
+  border: none;
+  border-top: 4px solid var(--laranja);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.siprac-login-logo {
+  color: var(--azul-escuro);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.siprac-login-logo span {
+  color: var(--laranja);
+}
+
+.siprac-login-title {
+  color: var(--azul-escuro);
+  font-weight: 700;
+  font-size: 1.75rem;
+}
+
+.siprac-login-subtitle {
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.siprac-btn-primary {
+  background-color: var(--azul-escuro);
+  border-color: var(--azul-escuro);
+}
+
+.siprac-btn-primary:hover {
+  background-color: #142d47;
+  border-color: #142d47;
+}
+
+.siprac-row-expand {
+  background-color: #f8f9fa;
+}

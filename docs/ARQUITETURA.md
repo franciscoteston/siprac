@@ -2,7 +2,7 @@
 
 ## 1. Contexto e motivação
 
-A Divisão de Avaliação de Imóveis (DAI) da Prefeitura Municipal de Porto Alegre utiliza o Sistema Eletrônico de Informações (SEI) como sistema oficial de gerenciamento de processos. O SEI trata o número do processo como entidade central, exigindo que um mesmo trabalho seja registrado individualmente para cada processo ao qual se vincula — gerando retrabalho quando uma produção atende a múltiplos processos simultaneamente.
+A Divisão de Avaliação de Imóveis (DAI) da Prefeitura Municipal de Porto Alegre utiliza o Sistema Eletrônico de Informações (SEI) como sistema oficial de gerenciamento de processos. O SEI trata o número do processo como entidade central, exigindo que um mesmo trabalho seja registrado individualmente para cada processo ao qual se vincula — gerando retrabalho quando uma produção atende a múltiplos processos simultaneamente. O sistema é denominado SIPRAC — Sistema de Processos, Acompanhamento e Cronogramas.
 
 O SGBD da DAI foi concebido para operar em complemento ao SEI, oferecendo gerenciamento detalhado em nível operacional e gerencial, sem replicar o SEI nem substituí-lo. A integração com o SEI é indireta: números de processo, documentos e despachos são registrados manualmente no SGBD, sem leitura automática do SEI.
 

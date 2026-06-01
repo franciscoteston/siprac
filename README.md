@@ -1,5 +1,7 @@
 # SGBD DAI — Sistema de Gerenciamento da Divisão de Avaliação de Imóveis
 
+> **SIPRAC** — Sistema de Processos, Acompanhamento e Cronogramas
+
 Sistema de gerenciamento de processos e produção técnica da Divisão de Avaliação de Imóveis (DAI) da Prefeitura Municipal de Porto Alegre. Desenvolvido para operar em complemento ao SEI, oferecendo rastreamento detalhado em nível operacional e gerencial.
 
 ---

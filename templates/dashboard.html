@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Dashboard</h1>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">OSs abertas</p>
+        <p class="card-value mb-0">—</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card card-verde h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">Na minha fila</p>
+        <p class="card-value mb-0">—</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card card-laranja h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">Aguard. retorno</p>
+        <p class="card-value mb-0">—</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">Produção/mês</p>
+        <p class="card-value mb-0">—</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Fila de trabalho</h2>
+<div class="table-responsive">
+  <table class="table table-hover siprac-table align-middle mb-0">
+    <thead>
+      <tr>
+        <th scope="col" style="width: 2rem;"></th>
+        <th scope="col">Nº OS</th>
+        <th scope="col">Processo SEI</th>
+        <th scope="col">Natureza</th>
+        <th scope="col">Etapa</th>
+        <th scope="col">Prazo</th>
+        <th scope="col">Prioridade</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr data-bs-toggle="collapse" data-bs-target="#fila-detalhe-1" role="button" aria-expanded="false"
+          aria-controls="fila-detalhe-1" class="cursor-pointer">
+        <td><span class="text-muted">▸</span></td>
+        <td>OS_00001_2026</td>
+        <td>00000.000000/0000-00</td>
+        <td>Tributário – IPTU</td>
+        <td>Análise</td>
+        <td>—</td>
+        <td><span class="badge bg-secondary">NORMAL</span></td>
+      </tr>
+      <tr class="collapse siprac-row-expand" id="fila-detalhe-1">
+        <td colspan="7" class="small text-muted ps-4">
+          Detalhes da OS serão exibidos aqui (placeholder).
+        </td>
+      </tr>
+      <tr data-bs-toggle="collapse" data-bs-target="#fila-detalhe-2" role="button" aria-expanded="false"
+          aria-controls="fila-detalhe-2">
+        <td><span class="text-muted">▸</span></td>
+        <td>OS_00002_2026</td>
+        <td>00000.000001/0000-00</td>
+        <td>Tributário – ITBI</td>
+        <td>Triagem</td>
+        <td>—</td>
+        <td><span class="badge badge-prioridade-prioritario">PRIORITÁRIO</span></td>
+      </tr>
+      <tr class="collapse siprac-row-expand" id="fila-detalhe-2">
+        <td colspan="7" class="small text-muted ps-4">
+          Detalhes da OS serão exibidos aqui (placeholder).
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
