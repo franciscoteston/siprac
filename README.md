@@ -75,7 +75,7 @@ Documentação detalhada:
 ## Roadmap de desenvolvimento
 
 - [x] **Fase 1 — Fundação:** configuração do ambiente, modelagem Django ORM, Django Admin para entidades de domínio
-- [ ] **Fase 2 — Núcleo operacional:** criação e tramitação de OS, macroetapas, encaminhamentos, controle de acesso
+- [x] **Fase 2 — Núcleo operacional:** criação e tramitação de OS, macroetapas, encaminhamentos, controle de acesso
 - [ ] **Fase 3 — Produção e imóveis:** cadastro de imóveis, integração SIAT, registro de produções, agrupamentos
 - [ ] **Fase 4 — Dashboard e relatórios:** painéis gerenciais, produtividade, módulo de pesquisa e metas
 - [ ] **Fase 5 — Auditoria e refinamentos:** log completo, revisão de regras de negócio, documentação de manutenção
