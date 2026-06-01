@@ -3,13 +3,14 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import OuterRef, Q, Subquery
 from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 
-from core.forms import OSForm
+from core.forms import EncaminhamentoForm, OSForm
+from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerCriarOSMixin, RequerLoginJSONMixin, RequerLoginMixin
 from core.models import (
     Encaminhamento,
@@ -354,6 +355,83 @@ class OSDetailView(RequerLoginMixin, DetailView):
             .first()
         )
         return context
+
+
+class EncaminhamentoCreateView(RequerLoginMixin, FormView):
+    template_name = "encaminhamento_form.html"
+    form_class = EncaminhamentoForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["os"] = self.os_obj
+        return context
+
+    def form_valid(self, form):
+        servidor = _obter_servidor(self.request.user)
+        if servidor is None:
+            raise PermissionDenied
+
+        vinculo = obter_vinculo_unidade_ativo(servidor)
+        if vinculo is None:
+            form.add_error(None, "Servidor sem vínculo ativo em unidade.")
+            return self.form_invalid(form)
+
+        agora = timezone.now()
+        dados = form.cleaned_data
+        tipo_destino = dados["tipo_destino"]
+
+        with transaction.atomic():
+            encaminhamento = Encaminhamento.objects.create(
+                os=self.os_obj,
+                unidade_interna_origem=vinculo.unidade,
+                servidor_origem=servidor,
+                unidade_interna_destino=dados.get("unidade_interna_destino"),
+                servidor_destino=dados.get("servidor_destino"),
+                unidade_externa_destino=dados.get("unidade_externa_destino"),
+                etapa_interna=dados["etapa_interna"],
+                tipo_acao=dados["tipo_acao"],
+                aguarda_retorno=dados.get("aguarda_retorno") or False,
+                data_retorno_prevista=dados.get("data_retorno_prevista"),
+                observacao=dados.get("observacao") or None,
+            )
+
+            if tipo_destino == "INTERNO":
+                unidade_tarefa = dados["unidade_interna_destino"]
+                servidor_tarefa = dados.get("servidor_destino") or servidor
+            else:
+                unidade_tarefa = vinculo.unidade
+                servidor_tarefa = servidor
+
+            TarefaInterna.objects.create(
+                os=self.os_obj,
+                encaminhamento=encaminhamento,
+                unidade=unidade_tarefa,
+                servidor=servidor_tarefa,
+                etapa_interna=dados["etapa_interna"],
+                status="PENDENTE",
+                data_inicio=agora,
+            )
+
+            if tipo_destino == "INTERNO":
+                MacroetapaLog.objects.create(
+                    os=self.os_obj,
+                    macroetapa="ATENDIMENTO_INTERNO",
+                    servidor=servidor,
+                    automatico=True,
+                )
+            elif dados.get("aguarda_retorno"):
+                MacroetapaLog.objects.create(
+                    os=self.os_obj,
+                    macroetapa="ATENDIMENTO_EXTERNO",
+                    servidor=servidor,
+                    automatico=True,
+                )
+
+        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
 
 class TiposDemandaAPIView(RequerLoginJSONMixin, View):

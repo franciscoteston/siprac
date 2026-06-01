@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Encaminhar {{ os.numero_os }} — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1 text-dark">Encaminhar OS</h1>
+<p class="text-muted mb-4">{{ os.numero_os }}</p>
+
+<form method="post" id="encaminhamento-form" novalidate>
+  {% csrf_token %}
+
+  <div class="mb-4">
+    <label class="form-label d-block fw-semibold">Tipo de destino</label>
+    {% for radio in form.tipo_destino %}
+    <div class="form-check form-check-inline">
+      {{ radio.tag }}
+      <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+    </div>
+    {% endfor %}
+    {% if form.tipo_destino.errors %}
+    <div class="text-danger small">{{ form.tipo_destino.errors }}</div>
+    {% endif %}
+  </div>
+
+  <div id="secao-interno" class="card siprac-card mb-3">
+    <div class="card-header bg-white fw-semibold">Destino interno</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.unidade_interna_destino|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.servidor_destino|as_crispy_field }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="secao-externo" class="card siprac-card mb-3 d-none">
+    <div class="card-header bg-white fw-semibold">Destino externo</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.unidade_externa_destino|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.aguarda_retorno|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.data_retorno_prevista|as_crispy_field }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card siprac-card mb-3">
+    <div class="card-header bg-white fw-semibold">Dados do encaminhamento</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.etapa_interna|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.tipo_acao|as_crispy_field }}</div>
+        <div class="col-12">{{ form.observacao|as_crispy_field }}</div>
+      </div>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary siprac-btn-primary">Salvar</button>
+    <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const secaoInterno = document.getElementById('secao-interno');
+  const secaoExterno = document.getElementById('secao-externo');
+  const radios = document.querySelectorAll('input[name="tipo_destino"]');
+
+  function atualizarSecoes() {
+    const selecionado = document.querySelector('input[name="tipo_destino"]:checked');
+    const interno = selecionado && selecionado.value === 'INTERNO';
+    secaoInterno.classList.toggle('d-none', !interno);
+    secaoExterno.classList.toggle('d-none', interno);
+  }
+
+  radios.forEach(function (radio) {
+    radio.addEventListener('change', atualizarSecoes);
+  });
+
+  atualizarSecoes();
+});
+</script>
+{% endblock %}

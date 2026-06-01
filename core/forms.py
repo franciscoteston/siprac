@@ -1,7 +1,15 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from core.models import CombinacaoValida, Finalidade, Natureza, TipoDemanda
+from core.models import (
+    CombinacaoValida,
+    Finalidade,
+    Natureza,
+    Servidor,
+    TipoDemanda,
+    UnidadeExterna,
+    UnidadeInterna,
+)
 
 
 class OSForm(forms.Form):
@@ -78,5 +86,97 @@ class OSForm(forms.Form):
                 finalidade=finalidade,
             ).exists():
                 raise ValidationError("Combinação inválida para esta natureza.")
+
+        return cleaned_data
+
+
+class EncaminhamentoForm(forms.Form):
+    tipo_destino = forms.ChoiceField(
+        label="Tipo de destino",
+        choices=[
+            ("INTERNO", "Interno"),
+            ("EXTERNO", "Externo"),
+        ],
+        widget=forms.RadioSelect,
+        initial="INTERNO",
+    )
+    unidade_interna_destino = forms.ModelChoiceField(
+        label="Unidade interna destino",
+        queryset=UnidadeInterna.objects.all().order_by("sigla"),
+        required=False,
+    )
+    servidor_destino = forms.ModelChoiceField(
+        label="Servidor destino",
+        queryset=Servidor.objects.all().order_by("nome"),
+        required=False,
+    )
+    unidade_externa_destino = forms.ModelChoiceField(
+        label="Unidade externa destino",
+        queryset=UnidadeExterna.objects.filter(ativa=True).order_by("nome"),
+        required=False,
+    )
+    etapa_interna = forms.ChoiceField(
+        label="Etapa interna",
+        choices=[
+            ("TRIAGEM", "Triagem"),
+            ("ANALISE", "Análise"),
+            ("REVISAO", "Revisão"),
+            ("HOMOLOGACAO", "Homologação"),
+            ("CONCLUSAO", "Conclusão"),
+        ],
+    )
+    tipo_acao = forms.ChoiceField(
+        label="Tipo de ação",
+        choices=[
+            ("ATRIBUICAO", "Atribuição"),
+            ("DEVOLUCAO", "Devolução"),
+            ("SOLICITACAO_AJUSTE", "Solicitação de ajuste"),
+            ("ENCAMINHAMENTO_EXTERNO", "Encaminhamento externo"),
+            ("HOMOLOGACAO", "Homologação"),
+            ("CONCLUSAO", "Conclusão"),
+        ],
+    )
+    aguarda_retorno = forms.BooleanField(
+        label="Aguarda retorno",
+        required=False,
+        initial=False,
+    )
+    data_retorno_prevista = forms.DateField(
+        label="Data de retorno prevista",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    observacao = forms.CharField(
+        label="Observação",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_destino = cleaned_data.get("tipo_destino")
+        unidade_interna = cleaned_data.get("unidade_interna_destino")
+        unidade_externa = cleaned_data.get("unidade_externa_destino")
+
+        if unidade_interna and unidade_externa:
+            raise ValidationError(
+                "Unidade interna e unidade externa são mutuamente exclusivas."
+            )
+
+        if tipo_destino == "INTERNO":
+            if not unidade_interna:
+                self.add_error(
+                    "unidade_interna_destino",
+                    "Obrigatório para encaminhamento interno.",
+                )
+            cleaned_data["unidade_externa_destino"] = None
+        elif tipo_destino == "EXTERNO":
+            if not unidade_externa:
+                self.add_error(
+                    "unidade_externa_destino",
+                    "Obrigatório para encaminhamento externo.",
+                )
+            cleaned_data["unidade_interna_destino"] = None
+            cleaned_data["servidor_destino"] = None
 
         return cleaned_data

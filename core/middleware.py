@@ -23,12 +23,12 @@ def _nivel_hierarquico(nome_perfil: str) -> int:
         return len(HIERARQUIA_PERFIS)
 
 
-def obter_perfil_acesso_ativo(servidor: Servidor):
-    """Retorna o PerfilAcesso do vínculo ativo de maior hierarquia."""
+def obter_vinculo_unidade_ativo(servidor: Servidor):
+    """Retorna o ServidorUnidade ativo de maior hierarquia."""
     hoje = timezone.localdate()
     vinculos_ativos = servidor.vinculos_unidade.filter(
         Q(data_fim__isnull=True) | Q(data_fim__gte=hoje),
-    ).select_related("perfil")
+    ).select_related("unidade", "perfil")
 
     vinculo_escolhido = None
     melhor_nivel = len(HIERARQUIA_PERFIS)
@@ -39,9 +39,15 @@ def obter_perfil_acesso_ativo(servidor: Servidor):
             melhor_nivel = nivel
             vinculo_escolhido = vinculo
 
-    if vinculo_escolhido is None:
+    return vinculo_escolhido
+
+
+def obter_perfil_acesso_ativo(servidor: Servidor):
+    """Retorna o PerfilAcesso do vínculo ativo de maior hierarquia."""
+    vinculo = obter_vinculo_unidade_ativo(servidor)
+    if vinculo is None:
         return None
-    return vinculo_escolhido.perfil
+    return vinculo.perfil
 
 
 class PerfilAcessoMiddleware:
