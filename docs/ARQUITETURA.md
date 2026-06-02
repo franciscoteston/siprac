@@ -313,3 +313,26 @@ permitem a implementação futura de um mapa interativo para gerenciamento visua
 dos imóveis vinculados a OSs e produções. Bibliotecas candidatas: Leaflet.js
 (coordenadas geográficas) ou mapa base TM POA (coordenadas UTM locais).
 A implementação será definida após a conclusão das fases principais do sistema.
+
+### 15.2 Deduplicação e reaproveitamento de ISICs
+Imóveis sem inscrição cadastral (ISIC) tendem a ser recadastrados por diferentes
+usuários ao longo do tempo, mesmo representando o mesmo imóvel físico. Para garantir
+histórico consistente e evitar duplicidades, será necessário implementar:
+- Busca por similaridade ao criar novo ISIC: verificar NUM_BLOCO, cod_logradouro,
+  num_endereco e coordenadas antes de criar novo registro
+- Alerta ao usuário quando um ISIC similar já existir, sugerindo reaproveitamento
+- Ferramenta administrativa de mesclagem de ISICs duplicados, preservando todos
+  os vínculos históricos com OSs e produções
+- Identificador estável de imóvel físico (independente da inscrição cadastral)
+  para garantir rastreabilidade mesmo quando o imóvel receber inscrição futuramente
+
+### 15.3 Histórico visual georreferenciado
+Com as coordenadas (latitude, longitude, coord_x, coord_y) armazenadas em Imovel
+e nos snapshots de OsImovel, será possível implementar:
+- Mapa interativo mostrando imóveis vinculados a uma OS
+- Linha do tempo visual por imóvel: quais OSs o atenderam e quando
+- Visualização de clusters de imóveis por bairro ou região homogênea
+- Histórico de alterações cadastrais plotado no mapa (área, finalidade, RH)
+- Base para análises espaciais de mercado imobiliário pela EPGV
+Bibliotecas candidatas: Leaflet.js (coordenadas geográficas WGS84)
+e/ou sistema TM POA (coord_x, coord_y) para mapas municipais.
