@@ -250,7 +250,7 @@ Campos livres como observações e anotações internas não são auditados.
 
 ---
 
-## 12. Inventário de entidades — 26 entidades
+## 12. Inventário de entidades — 28 entidades
 
 ### Estrutura e segurança
 `SERVIDOR` · `UNIDADE_INTERNA` · `SERVIDOR_UNIDADE` · `PERFIL_ACESSO` · `PERMISSAO_ESPECIAL`
@@ -268,7 +268,7 @@ Campos livres como observações e anotações internas não são auditados.
 `OS` · `PROCESSO_SEI` · `OS_PROCESSO` · `MACROETAPA_LOG` · `ENCAMINHAMENTO` · `TAREFA_INTERNA`
 
 ### Produção
-`PRODUCAO` · `PRODUCAO_ATRIBUTO` · `TIPO_PRODUCAO`
+`PRODUCAO` · `PRODUCAO_ATRIBUTO` · `PRODUCAO_STATUS_LOG` · `TIPO_PRODUCAO` · `TIPO_PRODUCAO_UNIDADE`
 
 ### Pesquisa
 `REGISTRO_PESQUISA` · `META_PESQUISA`

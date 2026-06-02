@@ -49,6 +49,7 @@ from core.models import (
     Producao,
     ProducaoImovel,
     ProducaoImovelDados,
+    ProducaoStatusLog,
     Servidor,
     TarefaInterna,
     TipoDemanda,
@@ -1081,6 +1082,8 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
             "tipo_producao",
             "criado_por",
             "homologado_por",
+            "servidor_responsavel",
+            "autor_trabalho",
         )
 
     def get_context_data(self, **kwargs):
@@ -1102,6 +1105,15 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
         context["os"] = producao.os
         context["imoveis"] = imoveis
         context["dados_por_exercicio"] = dict(dados_por_exercicio)
+        context["status_logs"] = (
+            ProducaoStatusLog.objects.filter(producao=producao)
+            .select_related(
+                "servidor_origem",
+                "servidor_destino",
+                "unidade_destino",
+            )
+            .order_by("data_hora")
+        )
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
         return context
 
@@ -1187,12 +1199,67 @@ def _transicao_status_permitida(producao, request, status_novo):
     return None
 
 
+def _pode_redistribuir_producao(producao, request):
+    perfil = getattr(request, "perfil_acesso", None)
+    if perfil is None or not perfil.pode_homologar:
+        return False
+    return producao.status not in (
+        Producao.STATUS_HOMOLOGADO,
+        Producao.STATUS_CANCELADO,
+    )
+
+
+def _obter_servidor_responsavel_post(request):
+    servidor_id = request.POST.get("servidor_responsavel")
+    if not servidor_id:
+        return None, "Selecione o servidor responsável."
+    try:
+        return Servidor.objects.get(pk=int(servidor_id)), None
+    except (Servidor.DoesNotExist, ValueError, TypeError):
+        return None, "Servidor responsável inválido."
+
+
+def _obter_autor_trabalho_post(request):
+    autor_id = request.POST.get("autor_trabalho")
+    if not autor_id:
+        return None, "Selecione o autor do trabalho."
+    try:
+        return Servidor.objects.get(pk=int(autor_id)), None
+    except (Servidor.DoesNotExist, ValueError, TypeError):
+        return None, "Autor do trabalho inválido."
+
+
+def _criar_producao_status_log(
+    producao,
+    status_anterior,
+    status_novo,
+    servidor_origem,
+    *,
+    servidor_destino=None,
+    unidade_destino=None,
+    justificativa=None,
+):
+    ProducaoStatusLog.objects.create(
+        producao=producao,
+        status_anterior=status_anterior,
+        status_novo=status_novo,
+        servidor_origem=servidor_origem,
+        servidor_destino=servidor_destino,
+        unidade_destino=unidade_destino,
+        justificativa=justificativa or None,
+    )
+
+
 class ProducaoAlterarStatusView(RequerLoginMixin, View):
     template_name = "producao_alterar_status.html"
 
     def dispatch(self, request, *args, **kwargs):
         self.producao_obj = get_object_or_404(
-            Producao.objects.select_related("os", "tipo_producao"),
+            Producao.objects.select_related(
+                "os",
+                "tipo_producao",
+                "servidor_responsavel",
+            ),
             pk=kwargs["pk"],
         )
         if _obter_servidor(request.user) is None:
@@ -1200,17 +1267,18 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
+    def _contexto_formulario(self, request):
+        return {
+            "producao": self.producao_obj,
+            "os": self.producao_obj.os,
+            "transicoes": _transicoes_status_disponiveis(self.producao_obj, request),
+            "pode_redistribuir": _pode_redistribuir_producao(self.producao_obj, request),
+            "servidores": Servidor.objects.order_by("nome"),
+            "servidor_responsavel_atual_id": self.producao_obj.servidor_responsavel_id,
+        }
+
     def get(self, request, *args, **kwargs):
-        transicoes = _transicoes_status_disponiveis(self.producao_obj, request)
-        return render(
-            request,
-            self.template_name,
-            {
-                "producao": self.producao_obj,
-                "os": self.producao_obj.os,
-                "transicoes": transicoes,
-            },
-        )
+        return render(request, self.template_name, self._contexto_formulario(request))
 
     def post(self, request, *args, **kwargs):
         servidor = _obter_servidor(request.user)
@@ -1218,8 +1286,55 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
-        status_novo = (request.POST.get("novo_status") or "").strip()
+        acao = (request.POST.get("acao") or "").strip()
         justificativa = (request.POST.get("justificativa") or "").strip()
+
+        if acao == "redistribuir":
+            return self._processar_redistribuicao(request, servidor, justificativa)
+
+        return self._processar_transicao_status(request, servidor, justificativa)
+
+    def _processar_redistribuicao(self, request, servidor, justificativa):
+        if not _pode_redistribuir_producao(self.producao_obj, request):
+            messages.error(request, "Você não tem permissão para redistribuir esta produção.")
+            return redirect(
+                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+            )
+
+        novo_responsavel, erro = _obter_servidor_responsavel_post(request)
+        if erro:
+            messages.error(request, erro)
+            return redirect(
+                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+            )
+
+        if self.producao_obj.servidor_responsavel_id == novo_responsavel.pk:
+            messages.warning(request, "O servidor selecionado já é o responsável atual.")
+            return redirect(
+                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+            )
+
+        status_atual = self.producao_obj.status
+        self.producao_obj.servidor_responsavel = novo_responsavel
+        self.producao_obj.save(update_fields=["servidor_responsavel"])
+
+        _criar_producao_status_log(
+            self.producao_obj,
+            status_atual,
+            status_atual,
+            servidor,
+            servidor_destino=novo_responsavel,
+            justificativa=justificativa,
+        )
+
+        messages.success(
+            request,
+            f"Produção redistribuída para {novo_responsavel.nome}.",
+        )
+        return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+
+    def _processar_transicao_status(self, request, servidor, justificativa):
+        status_novo = (request.POST.get("novo_status") or "").strip()
         transicao = _transicao_status_permitida(self.producao_obj, request, status_novo)
 
         if transicao is None:
@@ -1235,21 +1350,48 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             )
 
         status_anterior = self.producao_obj.status
-        self.producao_obj.status = status_novo
+        servidor_destino_log = self.producao_obj.servidor_responsavel
+        campos_atualizar = ["status"]
+
+        if status_novo == Producao.STATUS_DISTRIBUIDO:
+            novo_responsavel, erro = _obter_servidor_responsavel_post(request)
+            if erro:
+                messages.error(request, erro)
+                return redirect(
+                    reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+                )
+            self.producao_obj.servidor_responsavel = novo_responsavel
+            servidor_destino_log = novo_responsavel
+            campos_atualizar.append("servidor_responsavel")
 
         if status_novo == Producao.STATUS_HOMOLOGADO:
+            autor_trabalho, erro = _obter_autor_trabalho_post(request)
+            if erro:
+                messages.error(request, erro)
+                return redirect(
+                    reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+                )
             if not self.producao_obj.numero_producao:
                 self.producao_obj.numero_producao = _gerar_numero_producao(
                     self.producao_obj.tipo_producao,
                 )
+                campos_atualizar.append("numero_producao")
+            self.producao_obj.autor_trabalho = autor_trabalho
             self.producao_obj.homologado_por = servidor
             self.producao_obj.data_homologacao = timezone.localdate()
+            campos_atualizar.extend(["autor_trabalho", "homologado_por", "data_homologacao"])
 
-        campos_atualizar = ["status"]
-        if status_novo == Producao.STATUS_HOMOLOGADO:
-            campos_atualizar.extend(["numero_producao", "homologado_por", "data_homologacao"])
-
+        self.producao_obj.status = status_novo
         self.producao_obj.save(update_fields=campos_atualizar)
+
+        _criar_producao_status_log(
+            self.producao_obj,
+            status_anterior,
+            status_novo,
+            servidor,
+            servidor_destino=servidor_destino_log,
+            justificativa=justificativa,
+        )
 
         LogAuditoria.objects.create(
             servidor=servidor,

@@ -25,6 +25,7 @@ from core.models import (
     TarefaInterna,
     TipoDemanda,
     TipoProducao,
+    TipoProducaoUnidade,
     UnidadeExterna,
     UnidadeInterna,
 )
@@ -480,6 +481,8 @@ class ProducaoAdmin(admin.ModelAdmin):
         "os",
         "tipo_producao",
         "status",
+        "servidor_responsavel",
+        "autor_trabalho",
         "ano",
         "criado_por",
         "homologado_por",
@@ -487,7 +490,14 @@ class ProducaoAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "tipo_producao", "ano")
     search_fields = ("numero_producao", "numero_sei", "os__numero_os")
-    autocomplete_fields = ("os", "tipo_producao", "criado_por", "homologado_por")
+    autocomplete_fields = (
+        "os",
+        "tipo_producao",
+        "criado_por",
+        "homologado_por",
+        "servidor_responsavel",
+        "autor_trabalho",
+    )
     inlines = (ProducaoImovelInline,)
     ordering = ("-ano", "numero_producao")
     date_hierarchy = "data_homologacao"
@@ -511,6 +521,16 @@ class TipoProducaoAdmin(admin.ModelAdmin):
     list_filter = ("ativo",)
     search_fields = ("prefixo", "descricao")
     ordering = ("prefixo",)
+
+
+@admin.register(TipoProducaoUnidade)
+class TipoProducaoUnidadeAdmin(admin.ModelAdmin):
+    """Competências por unidade interna para tipos de produção."""
+
+    list_display = ("tipo_producao", "unidade_interna")
+    list_filter = ("unidade_interna",)
+    autocomplete_fields = ("tipo_producao", "unidade_interna")
+    ordering = ("tipo_producao__prefixo", "unidade_interna__sigla")
 
 
 # ---------------------------------------------------------------------------

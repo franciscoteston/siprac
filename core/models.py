@@ -334,6 +334,35 @@ class TipoProducao(models.Model):
         return f"{self.prefixo} — {self.descricao}"
 
 
+class TipoProducaoUnidade(models.Model):
+    """Competência de uma unidade interna para elaborar determinado tipo de produção."""
+
+    tipo_producao = models.ForeignKey(
+        TipoProducao,
+        on_delete=models.PROTECT,
+        related_name="unidades_competentes",
+    )
+    unidade_interna = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        related_name="tipos_producao",
+    )
+
+    class Meta:
+        db_table = "tipo_producao_unidade"
+        verbose_name = "Competência por unidade"
+        verbose_name_plural = "Competências por unidade"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tipo_producao", "unidade_interna"],
+                name="tipo_producao_unidade_unico",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tipo_producao.prefixo} — {self.unidade_interna.sigla}"
+
+
 class ProcessoSei(models.Model):
     """Processo registrado no SEI, referenciado por uma ou mais OS."""
 
@@ -711,6 +740,22 @@ class Producao(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_ENTRADA,
     )
+    servidor_responsavel = models.ForeignKey(
+        Servidor,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="producoes_responsavel",
+        verbose_name="Servidor responsável",
+    )
+    autor_trabalho = models.ForeignKey(
+        Servidor,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="producoes_autor",
+        verbose_name="Autor do trabalho",
+    )
     criado_por = models.ForeignKey(
         Servidor,
         on_delete=models.PROTECT,
@@ -738,6 +783,49 @@ class Producao(models.Model):
         if self.numero_sei:
             return self.numero_sei
         return f"Produção #{self.pk}"
+
+
+class ProducaoStatusLog(models.Model):
+    """Histórico de transições de status e atribuições da produção."""
+
+    producao = models.ForeignKey(
+        Producao,
+        on_delete=models.PROTECT,
+        related_name="status_logs",
+    )
+    status_anterior = models.CharField(max_length=20, null=True, blank=True)
+    status_novo = models.CharField(max_length=20)
+    servidor_origem = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="status_logs_origem",
+        null=True,
+        blank=True,
+    )
+    servidor_destino = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="status_logs_destino",
+        null=True,
+        blank=True,
+    )
+    unidade_destino = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    data_hora = models.DateTimeField(auto_now_add=True)
+    justificativa = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "producao_status_log"
+        verbose_name = "Log de status da produção"
+        verbose_name_plural = "Logs de status da produção"
+        ordering = ["data_hora"]
+
+    def __str__(self):
+        return f"{self.producao} — {self.status_anterior} → {self.status_novo}"
 
 
 CAMPOS_SNAP_IMOVEL = (

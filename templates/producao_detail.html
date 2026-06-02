@@ -59,6 +59,18 @@
       <dd class="col-sm-9"><a href="{% url 'os_detalhe' os.pk %}">{{ os.numero_os }}</a></dd>
       <dt class="col-sm-3">Criado por</dt>
       <dd class="col-sm-9">{{ producao.criado_por.nome }}</dd>
+      <dt class="col-sm-3">Servidor responsável</dt>
+      <dd class="col-sm-9">
+        {% if producao.servidor_responsavel %}
+          {{ producao.servidor_responsavel.nome }}
+        {% else %}—{% endif %}
+      </dd>
+      <dt class="col-sm-3">Autor do trabalho</dt>
+      <dd class="col-sm-9">
+        {% if producao.status == 'HOMOLOGADO' and producao.autor_trabalho %}
+          {{ producao.autor_trabalho.nome }}
+        {% else %}—{% endif %}
+      </dd>
       <dt class="col-sm-3">Homologado por</dt>
       <dd class="col-sm-9">
         {% if producao.status == 'HOMOLOGADO' and producao.homologado_por %}
@@ -71,6 +83,46 @@
       <dd class="col-sm-9">{{ producao.observacao }}</dd>
       {% endif %}
     </dl>
+  </div>
+</div>
+
+<div class="card siprac-card mb-4">
+  <div class="card-header bg-white fw-semibold">Histórico de status</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Data/hora</th>
+            <th>De</th>
+            <th>Para</th>
+            <th>Encaminhado por</th>
+            <th>Atribuído a</th>
+            <th>Justificativa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in status_logs %}
+          <tr>
+            <td>{{ log.data_hora|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if log.status_anterior %}
+                {{ log.status_anterior|status_producao_display }}
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ log.status_novo|status_producao_display }}</td>
+            <td>{% if log.servidor_origem %}{{ log.servidor_origem.nome }}{% else %}—{% endif %}</td>
+            <td>{% if log.servidor_destino %}{{ log.servidor_destino.nome }}{% else %}—{% endif %}</td>
+            <td>{% if log.justificativa %}{{ log.justificativa }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-muted text-center py-3">Nenhum registro de status.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
