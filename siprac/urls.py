@@ -18,6 +18,7 @@ from core.views import (
     OSDetailView,
     OSListView,
     OSVincularImovelView,
+    ProducaoAlterarStatusView,
     ProducaoCreateView,
     ProducaoDetailView,
     ProducaoVincularImovelView,
@@ -40,6 +41,11 @@ urlpatterns = [
     path('os/<int:pk>/encaminhar/', EncaminhamentoCreateView.as_view(), name='os_encaminhar'),
     path('os/<int:pk>/producao/', ProducaoCreateView.as_view(), name='os_producao'),
     path('producoes/<int:pk>/', ProducaoDetailView.as_view(), name='producao_detail'),
+    path(
+        'producoes/<int:pk>/status/',
+        ProducaoAlterarStatusView.as_view(),
+        name='producao_alterar_status',
+    ),
     path(
         'producoes/<int:pk>/imoveis/',
         ProducaoVincularImovelView.as_view(),

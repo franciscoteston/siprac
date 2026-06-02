@@ -178,11 +178,19 @@
               <tr>
                 <td>
                   <a href="{% url 'producao_detail' producao.pk %}">
-                    {% if producao.numero_producao %}{{ producao.numero_producao }}{% elif producao.numero_sei %}{{ producao.numero_sei }}{% else %}—{% endif %}
+                    {% if producao.numero_producao %}
+                      {{ producao.numero_producao }}
+                    {% else %}
+                      {{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}
+                    {% endif %}
                   </a>
                 </td>
                 <td>{{ producao.tipo_producao.prefixo }}</td>
-                <td>{{ producao.status }}</td>
+                <td>
+                  <span class="badge bg-{{ producao.status|status_producao_cor }}">
+                    {{ producao.status|status_producao_display }}
+                  </span>
+                </td>
                 <td>{{ producao.data_criacao|date:"d/m/Y H:i" }}</td>
               </tr>
               {% empty %}

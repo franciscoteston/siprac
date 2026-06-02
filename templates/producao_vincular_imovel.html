@@ -4,6 +4,8 @@
 {% block title %}Gerenciar imóveis — {{ producao.numero_producao|default:"Despacho" }} — SIPRAC{% endblock %}
 
 {% block content %}
+<form class="d-none" id="csrf-form">{% csrf_token %}</form>
+
 <h1 class="h3 mb-1 text-dark">Gerenciar imóveis da produção</h1>
 <p class="text-muted mb-3">
   Produção:
@@ -133,7 +135,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const urlPost = '{% url "producao_vincular_imovel" producao.pk %}';
-  const csrfToken = '{{ csrf_token }}';
   const podeAgrupar = {{ pode_agrupar|yesno:"true,false" }};
   const producaoHomologada = {{ producao_homologada|yesno:"true,false" }};
   const justificativaEl = document.getElementById('justificativa');
@@ -141,6 +142,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const tbodyDisponiveis = document.getElementById('tbody-disponiveis');
   const tbodyProducao = document.getElementById('tbody-producao');
   const proximoGrupoLabel = document.getElementById('proximo-grupo-label');
+
+  function obterCsrfToken() {
+    const input = document.querySelector('#csrf-form [name=csrfmiddlewaretoken]');
+    if (input && input.value) {
+      return input.value;
+    }
+    const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
 
   const GRUPO_BADGE_CLASSES = [
     'text-bg-primary',
@@ -206,34 +216,65 @@ document.addEventListener('DOMContentLoaded', function () {
       return null;
     }
 
-    const response = await fetch(urlPost, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-CSRFToken': csrfToken,
-      },
-      body: JSON.stringify({
-        acoes: acoes,
-        justificativa: obterJustificativa(),
-      }),
-    });
+    const payload = {
+      acoes: acoes,
+      justificativa: obterJustificativa(),
+    };
+    console.log('[SIPRAC] Enviando ações:', payload);
 
-    const data = await response.json();
-    if (!response.ok || !data.sucesso) {
-      mostrarAlerta(data.erro || 'Erro ao processar a solicitação.', 'danger');
+    try {
+      const response = await fetch(urlPost, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-CSRFToken': obterCsrfToken(),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const textoResposta = await response.text();
+      console.log('[SIPRAC] Resposta HTTP', response.status, textoResposta);
+
+      let data;
+      try {
+        data = JSON.parse(textoResposta);
+      } catch (parseError) {
+        console.error('[SIPRAC] Resposta não é JSON válido:', parseError);
+        mostrarAlerta(
+          'Resposta inválida do servidor (HTTP ' + response.status + '). Verifique o console.',
+          'danger',
+        );
+        return null;
+      }
+
+      if (!response.ok || !data.sucesso) {
+        mostrarAlerta(data.erro || 'Erro ao processar a solicitação.', 'danger');
+        return null;
+      }
+
+      console.log('[SIPRAC] Sucesso:', data.resultados || data);
+      if (data.mensagem) {
+        mostrarAlerta(data.mensagem, 'success');
+      } else if (data.resultados && data.resultados.length) {
+        const novoGrupo = data.resultados.find(function (item) {
+          return item.tipo === 'novo_grupo';
+        });
+        if (novoGrupo && novoGrupo.grupo_ref) {
+          mostrarAlerta('Grupo ' + novoGrupo.grupo_ref + ' atribuído com sucesso.', 'success');
+        }
+      }
+      if (proximoGrupoLabel && data.proximo_grupo_ref) {
+        proximoGrupoLabel.textContent = data.proximo_grupo_ref;
+      }
+      renderTabelas(data.imoveis_disponiveis, data.imoveis_producao);
+      return data;
+    } catch (error) {
+      console.error('[SIPRAC] Erro no fetch:', error);
+      mostrarAlerta('Erro de comunicação com o servidor.', 'danger');
       return null;
     }
-
-    if (data.mensagem) {
-      mostrarAlerta(data.mensagem, 'success');
-    }
-    if (proximoGrupoLabel && data.proximo_grupo_ref) {
-      proximoGrupoLabel.textContent = data.proximo_grupo_ref;
-    }
-    renderTabelas(data.imoveis_disponiveis, data.imoveis_producao);
-    return data;
   }
 
   function renderTabelas(disponiveis, producao) {
@@ -311,6 +352,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const ids = selecionados.map(function (checkbox) {
         return parseInt(checkbox.value, 10);
       });
+      console.log('[SIPRAC] Agrupar selecionados, ids:', ids);
       await executarAcoes([{ tipo: 'novo_grupo', ids: ids }]);
     });
   }

@@ -1,4 +1,5 @@
 import json
+import logging
 from collections import defaultdict
 
 from django.contrib import messages
@@ -11,7 +12,9 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 
 from core.forms import (
@@ -54,6 +57,8 @@ from core.models import (
 
 
 MSG_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação."
+
+logger = logging.getLogger(__name__)
 
 
 def _contexto_dashboard_vazio():
@@ -613,26 +618,24 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
 
         if dados.get("is_despacho"):
             tipo_producao = _obter_tipo_producao_despacho()
-            numero_producao = None
             numero_sei = dados["numero_sei"]
         else:
             tipo_producao = dados["tipo_producao_obj"]
-            numero_producao = _gerar_numero_producao(tipo_producao)
             numero_sei = dados.get("numero_sei") or None
 
-        Producao.objects.create(
+        producao = Producao.objects.create(
             os=self.os_obj,
             tipo_producao=tipo_producao,
-            numero_producao=numero_producao,
+            numero_producao=None,
             numero_sei=numero_sei,
             ano=ano,
-            status="EM_ELABORACAO",
+            status=Producao.STATUS_ENTRADA,
             criado_por=servidor,
             observacao=dados.get("observacao") or None,
         )
 
         messages.success(self.request, "Produção registrada.")
-        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        return redirect(reverse("producao_detail", kwargs={"pk": producao.pk}))
 
 
 class OSEncerramentoView(RequerLoginMixin, FormView):
@@ -1040,7 +1043,7 @@ def _contexto_imoveis_producao(producao):
 
 
 def _validar_justificativa_homologada(producao, justificativa):
-    if producao.status == "HOMOLOGADO" and not (justificativa or "").strip():
+    if producao.status == Producao.STATUS_HOMOLOGADO and not (justificativa or "").strip():
         return "Justificativa obrigatória para alterações em produção homologada."
     return None
 
@@ -1103,6 +1106,169 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
         return context
 
 
+TRANSICOES_PERMITIDAS_PRODUCAO = {
+    Producao.STATUS_ENTRADA: [
+        (Producao.STATUS_DISTRIBUIDO, True),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_DISTRIBUIDO: [
+        (Producao.STATUS_EM_ELABORACAO, False),
+        (Producao.STATUS_ENTRADA, True),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_EM_ELABORACAO: [
+        (Producao.STATUS_PARA_REVISAO, False),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_PARA_REVISAO: [
+        (Producao.STATUS_PARA_AJUSTES, True),
+        (Producao.STATUS_HOMOLOGADO, True),
+        (Producao.STATUS_EM_ELABORACAO, True),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_PARA_AJUSTES: [
+        (Producao.STATUS_PARA_REVISAO, False),
+        (Producao.STATUS_HOMOLOGADO, True),
+        (Producao.STATUS_EM_ELABORACAO, True),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+}
+
+STATUS_PRODUCAO_BOTAO_CLASSES = {
+    Producao.STATUS_ENTRADA: "btn-secondary",
+    Producao.STATUS_DISTRIBUIDO: "btn-primary",
+    Producao.STATUS_EM_ELABORACAO: "btn-primary",
+    Producao.STATUS_PARA_REVISAO: "btn-warning",
+    Producao.STATUS_PARA_AJUSTES: "btn-warning btn-ajustes",
+    Producao.STATUS_HOMOLOGADO: "btn-success",
+    Producao.STATUS_CANCELADO: "btn-danger",
+}
+
+
+def _justificativa_obrigatoria_status(status_atual, status_novo):
+    if status_novo == Producao.STATUS_CANCELADO:
+        return True
+    if status_novo == Producao.STATUS_EM_ELABORACAO and status_atual in (
+        Producao.STATUS_PARA_REVISAO,
+        Producao.STATUS_PARA_AJUSTES,
+    ):
+        return True
+    return False
+
+
+def _transicoes_status_disponiveis(producao, request):
+    perfil = getattr(request, "perfil_acesso", None)
+    pode_homologar = perfil is not None and perfil.pode_homologar
+    status_atual = producao.status
+    transicoes = []
+
+    for destino, requer_homologar in TRANSICOES_PERMITIDAS_PRODUCAO.get(status_atual, []):
+        if requer_homologar and not pode_homologar:
+            continue
+        transicoes.append(
+            {
+                "destino": destino,
+                "label": dict(Producao.STATUS_CHOICES).get(destino, destino),
+                "requer_homologar": requer_homologar,
+                "justificativa_obrigatoria": _justificativa_obrigatoria_status(
+                    status_atual,
+                    destino,
+                ),
+                "botao_classe": STATUS_PRODUCAO_BOTAO_CLASSES.get(destino, "btn-secondary"),
+            },
+        )
+    return transicoes
+
+
+def _transicao_status_permitida(producao, request, status_novo):
+    for transicao in _transicoes_status_disponiveis(producao, request):
+        if transicao["destino"] == status_novo:
+            return transicao
+    return None
+
+
+class ProducaoAlterarStatusView(RequerLoginMixin, View):
+    template_name = "producao_alterar_status.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.producao_obj = get_object_or_404(
+            Producao.objects.select_related("os", "tipo_producao"),
+            pk=kwargs["pk"],
+        )
+        if _obter_servidor(request.user) is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        transicoes = _transicoes_status_disponiveis(self.producao_obj, request)
+        return render(
+            request,
+            self.template_name,
+            {
+                "producao": self.producao_obj,
+                "os": self.producao_obj.os,
+                "transicoes": transicoes,
+            },
+        )
+
+    def post(self, request, *args, **kwargs):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+
+        status_novo = (request.POST.get("novo_status") or "").strip()
+        justificativa = (request.POST.get("justificativa") or "").strip()
+        transicao = _transicao_status_permitida(self.producao_obj, request, status_novo)
+
+        if transicao is None:
+            messages.error(request, "Transição de status não permitida.")
+            return redirect(
+                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+            )
+
+        if transicao["justificativa_obrigatoria"] and not justificativa:
+            messages.error(request, "Justificativa obrigatória para esta transição.")
+            return redirect(
+                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+            )
+
+        status_anterior = self.producao_obj.status
+        self.producao_obj.status = status_novo
+
+        if status_novo == Producao.STATUS_HOMOLOGADO:
+            if not self.producao_obj.numero_producao:
+                self.producao_obj.numero_producao = _gerar_numero_producao(
+                    self.producao_obj.tipo_producao,
+                )
+            self.producao_obj.homologado_por = servidor
+            self.producao_obj.data_homologacao = timezone.localdate()
+
+        campos_atualizar = ["status"]
+        if status_novo == Producao.STATUS_HOMOLOGADO:
+            campos_atualizar.extend(["numero_producao", "homologado_por", "data_homologacao"])
+
+        self.producao_obj.save(update_fields=campos_atualizar)
+
+        LogAuditoria.objects.create(
+            servidor=servidor,
+            entidade="Producao",
+            entidade_id=self.producao_obj.pk,
+            operacao="ALTERACAO_STATUS",
+            campo_alterado="status",
+            valor_anterior=status_anterior,
+            valor_novo=status_novo,
+            justificativa=justificativa or None,
+        )
+
+        messages.success(
+            request,
+            f"Status alterado para {dict(Producao.STATUS_CHOICES).get(status_novo, status_novo)}.",
+        )
+        return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+
+
 class ProducaoVincularImovelView(RequerLoginMixin, View):
     template_name = "producao_vincular_imovel.html"
 
@@ -1112,7 +1278,7 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
             pk=kwargs["pk"],
         )
         if _obter_servidor(request.user) is None:
-            if request.headers.get("Content-Type", "").startswith("application/json"):
+            if request.content_type and "application/json" in request.content_type:
                 return JsonResponse(
                     {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
                     status=403,
@@ -1120,6 +1286,23 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
+
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request, *args, **kwargs):
+        imoveis_disponiveis, imoveis_producao = _contexto_imoveis_producao(self.producao_obj)
+        return render(
+            request,
+            self.template_name,
+            {
+                "producao": self.producao_obj,
+                "os": self.producao_obj.os,
+                "imoveis_disponiveis": imoveis_disponiveis,
+                "imoveis_producao": imoveis_producao,
+                "pode_agrupar": _pode_agrupar_producao(request),
+                "producao_homologada": self.producao_obj.status == Producao.STATUS_HOMOLOGADO,
+                "proximo_grupo_ref": _proximo_grupo_ref(self.producao_obj),
+            },
+        )
 
     def _resposta_json(self, request, *, sucesso=True, status=200, **dados):
         imoveis_disponiveis, imoveis_producao = _contexto_imoveis_producao(self.producao_obj)
@@ -1133,31 +1316,20 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
         payload.update(dados)
         return JsonResponse(payload, status=status)
 
-    def get(self, request, *args, **kwargs):
-        imoveis_disponiveis, imoveis_producao = _contexto_imoveis_producao(self.producao_obj)
-        return render(
-            request,
-            self.template_name,
-            {
-                "producao": self.producao_obj,
-                "os": self.producao_obj.os,
-                "imoveis_disponiveis": imoveis_disponiveis,
-                "imoveis_producao": imoveis_producao,
-                "pode_agrupar": _pode_agrupar_producao(request),
-                "producao_homologada": self.producao_obj.status == "HOMOLOGADO",
-                "proximo_grupo_ref": _proximo_grupo_ref(self.producao_obj),
-            },
-        )
-
     def _obter_producao_imovel(self, producao_imovel_id):
-        return get_object_or_404(
-            ProducaoImovel,
+        if producao_imovel_id in (None, ""):
+            return None
+        try:
+            producao_imovel_id = int(producao_imovel_id)
+        except (TypeError, ValueError):
+            return None
+        return ProducaoImovel.objects.filter(
             pk=producao_imovel_id,
             producao=self.producao_obj,
-        )
+        ).first()
 
     def _auditar_se_homologada(self, servidor, producao_imovel, justificativa, **kwargs):
-        if self.producao_obj.status == "HOMOLOGADO":
+        if self.producao_obj.status == Producao.STATUS_HOMOLOGADO:
             _registrar_auditoria_producao_imovel(
                 servidor,
                 producao_imovel,
@@ -1216,6 +1388,8 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
 
         if tipo == "agrupar":
             producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
+            if producao_imovel is None:
+                return {"sucesso": False, "erro": "Imóvel da produção não encontrado."}
             grupo_ref = (acao.get("grupo_ref") or "").strip()
             if not grupo_ref:
                 return {"sucesso": False, "erro": "grupo_ref é obrigatório."}
@@ -1239,16 +1413,34 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
 
         if tipo == "novo_grupo":
             ids = acao.get("ids") or []
-            if not ids:
-                return {"sucesso": False, "erro": "Informe ao menos um imóvel para agrupar."}
+            if len(ids) < 2:
+                return {
+                    "sucesso": False,
+                    "erro": "Selecione ao menos dois imóveis para agrupar.",
+                }
+
+            ids_int = []
+            for raw_id in ids:
+                try:
+                    ids_int.append(int(raw_id))
+                except (TypeError, ValueError):
+                    return {"sucesso": False, "erro": f"ID inválido: {raw_id}"}
+
+            registros = list(
+                ProducaoImovel.objects.filter(
+                    producao=self.producao_obj,
+                    pk__in=ids_int,
+                ),
+            )
+            if len(registros) != len(set(ids_int)):
+                return {
+                    "sucesso": False,
+                    "erro": "Um ou mais imóveis não pertencem a esta produção.",
+                }
 
             grupo_ref = _proximo_grupo_ref(self.producao_obj)
-            itens = []
-            for producao_imovel_id in ids:
-                producao_imovel = self._obter_producao_imovel(producao_imovel_id)
+            for producao_imovel in registros:
                 valor_anterior = producao_imovel.grupo_ref
-                producao_imovel.grupo_ref = grupo_ref
-                producao_imovel.save(update_fields=["grupo_ref"])
                 self._auditar_se_homologada(
                     servidor,
                     producao_imovel,
@@ -1257,11 +1449,37 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
                     valor_anterior=valor_anterior,
                     valor_novo=grupo_ref,
                 )
-                itens.append(_serializar_producao_imovel(producao_imovel))
-            return {"sucesso": True, "tipo": tipo, "grupo_ref": grupo_ref, "itens": itens}
+
+            atualizados = ProducaoImovel.objects.filter(
+                producao=self.producao_obj,
+                pk__in=ids_int,
+            ).update(grupo_ref=grupo_ref)
+            logger.info(
+                "novo_grupo producao=%s grupo_ref=%s ids=%s atualizados=%s",
+                self.producao_obj.pk,
+                grupo_ref,
+                ids_int,
+                atualizados,
+            )
+            itens = [
+                _serializar_producao_imovel(item)
+                for item in ProducaoImovel.objects.filter(
+                    producao=self.producao_obj,
+                    pk__in=ids_int,
+                ).order_by("pk")
+            ]
+            return {
+                "sucesso": True,
+                "tipo": tipo,
+                "grupo_ref": grupo_ref,
+                "ids_atualizados": ids_int,
+                "itens": itens,
+            }
 
         if tipo == "remover_grupo":
             producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
+            if producao_imovel is None:
+                return {"sucesso": False, "erro": "Imóvel da produção não encontrado."}
             valor_anterior = producao_imovel.grupo_ref
             producao_imovel.grupo_ref = None
             producao_imovel.save(update_fields=["grupo_ref"])
@@ -1281,6 +1499,8 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
 
         if tipo == "desvincular":
             producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
+            if producao_imovel is None:
+                return {"sucesso": False, "erro": "Imóvel da produção não encontrado."}
             item_id = producao_imovel.pk
             imovel_id = producao_imovel.imovel_id
             self._auditar_se_homologada(
@@ -1313,6 +1533,12 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
         acoes = payload.get("acoes") or []
         if not acoes:
             return JsonResponse({"sucesso": False, "erro": "Nenhuma ação informada."}, status=400)
+
+        logger.info(
+            "ProducaoVincularImovelView POST producao=%s acoes=%s",
+            self.producao_obj.pk,
+            acoes,
+        )
 
         justificativa = (payload.get("justificativa") or "").strip()
         erro_justificativa = _validar_justificativa_homologada(

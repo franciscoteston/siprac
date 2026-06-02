@@ -16,8 +16,8 @@
         <div class="col-md-6">{{ form.tipo_producao|as_crispy_field }}</div>
         <div class="col-md-6">
           <div id="preview-numero" class="alert alert-light border mb-0 d-none" role="status">
-            <span class="text-muted">Será gerado:</span>
-            <strong id="preview-numero-valor"></strong>
+            <span class="text-muted">Numeração:</span>
+            <strong id="preview-numero-valor">Será gerada na homologação</strong>
           </div>
         </div>
         <div class="col-md-6">{{ form.numero_sei|as_crispy_field }}</div>
@@ -43,7 +43,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const tipoSelect = document.getElementById('id_tipo_producao');
   const previewBox = document.getElementById('preview-numero');
   const previewValor = document.getElementById('preview-numero-valor');
-  const urlProximoNumero = '{% url "api_proximo_numero" %}';
   const despachoValue = 'DESPACHO';
 
   function atualizarPreview() {
@@ -54,25 +53,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (tipoId === despachoValue) {
       previewValor.textContent = 'Despacho (sem numeração própria — use o número SEI)';
-      previewBox.classList.remove('d-none');
-      return;
+    } else {
+      previewValor.textContent = 'Será gerada na homologação';
     }
-    fetch(urlProximoNumero + '?tipo_id=' + encodeURIComponent(tipoId), {
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-    })
-      .then(function (response) { return response.json(); })
-      .then(function (data) {
-        if (data.numero) {
-          previewValor.textContent = data.numero;
-          previewBox.classList.remove('d-none');
-        } else {
-          previewBox.classList.add('d-none');
-        }
-      })
-      .catch(function () {
-        previewBox.classList.add('d-none');
-      });
+    previewBox.classList.remove('d-none');
   }
 
   tipoSelect.addEventListener('change', atualizarPreview);

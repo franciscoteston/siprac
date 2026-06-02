@@ -675,6 +675,24 @@ class OsImovel(models.Model):
 class Producao(models.Model):
     """Produto gerado pela OS (laudo, parecer, despacho, etc.)."""
 
+    STATUS_ENTRADA = "ENTRADA"
+    STATUS_DISTRIBUIDO = "DISTRIBUIDO"
+    STATUS_EM_ELABORACAO = "EM_ELABORACAO"
+    STATUS_PARA_REVISAO = "PARA_REVISAO"
+    STATUS_PARA_AJUSTES = "PARA_AJUSTES"
+    STATUS_HOMOLOGADO = "HOMOLOGADO"
+    STATUS_CANCELADO = "CANCELADO"
+
+    STATUS_CHOICES = [
+        (STATUS_ENTRADA, "Entrada"),
+        (STATUS_DISTRIBUIDO, "Distribuído"),
+        (STATUS_EM_ELABORACAO, "Em elaboração"),
+        (STATUS_PARA_REVISAO, "Para revisão"),
+        (STATUS_PARA_AJUSTES, "Para ajustes"),
+        (STATUS_HOMOLOGADO, "Homologado"),
+        (STATUS_CANCELADO, "Cancelado"),
+    ]
+
     os = models.ForeignKey(
         OS,
         on_delete=models.PROTECT,
@@ -688,7 +706,11 @@ class Producao(models.Model):
     numero_producao = models.CharField(max_length=255, null=True, blank=True)
     numero_sei = models.CharField(max_length=255, null=True, blank=True)
     ano = models.IntegerField()
-    status = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_ENTRADA,
+    )
     criado_por = models.ForeignKey(
         Servidor,
         on_delete=models.PROTECT,

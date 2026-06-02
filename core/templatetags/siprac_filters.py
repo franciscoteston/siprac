@@ -44,10 +44,23 @@ def macroetapa_display(value):
 
 
 STATUS_PRODUCAO_LABELS = {
+    "ENTRADA": "Entrada",
+    "DISTRIBUIDO": "Distribuído",
     "EM_ELABORACAO": "Em elaboração",
-    "CONCLUIDO": "Concluído",
+    "PARA_REVISAO": "Para revisão",
+    "PARA_AJUSTES": "Para ajustes",
     "HOMOLOGADO": "Homologado",
     "CANCELADO": "Cancelado",
+}
+
+STATUS_PRODUCAO_CORES = {
+    "ENTRADA": "secondary",
+    "DISTRIBUIDO": "info",
+    "EM_ELABORACAO": "primary",
+    "PARA_REVISAO": "warning",
+    "PARA_AJUSTES": "warning",
+    "HOMOLOGADO": "success",
+    "CANCELADO": "danger",
 }
 
 GRUPO_BADGE_CLASSES = (
@@ -72,6 +85,13 @@ def status_producao_display(value):
     if not value:
         return "—"
     return STATUS_PRODUCAO_LABELS.get(value, value)
+
+
+@register.filter
+def status_producao_cor(value):
+    if not value:
+        return "secondary"
+    return STATUS_PRODUCAO_CORES.get(value, "secondary")
 
 
 @register.filter

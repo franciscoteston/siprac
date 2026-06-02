@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load siprac_filters %}
 
-{% block title %}{% if producao.numero_producao %}{{ producao.numero_producao }}{% elif producao.numero_sei %}{{ producao.numero_sei }}{% else %}Despacho{% endif %} — SIPRAC{% endblock %}
+{% block title %}{% if producao.numero_producao %}{{ producao.numero_producao }}{% else %}{{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}{% endif %} — SIPRAC{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
@@ -9,15 +9,21 @@
     <h1 class="h3 mb-2 text-dark">
       {% if producao.numero_producao %}
         {{ producao.numero_producao }}
-      {% elif producao.numero_sei %}
-        {{ producao.numero_sei }}
       {% else %}
-        Despacho
+        {{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}
       {% endif %}
     </h1>
     <div class="d-flex flex-wrap gap-2 align-items-center">
-      <span class="badge bg-secondary">{{ producao.status|status_producao_display }}</span>
+      <span class="badge bg-{{ producao.status|status_producao_cor }}">
+        {{ producao.status|status_producao_display }}
+      </span>
       <span class="text-muted small">{{ producao.data_criacao|date:"d/m/Y H:i" }}</span>
+      {% if producao.status == 'HOMOLOGADO' and producao.data_homologacao %}
+      <span class="text-muted small">
+        · Homologado em {{ producao.data_homologacao|date:"d/m/Y" }}
+        {% if producao.homologado_por %} por {{ producao.homologado_por.nome }}{% endif %}
+      </span>
+      {% endif %}
     </div>
   </div>
   <div class="d-flex flex-wrap gap-2">
@@ -25,9 +31,9 @@
     <a href="{% url 'producao_vincular_imovel' producao.pk %}" class="btn btn-outline-primary btn-sm">
       Gerenciar imóveis
     </a>
-    <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Em breve">
+    <a href="{% url 'producao_alterar_status' producao.pk %}" class="btn btn-outline-secondary btn-sm">
       Alterar status
-    </button>
+    </a>
     {% endif %}
     <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary btn-sm">Voltar à OS</a>
   </div>
@@ -39,6 +45,14 @@
     <dl class="row mb-0 small">
       <dt class="col-sm-3">Tipo</dt>
       <dd class="col-sm-9">{{ producao.tipo_producao.prefixo }} — {{ producao.tipo_producao.descricao }}</dd>
+      <dt class="col-sm-3">Identificação</dt>
+      <dd class="col-sm-9">
+        {% if producao.numero_producao %}
+          {{ producao.numero_producao }}
+        {% else %}
+          {{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}
+        {% endif %}
+      </dd>
       <dt class="col-sm-3">Número SEI</dt>
       <dd class="col-sm-9">{% if producao.numero_sei %}{{ producao.numero_sei }}{% else %}—{% endif %}</dd>
       <dt class="col-sm-3">OS vinculada</dt>
@@ -47,7 +61,7 @@
       <dd class="col-sm-9">{{ producao.criado_por.nome }}</dd>
       <dt class="col-sm-3">Homologado por</dt>
       <dd class="col-sm-9">
-        {% if producao.homologado_por %}
+        {% if producao.status == 'HOMOLOGADO' and producao.homologado_por %}
           {{ producao.homologado_por.nome }}
           {% if producao.data_homologacao %} · {{ producao.data_homologacao|date:"d/m/Y" }}{% endif %}
         {% else %}—{% endif %}
