@@ -257,6 +257,7 @@ class ImovelAdmin(admin.ModelAdmin):
         "tipo_identificacao",
         "inscricao_cadastral",
         "codigo_isic",
+        "nom_logradouro",
         "bairro",
         "exercicio_referencia",
         "editado_manualmente",
@@ -265,7 +266,7 @@ class ImovelAdmin(admin.ModelAdmin):
     search_fields = (
         "inscricao_cadastral",
         "codigo_isic",
-        "endereco",
+        "nom_logradouro",
         "bairro",
     )
     ordering = ("inscricao_cadastral", "codigo_isic")

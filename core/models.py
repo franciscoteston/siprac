@@ -237,29 +237,85 @@ class CombinacaoValida(models.Model):
 class Imovel(models.Model):
     """Dados de referência do imóvel (inscrição SIAT ou código ISIC)."""
 
-    tipo_identificacao = models.CharField(max_length=255)
-    inscricao_cadastral = models.CharField(max_length=255, null=True, blank=True)
-    codigo_isic = models.CharField(max_length=255, null=True, blank=True)
-    endereco = models.CharField(max_length=255, null=True, blank=True)
-    bairro = models.CharField(max_length=255, null=True, blank=True)
-    area_referencia = models.FloatField(null=True, blank=True)
+    TIPO_IDENTIFICACAO = [
+        ("CADASTRAL", "Cadastral"),
+        ("ISIC", "ISIC"),
+    ]
+    ORIGEM_DADOS = [
+        ("SIAT", "SIAT"),
+        ("MANUAL", "Manual"),
+        ("SIAT_EDITADO", "SIAT Editado"),
+    ]
+
+    tipo_identificacao = models.CharField(max_length=10, choices=TIPO_IDENTIFICACAO)
+    inscricao_cadastral = models.IntegerField(null=True, blank=True, unique=True)
+    codigo_isic = models.CharField(max_length=20, null=True, blank=True, unique=True)
+    num_bloco = models.CharField(max_length=12, null=True, blank=True)
+    cod_logradouro = models.IntegerField(null=True, blank=True)
+    nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
+    num_endereco = models.CharField(max_length=20, null=True, blank=True)
+    num_unidade = models.CharField(max_length=20, null=True, blank=True)
+    bairro = models.CharField(max_length=100, null=True, blank=True)
+    des_finalidade = models.CharField(max_length=255, null=True, blank=True)
+    area_territorial = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    area_construida = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     exercicio_referencia = models.IntegerField(null=True, blank=True)
-    origem_dados = models.CharField(max_length=255, null=True, blank=True)
+    num_versao = models.IntegerField(default=0)
+    rh_nome = models.CharField(max_length=20, null=True, blank=True)
+    rh_valor = models.IntegerField(null=True, blank=True)
+    idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
+    latitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    longitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    coord_x = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    coord_y = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    origem_dados = models.CharField(
+        max_length=20,
+        choices=ORIGEM_DADOS,
+        default="MANUAL",
+    )
     editado_manualmente = models.BooleanField(default=False)
     data_ultima_importacao = models.DateField(null=True, blank=True)
     observacao_interna = models.TextField(null=True, blank=True)
 
     class Meta:
-        db_table = "IMOVEL"
-        verbose_name = "imóvel"
-        verbose_name_plural = "imóveis"
+        db_table = "imovel"
+        verbose_name = "Imóvel"
+        verbose_name_plural = "Imóveis"
 
     def __str__(self):
         if self.inscricao_cadastral:
-            return self.inscricao_cadastral
-        if self.codigo_isic:
-            return self.codigo_isic
-        return f"Imóvel #{self.pk}"
+            return f"{self.inscricao_cadastral} — {self.nom_logradouro or ''}"
+        return self.codigo_isic or "Imóvel sem identificação"
 
 
 class TipoProducao(models.Model):

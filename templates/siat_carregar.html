@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Carregar View SIAT — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Carregar View SIAT</h1>
+
+<div class="card siprac-card mb-4">
+  <div class="card-body">
+    <p class="text-muted mb-3">
+      Envie o arquivo <code>.txt</code> exportado da View SIAT (separador <code>|</code>).
+      O arquivo será salvo em <code>data/siat_view.txt</code> e processado imediatamente.
+    </p>
+    {% if arquivo_existe %}
+    <p class="small text-success mb-3">Arquivo SIAT presente no servidor.</p>
+    {% else %}
+    <p class="small text-warning mb-3">Nenhum arquivo SIAT carregado ainda.</p>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      {{ form.arquivo|as_crispy_field }}
+      <button type="submit" class="btn btn-primary siprac-btn-primary">Carregar e processar</button>
+    </form>
+  </div>
+</div>
+
+{% if relatorio %}
+<div class="card siprac-card">
+  <div class="card-header bg-white fw-semibold">Relatório da importação</div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-sm-3">
+        <div class="border rounded p-3 text-center">
+          <div class="text-muted small">Criados</div>
+          <div class="fs-4 fw-bold text-success">{{ relatorio.criados }}</div>
+        </div>
+      </div>
+      <div class="col-sm-3">
+        <div class="border rounded p-3 text-center">
+          <div class="text-muted small">Atualizados</div>
+          <div class="fs-4 fw-bold text-primary">{{ relatorio.atualizados }}</div>
+        </div>
+      </div>
+      <div class="col-sm-3">
+        <div class="border rounded p-3 text-center">
+          <div class="text-muted small">Ignorados</div>
+          <div class="fs-4 fw-bold text-warning">{{ relatorio.ignorados }}</div>
+        </div>
+      </div>
+      <div class="col-sm-3">
+        <div class="border rounded p-3 text-center">
+          <div class="text-muted small">Erros</div>
+          <div class="fs-4 fw-bold text-danger">{{ relatorio.erros }}</div>
+        </div>
+      </div>
+    </div>
+
+    {% if relatorio.detalhes_erros %}
+    <h2 class="h6">Detalhes dos erros</h2>
+    <ul class="small mb-0">
+      {% for erro in relatorio.detalhes_erros %}
+      <li>{{ erro }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

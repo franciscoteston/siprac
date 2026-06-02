@@ -1,9 +1,11 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from core.models import (
     CombinacaoValida,
     Finalidade,
+    Imovel,
     Natureza,
     Servidor,
     TipoDemanda,
@@ -244,3 +246,190 @@ class OSEncerramentoForm(forms.Form):
         label="Motivo do encerramento",
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+
+
+class ImovelForm(forms.Form):
+    tipo_identificacao = forms.ChoiceField(
+        label="Tipo de identificação",
+        choices=[
+            ("CADASTRAL", "Inscrição cadastral (SIAT)"),
+            ("ISIC", "Código ISIC (sem inscrição)"),
+        ],
+        widget=forms.RadioSelect,
+        initial="CADASTRAL",
+    )
+    inscricao_cadastral = forms.IntegerField(
+        label="Inscrição cadastral",
+        required=False,
+    )
+    num_bloco = forms.CharField(
+        label="Número do bloco",
+        max_length=12,
+        required=False,
+    )
+    cod_logradouro = forms.IntegerField(
+        label="Código do logradouro",
+        required=False,
+    )
+    nom_logradouro = forms.CharField(
+        label="Logradouro",
+        max_length=255,
+        required=False,
+    )
+    num_endereco = forms.CharField(
+        label="Número",
+        max_length=20,
+        required=False,
+    )
+    num_unidade = forms.CharField(
+        label="Unidade",
+        max_length=20,
+        required=False,
+    )
+    bairro = forms.CharField(
+        label="Bairro",
+        max_length=100,
+        required=False,
+    )
+    des_finalidade = forms.CharField(
+        label="Finalidade",
+        max_length=255,
+        required=False,
+    )
+    area_territorial = forms.DecimalField(
+        label="Área territorial (m²)",
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+    )
+    area_construida = forms.DecimalField(
+        label="Área construída (m²)",
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+    )
+    exercicio_referencia = forms.IntegerField(
+        label="Exercício de referência",
+        required=False,
+        initial=timezone.localdate().year,
+    )
+    num_versao = forms.IntegerField(
+        label="Versão",
+        required=False,
+        initial=0,
+    )
+    rh_nome = forms.CharField(
+        label="Nome da RH",
+        max_length=20,
+        required=False,
+    )
+    rh_valor = forms.IntegerField(
+        label="Valor da RH",
+        required=False,
+    )
+    idf_regiao_homogenea = forms.IntegerField(
+        label="ID região homogênea",
+        required=False,
+    )
+    latitude = forms.DecimalField(
+        label="Latitude",
+        max_digits=12,
+        decimal_places=8,
+        required=False,
+    )
+    longitude = forms.DecimalField(
+        label="Longitude",
+        max_digits=12,
+        decimal_places=8,
+        required=False,
+    )
+    coord_x = forms.DecimalField(
+        label="Coordenada X",
+        max_digits=15,
+        decimal_places=6,
+        required=False,
+    )
+    coord_y = forms.DecimalField(
+        label="Coordenada Y",
+        max_digits=15,
+        decimal_places=6,
+        required=False,
+    )
+    origem_dados = forms.ChoiceField(
+        label="Origem dos dados",
+        choices=[
+            ("SIAT", "SIAT"),
+            ("MANUAL", "Manual"),
+            ("SIAT_EDITADO", "SIAT editado"),
+        ],
+        initial="MANUAL",
+    )
+    observacao_interna = forms.CharField(
+        label="Observação interna",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    CAMPOS_IMOVEL = (
+        "num_bloco",
+        "cod_logradouro",
+        "nom_logradouro",
+        "num_endereco",
+        "num_unidade",
+        "bairro",
+        "des_finalidade",
+        "area_territorial",
+        "area_construida",
+        "exercicio_referencia",
+        "num_versao",
+        "rh_nome",
+        "rh_valor",
+        "idf_regiao_homogenea",
+        "latitude",
+        "longitude",
+        "coord_x",
+        "coord_y",
+        "origem_dados",
+        "observacao_interna",
+    )
+
+    def __init__(self, *args, imovel=None, **kwargs):
+        self.imovel = imovel
+        super().__init__(*args, **kwargs)
+        if imovel and not self.data:
+            self.fields["tipo_identificacao"].initial = imovel.tipo_identificacao
+            self.fields["inscricao_cadastral"].initial = imovel.inscricao_cadastral
+            for campo in self.CAMPOS_IMOVEL:
+                valor = getattr(imovel, campo)
+                if campo == "origem_dados":
+                    valor = valor or "MANUAL"
+                self.fields[campo].initial = valor
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get("tipo_identificacao")
+        inscricao = cleaned_data.get("inscricao_cadastral")
+
+        if tipo == "CADASTRAL":
+            if inscricao is None:
+                self.add_error(
+                    "inscricao_cadastral",
+                    "Obrigatório para imóvel com inscrição cadastral.",
+                )
+            else:
+                qs = Imovel.objects.filter(inscricao_cadastral=inscricao)
+                if self.imovel:
+                    qs = qs.exclude(pk=self.imovel.pk)
+                if qs.exists():
+                    self.add_error(
+                        "inscricao_cadastral",
+                        "Inscrição cadastral já cadastrada.",
+                    )
+        elif tipo == "ISIC":
+            cleaned_data["inscricao_cadastral"] = None
+
+        return cleaned_data
+
+
+class SiatUploadForm(forms.Form):
+    arquivo = forms.FileField(label="Arquivo SIAT (.txt)")

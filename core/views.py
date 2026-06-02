@@ -13,15 +13,20 @@ from django.views.generic import DetailView, FormView, ListView, TemplateView
 from core.forms import (
     DESPACHO_VALUE,
     EncaminhamentoForm,
+    ImovelForm,
     OSEncerramentoForm,
     OSForm,
     ProducaoForm,
+    SiatUploadForm,
 )
 from core.middleware import obter_vinculo_unidade_ativo
-from core.mixins import RequerLoginJSONMixin, RequerLoginMixin
+from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
+from core.siat_config import SIAT_ARQUIVO_PATH
+from core.siat_service import atualizar_inscricao_do_arquivo, carregar_arquivo_siat
 from core.models import (
     Encaminhamento,
     Finalidade,
+    Imovel,
     MacroetapaLog,
     Natureza,
     OS,
@@ -29,6 +34,7 @@ from core.models import (
     OsProcesso,
     ProcessoSei,
     Producao,
+    ProducaoImovel,
     Servidor,
     TarefaInterna,
     TipoDemanda,
@@ -179,6 +185,50 @@ def _gerar_numero_producao(tipo_producao):
                 continue
 
     return f"{prefixo}_{maior_sequencia + 1:03d}_{ano}"
+
+
+def _gerar_codigo_isic():
+    maior_sequencia = 0
+
+    for codigo in Imovel.objects.exclude(codigo_isic__isnull=True).exclude(
+        codigo_isic="",
+    ).values_list("codigo_isic", flat=True):
+        partes = codigo.split("_")
+        if len(partes) == 2 and partes[0] == "ISIC":
+            try:
+                maior_sequencia = max(maior_sequencia, int(partes[1]))
+            except ValueError:
+                continue
+
+    return f"ISIC_{maior_sequencia + 1:04d}"
+
+
+def _salvar_imovel_from_form(dados, imovel=None):
+    if imovel is None:
+        imovel = Imovel()
+
+    imovel.tipo_identificacao = dados["tipo_identificacao"]
+    for campo in ImovelForm.CAMPOS_IMOVEL:
+        valor = dados.get(campo)
+        if campo == "observacao_interna":
+            valor = valor or None
+        elif campo == "origem_dados":
+            valor = valor or "MANUAL"
+        elif campo == "num_versao" and valor is None:
+            valor = 0
+        setattr(imovel, campo, valor)
+
+    if dados["tipo_identificacao"] == "ISIC":
+        if not imovel.codigo_isic:
+            imovel.codigo_isic = _gerar_codigo_isic()
+        imovel.inscricao_cadastral = None
+    else:
+        imovel.inscricao_cadastral = dados["inscricao_cadastral"]
+        imovel.codigo_isic = None
+
+    imovel.editado_manualmente = True
+    imovel.save()
+    return imovel
 
 
 def _queryset_os_anotado():
@@ -639,3 +689,160 @@ class FinalidadesAPIView(RequerLoginJSONMixin, View):
             .values("id", "descricao")
         )
         return JsonResponse(finalidades, safe=False)
+
+
+class ImovelListView(RequerLoginMixin, ListView):
+    model = Imovel
+    template_name = "imovel_list.html"
+    context_object_name = "imoveis"
+    paginate_by = 20
+
+    def get_queryset(self):
+        queryset = Imovel.objects.all()
+        busca = self.request.GET.get("q", "").strip()
+        if busca:
+            filtros = (
+                Q(codigo_isic__icontains=busca)
+                | Q(nom_logradouro__icontains=busca)
+                | Q(bairro__icontains=busca)
+                | Q(num_endereco__icontains=busca)
+            )
+            try:
+                filtros |= Q(inscricao_cadastral=int(busca))
+            except ValueError:
+                pass
+            queryset = queryset.filter(filtros)
+        return queryset.order_by("-id")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filtro_q"] = self.request.GET.get("q", "")
+        return context
+
+
+class ImovelCreateView(RequerLoginMixin, FormView):
+    template_name = "imovel_form.html"
+    form_class = ImovelForm
+
+    def form_valid(self, form):
+        imovel = _salvar_imovel_from_form(form.cleaned_data)
+        messages.success(self.request, "Imóvel cadastrado com sucesso.")
+        return redirect(reverse("imovel_detalhe", kwargs={"pk": imovel.pk}))
+
+
+class ImovelDetailView(RequerLoginMixin, DetailView):
+    model = Imovel
+    template_name = "imovel_detail.html"
+    context_object_name = "imovel"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        imovel = self.object
+        context["vinculos_os"] = (
+            OsImovel.objects.filter(imovel=imovel)
+            .select_related("os")
+            .order_by("-os__data_criacao_sgbd")
+        )
+        context["vinculos_producao"] = (
+            ProducaoImovel.objects.filter(imovel=imovel)
+            .select_related("producao", "producao__tipo_producao", "producao__os")
+            .order_by("-producao__data_criacao")
+        )
+        return context
+
+
+class ImovelUpdateView(RequerLoginMixin, FormView):
+    template_name = "imovel_form.html"
+    form_class = ImovelForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.imovel_obj = get_object_or_404(Imovel, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["imovel"] = self.imovel_obj
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["imovel"] = self.imovel_obj
+        context["editando"] = True
+        return context
+
+    def form_valid(self, form):
+        _salvar_imovel_from_form(form.cleaned_data, self.imovel_obj)
+        messages.success(self.request, "Imóvel atualizado com sucesso.")
+        return redirect(reverse("imovel_detalhe", kwargs={"pk": self.imovel_obj.pk}))
+
+
+class ProximoIsicAPIView(RequerLoginJSONMixin, View):
+    def get(self, request):
+        return JsonResponse({"codigo": _gerar_codigo_isic()})
+
+
+class SiatCarregarArquivoView(RequerAdminMixin, FormView):
+    template_name = "siat_carregar.html"
+    form_class = SiatUploadForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["arquivo_existe"] = SIAT_ARQUIVO_PATH.exists()
+        context["relatorio"] = self.request.session.pop("siat_relatorio", None)
+        return context
+
+    def form_valid(self, form):
+        SIAT_ARQUIVO_PATH.parent.mkdir(parents=True, exist_ok=True)
+        uploaded = form.cleaned_data["arquivo"]
+        with open(SIAT_ARQUIVO_PATH, "wb") as destino:
+            for chunk in uploaded.chunks():
+                destino.write(chunk)
+
+        relatorio = carregar_arquivo_siat(SIAT_ARQUIVO_PATH)
+        self.request.session["siat_relatorio"] = relatorio
+        messages.success(
+            self.request,
+            "Arquivo SIAT carregado e processado com sucesso.",
+        )
+        return redirect("siat_carregar")
+
+
+class SiatAtualizarInscricaoView(RequerLoginJSONMixin, View):
+    def post(self, request, inscricao):
+        imovel = Imovel.objects.filter(
+            inscricao_cadastral=inscricao,
+            tipo_identificacao="CADASTRAL",
+        ).first()
+        if imovel is None:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "mensagem": "Imóvel cadastral não encontrado.",
+                },
+                status=404,
+            )
+
+        if not SIAT_ARQUIVO_PATH.exists():
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "mensagem": "Arquivo SIAT não disponível no servidor.",
+                },
+                status=404,
+            )
+
+        if atualizar_inscricao_do_arquivo(imovel, SIAT_ARQUIVO_PATH):
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "mensagem": f"Inscrição {inscricao} atualizada da View SIAT.",
+                },
+            )
+
+        return JsonResponse(
+            {
+                "sucesso": False,
+                "mensagem": f"Inscrição {inscricao} não encontrada no arquivo SIAT.",
+            },
+            status=404,
+        )

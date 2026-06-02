@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}Imóvel #{{ imovel.pk }}{% endif %} — SIPRAC{% endblock %}
+
+{% block content %}
+<form class="d-none">{% csrf_token %}</form>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-2 text-dark">
+      {% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}Imóvel #{{ imovel.pk }}{% endif %}
+    </h1>
+    {% if imovel.tipo_identificacao == 'CADASTRAL' %}
+    <span class="badge badge-imovel-cadastral">CADASTRAL</span>
+    {% else %}
+    <span class="badge badge-imovel-isic">ISIC</span>
+    {% endif %}
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if imovel.tipo_identificacao == 'CADASTRAL' and imovel.inscricao_cadastral %}
+    <button type="button" class="btn btn-outline-success btn-sm" id="btn-atualizar-siat">
+      Atualizar da View
+    </button>
+    {% endif %}
+    <a href="{% url 'imovel_editar' imovel.pk %}" class="btn btn-outline-primary btn-sm">Editar imóvel</a>
+    <button type="button" class="btn btn-outline-secondary btn-sm" disabled title="Em breve">Vincular a OS</button>
+  </div>
+</div>
+
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+  <div id="siat-toast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body" id="siat-toast-body"></div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+    </div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="imovel-detail-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-resumo" type="button" role="tab">Resumo</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-siat" type="button" role="tab">Dados SIAT</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-vinculos" type="button" role="tab">Vínculos</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="pane-resumo" role="tabpanel">
+    <div class="card siprac-card">
+      <div class="card-header bg-white fw-semibold">Identificação e endereço</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-3">Inscrição cadastral</dt>
+          <dd class="col-sm-9">{% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Código ISIC</dt>
+          <dd class="col-sm-9">{% if imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Bloco</dt>
+          <dd class="col-sm-9">{% if imovel.num_bloco %}{{ imovel.num_bloco }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Logradouro</dt>
+          <dd class="col-sm-9">{% if imovel.nom_logradouro %}{{ imovel.nom_logradouro }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Número / Unidade</dt>
+          <dd class="col-sm-9">
+            {% if imovel.num_endereco or imovel.num_unidade %}
+              {{ imovel.num_endereco|default:"" }}{% if imovel.num_unidade %} / {{ imovel.num_unidade }}{% endif %}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-sm-3">Bairro</dt>
+          <dd class="col-sm-9">{% if imovel.bairro %}{{ imovel.bairro }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Finalidade</dt>
+          <dd class="col-sm-9">{% if imovel.des_finalidade %}{{ imovel.des_finalidade }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Área territorial</dt>
+          <dd class="col-sm-9">{% if imovel.area_territorial %}{{ imovel.area_territorial }} m²{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Área construída</dt>
+          <dd class="col-sm-9">{% if imovel.area_construida %}{{ imovel.area_construida }} m²{% else %}—{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="pane-siat" role="tabpanel">
+    <div class="card siprac-card">
+      <div class="card-header bg-white fw-semibold">Dados SIAT</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-3">Região homogênea</dt>
+          <dd class="col-sm-9">
+            {% if imovel.rh_nome or imovel.rh_valor %}
+              {{ imovel.rh_nome|default:"" }}{% if imovel.rh_valor %} ({{ imovel.rh_valor }}){% endif %}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-sm-3">ID região homogênea</dt>
+          <dd class="col-sm-9">{% if imovel.idf_regiao_homogenea %}{{ imovel.idf_regiao_homogenea }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Latitude / Longitude</dt>
+          <dd class="col-sm-9">
+            {% if imovel.latitude or imovel.longitude %}
+              {{ imovel.latitude|default:"—" }} / {{ imovel.longitude|default:"—" }}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-sm-3">Coord. X / Y</dt>
+          <dd class="col-sm-9">
+            {% if imovel.coord_x or imovel.coord_y %}
+              {{ imovel.coord_x|default:"—" }} / {{ imovel.coord_y|default:"—" }}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-sm-3">Exercício</dt>
+          <dd class="col-sm-9">{% if imovel.exercicio_referencia %}{{ imovel.exercicio_referencia }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Versão</dt>
+          <dd class="col-sm-9">{{ imovel.num_versao }}</dd>
+          <dt class="col-sm-3">Origem dos dados</dt>
+          <dd class="col-sm-9">{{ imovel.get_origem_dados_display }}</dd>
+          <dt class="col-sm-3">Última importação</dt>
+          <dd class="col-sm-9">{% if imovel.data_ultima_importacao %}{{ imovel.data_ultima_importacao|date:"d/m/Y" }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Observação interna</dt>
+          <dd class="col-sm-9">{% if imovel.observacao_interna %}{{ imovel.observacao_interna }}{% else %}—{% endif %}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="pane-vinculos" role="tabpanel">
+    <div class="card siprac-card mb-4">
+      <div class="card-header bg-white fw-semibold">OSs vinculadas</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Nº OS</th>
+                <th>Data criação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for vinculo in vinculos_os %}
+              <tr>
+                <td>
+                  <a href="{% url 'os_detalhe' vinculo.os.pk %}" class="text-decoration-none fw-semibold">
+                    {{ vinculo.os.numero_os }}
+                  </a>
+                </td>
+                <td>{{ vinculo.os.data_criacao_sgbd|date:"d/m/Y" }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="2" class="text-muted text-center py-3">Nenhuma OS vinculada.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card siprac-card">
+      <div class="card-header bg-white fw-semibold">Produções vinculadas</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Produção</th>
+                <th>Tipo</th>
+                <th>OS</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for vinculo in vinculos_producao %}
+              <tr>
+                <td>
+                  <a href="#" class="text-decoration-none text-muted" title="Detalhe em breve">
+                    {% if vinculo.producao.numero_producao %}{{ vinculo.producao.numero_producao }}{% elif vinculo.producao.numero_sei %}{{ vinculo.producao.numero_sei }}{% else %}—{% endif %}
+                  </a>
+                </td>
+                <td>{{ vinculo.producao.tipo_producao.prefixo }}</td>
+                <td>
+                  <a href="{% url 'os_detalhe' vinculo.producao.os.pk %}" class="text-decoration-none">
+                    {{ vinculo.producao.os.numero_os }}
+                  </a>
+                </td>
+                <td>{{ vinculo.producao.status }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="text-muted text-center py-3">Nenhuma produção vinculada.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4">
+  <a href="{% url 'imovel_list' %}" class="btn btn-outline-secondary">Voltar à listagem</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if imovel.tipo_identificacao == 'CADASTRAL' and imovel.inscricao_cadastral %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const btn = document.getElementById('btn-atualizar-siat');
+  const toastEl = document.getElementById('siat-toast');
+  const toastBody = document.getElementById('siat-toast-body');
+  const toast = new bootstrap.Toast(toastEl);
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+  const url = '{% url "api_siat_atualizar_inscricao" imovel.inscricao_cadastral %}';
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'X-CSRFToken': csrfToken ? csrfToken.value : '',
+      },
+    })
+      .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
+      .then(function (result) {
+        toastEl.classList.remove('text-bg-success', 'text-bg-danger');
+        toastEl.classList.add(result.data.sucesso ? 'text-bg-success' : 'text-bg-danger');
+        toastBody.textContent = result.data.mensagem;
+        toast.show();
+        if (result.data.sucesso) {
+          setTimeout(function () { window.location.reload(); }, 1500);
+        }
+      })
+      .catch(function () {
+        toastEl.classList.remove('text-bg-success');
+        toastEl.classList.add('text-bg-danger');
+        toastBody.textContent = 'Erro ao atualizar dados da View SIAT.';
+        toast.show();
+      })
+      .finally(function () {
+        btn.disabled = false;
+      });
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

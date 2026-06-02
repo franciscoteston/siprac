@@ -302,3 +302,14 @@ Campos livres como observações e anotações internas não são auditados.
 - Lista completa de Naturezas, Tipos de Demanda e Finalidades válidos (catálogo mínimo necessário antes do primeiro uso em produção)
 - Política de retenção dos logs de auditoria (verificar normativa municipal aplicável)
 - Notificações de encaminhamento além do painel (a definir em fase posterior)
+
+---
+
+## 15. Funcionalidades futuras previstas
+
+### 15.1 Visualização geográfica de imóveis
+Os campos latitude, longitude, coord_x e coord_y armazenados na entidade Imovel
+permitem a implementação futura de um mapa interativo para gerenciamento visual
+dos imóveis vinculados a OSs e produções. Bibliotecas candidatas: Leaflet.js
+(coordenadas geográficas) ou mapa base TM POA (coordenadas UTM locais).
+A implementação será definida após a conclusão das fases principais do sistema.

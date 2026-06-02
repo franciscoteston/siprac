@@ -116,7 +116,13 @@
                     —
                   {% endif %}
                 </td>
-                <td>{% if vinculo.imovel.endereco %}{{ vinculo.imovel.endereco }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if vinculo.imovel.nom_logradouro %}
+                    {{ vinculo.imovel.nom_logradouro }}{% if vinculo.imovel.num_endereco %}, {{ vinculo.imovel.num_endereco }}{% endif %}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
               </tr>
               {% empty %}
               <tr>
