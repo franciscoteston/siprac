@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 SIAT_COLUMN_MAP = {
     "NUM_BLOCO": "num_bloco",
@@ -47,32 +47,31 @@ def _normalizar_valor(valor):
     return str(valor).strip()
 
 
-def _parse_int(valor):
-    texto = _normalizar_valor(valor)
-    if not texto:
+def _parse_decimal_br(valor):
+    if not valor or valor.strip() == "":
         return None
+    valor = valor.strip().replace(".", "").replace(",", ".")
     try:
-        return int(float(texto.replace(",", ".")))
-    except (TypeError, ValueError):
+        return Decimal(valor)
+    except Exception:
         return None
 
 
-def _parse_decimal(valor):
-    texto = _normalizar_valor(valor)
-    if not texto:
+def _parse_int_br(valor):
+    if not valor or valor.strip() == "":
         return None
-    texto = texto.replace(",", ".")
+    valor = valor.strip().replace(".", "").replace(",", ".")
     try:
-        return Decimal(texto)
-    except (InvalidOperation, ValueError):
+        return int(float(valor))
+    except Exception:
         return None
 
 
 def _parse_field(campo, valor):
     if campo in INTEGER_FIELDS:
-        return _parse_int(valor)
+        return _parse_int_br(valor)
     if campo in DECIMAL_FIELDS:
-        return _parse_decimal(valor)
+        return _parse_decimal_br(valor)
     texto = _normalizar_valor(valor)
     return texto or None
 

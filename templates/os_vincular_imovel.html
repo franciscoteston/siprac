@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Vincular imóvel — {{ os.numero_os }} — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1 text-dark">Vincular imóvel</h1>
+<p class="text-muted mb-4">{{ os.numero_os }}</p>
+
+<div class="card siprac-card mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-end mb-3">
+      <div class="col-md-10">
+        <label for="busca-imovel" class="form-label">Buscar imóvel</label>
+        <input type="search" id="busca-imovel" class="form-control"
+               placeholder="Inscrição cadastral, código ISIC, logradouro ou bairro">
+      </div>
+      <div class="col-md-2">
+        <button type="button" id="btn-buscar-imovel" class="btn btn-primary siprac-btn-primary w-100">Buscar</button>
+      </div>
+    </div>
+
+    <div id="resultados-imovel" class="list-group"></div>
+    <p id="resultados-vazio" class="text-muted small mb-0 d-none">Nenhum imóvel encontrado.</p>
+  </div>
+</div>
+
+<p class="small text-muted mb-4">
+  Não encontrou o imóvel?
+  <a href="{% url 'imovel_novo' %}">Cadastrar novo imóvel</a>
+</p>
+
+<a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const inputBusca = document.getElementById('busca-imovel');
+  const btnBuscar = document.getElementById('btn-buscar-imovel');
+  const container = document.getElementById('resultados-imovel');
+  const vazio = document.getElementById('resultados-vazio');
+  const urlBusca = '{% url "api_buscar_imoveis" %}';
+  const csrfToken = '{{ csrf_token }}';
+
+  function origemLabel(origem) {
+    if (origem === 'SIAT_EDITADO') return 'SIAT editado';
+    if (origem === 'MANUAL') return 'Manual';
+    if (origem === 'SIAT') return 'SIAT';
+    return origem || '—';
+  }
+
+  function executarBusca() {
+    const termo = inputBusca.value.trim();
+    container.innerHTML = '';
+    vazio.classList.add('d-none');
+    if (!termo) {
+      return;
+    }
+
+    fetch(urlBusca + '?q=' + encodeURIComponent(termo), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (resultados) {
+        if (!resultados.length) {
+          vazio.classList.remove('d-none');
+          return;
+        }
+
+        resultados.forEach(function (item) {
+          const elemento = document.createElement('div');
+          elemento.className = 'list-group-item d-flex flex-wrap justify-content-between align-items-start gap-3';
+
+          const area = item.area_territorial ? item.area_territorial + ' m²' : '—';
+          elemento.innerHTML =
+            '<div>' +
+              '<div class="fw-semibold">' + item.identificacao + '</div>' +
+              '<div class="small text-muted">' +
+                (item.endereco || '—') +
+                (item.bairro ? ' · ' + item.bairro : '') +
+                ' · Área: ' + area +
+                ' · Origem: ' + origemLabel(item.origem_dados) +
+              '</div>' +
+            '</div>' +
+            '<form method="post">' +
+              '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrfToken + '">' +
+              '<input type="hidden" name="imovel_id" value="' + item.id + '">' +
+              '<button type="submit" class="btn btn-sm btn-primary siprac-btn-primary">Vincular</button>' +
+            '</form>';
+
+          container.appendChild(elemento);
+        });
+      })
+      .catch(function () {
+        vazio.textContent = 'Erro ao buscar imóveis.';
+        vazio.classList.remove('d-none');
+      });
+  }
+
+  btnBuscar.addEventListener('click', executarBusca);
+  inputBusca.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      executarBusca();
+    }
+  });
+});
+</script>
+{% endblock %}

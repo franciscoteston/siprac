@@ -1,10 +1,11 @@
 from django.contrib import messages
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
+import datetime
 from django.db import transaction
 from django.db.models import OuterRef, Q, Subquery
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
@@ -447,7 +448,10 @@ class OSDetailView(RequerLoginMixin, DetailView):
             )
             .order_by("data_hora")
         )
-        context["imoveis"] = OsImovel.objects.filter(os=os_obj).select_related("imovel")
+        context["imoveis"] = OsImovel.objects.filter(os=os_obj).select_related(
+            "imovel",
+            "vinculado_por",
+        )
         context["producoes"] = Producao.objects.filter(os=os_obj).select_related(
             "tipo_producao",
         )
@@ -781,13 +785,41 @@ class ProximoIsicAPIView(RequerLoginJSONMixin, View):
         return JsonResponse({"codigo": _gerar_codigo_isic()})
 
 
+def _contexto_arquivo_siat():
+    if not SIAT_ARQUIVO_PATH.exists():
+        return {"arquivo_existe": False}
+
+    stat = SIAT_ARQUIVO_PATH.stat()
+    modificado = timezone.localtime(
+        datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.timezone.utc),
+    )
+    tamanho = stat.st_size
+    if tamanho >= 1024 * 1024:
+        tamanho_formatado = f"{tamanho / (1024 * 1024):.1f} MB"
+    elif tamanho >= 1024:
+        tamanho_formatado = f"{tamanho / 1024:.1f} KB"
+    else:
+        tamanho_formatado = f"{tamanho} bytes"
+
+    return {
+        "arquivo_existe": True,
+        "arquivo_nome": SIAT_ARQUIVO_PATH.name,
+        "arquivo_modificado": modificado,
+        "arquivo_tamanho": tamanho_formatado,
+    }
+
+
+def _processar_arquivo_siat(request):
+    request.session["siat_relatorio"] = carregar_arquivo_siat(SIAT_ARQUIVO_PATH)
+
+
 class SiatCarregarArquivoView(RequerAdminMixin, FormView):
     template_name = "siat_carregar.html"
     form_class = SiatUploadForm
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["arquivo_existe"] = SIAT_ARQUIVO_PATH.exists()
+        context.update(_contexto_arquivo_siat())
         context["relatorio"] = self.request.session.pop("siat_relatorio", None)
         return context
 
@@ -798,12 +830,20 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
             for chunk in uploaded.chunks():
                 destino.write(chunk)
 
-        relatorio = carregar_arquivo_siat(SIAT_ARQUIVO_PATH)
-        self.request.session["siat_relatorio"] = relatorio
-        messages.success(
-            self.request,
-            "Arquivo SIAT carregado e processado com sucesso.",
-        )
+        return redirect("siat_processar")
+
+
+class SiatProcessarArquivoView(RequerAdminMixin, View):
+    def get(self, request):
+        if not SIAT_ARQUIVO_PATH.exists():
+            messages.error(
+                request,
+                "Arquivo SIAT não encontrado em data/siat_view.txt.",
+            )
+            return redirect("siat_carregar")
+
+        _processar_arquivo_siat(request)
+        messages.success(request, "Arquivo SIAT processado com sucesso.")
         return redirect("siat_carregar")
 
 
@@ -846,3 +886,88 @@ class SiatAtualizarInscricaoView(RequerLoginJSONMixin, View):
             },
             status=404,
         )
+
+
+def _formatar_identificacao_imovel(imovel):
+    if imovel.inscricao_cadastral:
+        return str(imovel.inscricao_cadastral)
+    if imovel.codigo_isic:
+        return imovel.codigo_isic
+    return f"Imóvel #{imovel.pk}"
+
+
+def _formatar_endereco_imovel(imovel):
+    partes = []
+    if imovel.nom_logradouro:
+        partes.append(imovel.nom_logradouro)
+    if imovel.num_endereco:
+        partes.append(imovel.num_endereco)
+    return ", ".join(partes)
+
+
+class OSVincularImovelView(RequerLoginMixin, View):
+    template_name = "os_vincular_imovel.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name, {"os": self.os_obj})
+
+    def post(self, request, *args, **kwargs):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+        imovel_id = request.POST.get("imovel_id")
+        if not imovel_id:
+            messages.error(request, "Selecione um imóvel para vincular.")
+            return redirect(reverse("os_vincular_imovel", kwargs={"pk": self.os_obj.pk}))
+
+        imovel = get_object_or_404(Imovel, pk=imovel_id)
+        if OsImovel.objects.filter(os=self.os_obj, imovel=imovel).exists():
+            messages.error(request, "Este imóvel já está vinculado à OS.")
+            return redirect(reverse("os_vincular_imovel", kwargs={"pk": self.os_obj.pk}))
+
+        vinculo = OsImovel.objects.create(os=self.os_obj, imovel=imovel)
+        vinculo.capturar_snapshot(servidor=servidor)
+        messages.success(request, "Imóvel vinculado à OS com sucesso.")
+        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
+    def get(self, request):
+        busca = request.GET.get("q", "").strip()
+        if not busca:
+            return JsonResponse([], safe=False)
+
+        filtros = (
+            Q(codigo_isic__icontains=busca)
+            | Q(nom_logradouro__icontains=busca)
+            | Q(bairro__icontains=busca)
+        )
+        try:
+            filtros |= Q(inscricao_cadastral=int(busca))
+        except ValueError:
+            pass
+
+        resultados = []
+        for imovel in Imovel.objects.filter(filtros).order_by("inscricao_cadastral", "codigo_isic")[:20]:
+            resultados.append(
+                {
+                    "id": imovel.pk,
+                    "identificacao": _formatar_identificacao_imovel(imovel),
+                    "endereco": _formatar_endereco_imovel(imovel),
+                    "bairro": imovel.bairro or "",
+                    "area_territorial": (
+                        str(imovel.area_territorial)
+                        if imovel.area_territorial is not None
+                        else None
+                    ),
+                    "origem_dados": imovel.origem_dados,
+                },
+            )
+
+        return JsonResponse(resultados, safe=False)

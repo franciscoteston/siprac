@@ -10,18 +10,25 @@
   <div class="card-body">
     <p class="text-muted mb-3">
       Envie o arquivo <code>.txt</code> exportado da View SIAT (separador <code>|</code>).
-      O arquivo será salvo em <code>data/siat_view.txt</code> e processado imediatamente.
+      O arquivo substituirá <code>data/siat_view.txt</code> e será processado imediatamente.
     </p>
+
     {% if arquivo_existe %}
-    <p class="small text-success mb-3">Arquivo SIAT presente no servidor.</p>
+    <div class="alert alert-light border mb-3" role="status">
+      <strong>Arquivo atual:</strong> {{ arquivo_nome }} —
+      modificado em {{ arquivo_modificado|date:"d/m/Y H:i" }} —
+      {{ arquivo_tamanho }}
+    </div>
     {% else %}
-    <p class="small text-warning mb-3">Nenhum arquivo SIAT carregado ainda.</p>
+    <div class="alert alert-warning mb-3" role="status">
+      Nenhum arquivo SIAT carregado em <code>data/siat_view.txt</code>.
+    </div>
     {% endif %}
 
     <form method="post" enctype="multipart/form-data" novalidate>
       {% csrf_token %}
       {{ form.arquivo|as_crispy_field }}
-      <button type="submit" class="btn btn-primary siprac-btn-primary">Carregar e processar</button>
+      <button type="submit" class="btn btn-primary siprac-btn-primary">Carregar novo arquivo</button>
     </form>
   </div>
 </div>

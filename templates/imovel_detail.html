@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load siprac_filters %}
 
 {% block title %}{% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}Imóvel #{{ imovel.pk }}{% endif %} — SIPRAC{% endblock %}
 
@@ -73,9 +74,9 @@
           <dt class="col-sm-3">Finalidade</dt>
           <dd class="col-sm-9">{% if imovel.des_finalidade %}{{ imovel.des_finalidade }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Área territorial</dt>
-          <dd class="col-sm-9">{% if imovel.area_territorial %}{{ imovel.area_territorial }} m²{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if imovel.area_territorial %}{{ imovel.area_territorial|decimal_br }} m²{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Área construída</dt>
-          <dd class="col-sm-9">{% if imovel.area_construida %}{{ imovel.area_construida }} m²{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if imovel.area_construida %}{{ imovel.area_construida|decimal_br }} m²{% else %}—{% endif %}</dd>
         </dl>
       </div>
     </div>
@@ -97,13 +98,13 @@
           <dt class="col-sm-3">Latitude / Longitude</dt>
           <dd class="col-sm-9">
             {% if imovel.latitude or imovel.longitude %}
-              {{ imovel.latitude|default:"—" }} / {{ imovel.longitude|default:"—" }}
+              {{ imovel.latitude|decimal_br }} / {{ imovel.longitude|decimal_br }}
             {% else %}—{% endif %}
           </dd>
           <dt class="col-sm-3">Coord. X / Y</dt>
           <dd class="col-sm-9">
             {% if imovel.coord_x or imovel.coord_y %}
-              {{ imovel.coord_x|default:"—" }} / {{ imovel.coord_y|default:"—" }}
+              {{ imovel.coord_x|decimal_br }} / {{ imovel.coord_y|decimal_br }}
             {% else %}—{% endif %}
           </dd>
           <dt class="col-sm-3">Exercício</dt>

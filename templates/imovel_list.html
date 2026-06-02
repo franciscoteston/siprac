@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load siprac_filters %}
 
 {% block title %}Imóveis — SIPRAC{% endblock %}
 
@@ -53,7 +54,7 @@
         </td>
         <td>{% if imovel.nom_logradouro %}{{ imovel.nom_logradouro }}{% else %}—{% endif %}</td>
         <td>{% if imovel.bairro %}{{ imovel.bairro }}{% else %}—{% endif %}</td>
-        <td>{% if imovel.area_territorial %}{{ imovel.area_territorial }}{% else %}—{% endif %}</td>
+        <td>{% if imovel.area_territorial %}{{ imovel.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
         <td>{% if imovel.exercicio_referencia %}{{ imovel.exercicio_referencia }}{% else %}—{% endif %}</td>
       </tr>
       {% empty %}

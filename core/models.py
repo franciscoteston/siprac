@@ -564,6 +564,66 @@ class OsImovel(models.Model):
         on_delete=models.PROTECT,
         related_name="vinculos_os",
     )
+    data_vinculo = models.DateTimeField(auto_now_add=True)
+    vinculado_por = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="imoveis_vinculados",
+    )
+    snap_num_bloco = models.CharField(max_length=12, null=True, blank=True)
+    snap_inscricao_cadastral = models.IntegerField(null=True, blank=True)
+    snap_codigo_isic = models.CharField(max_length=20, null=True, blank=True)
+    snap_cod_logradouro = models.IntegerField(null=True, blank=True)
+    snap_nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
+    snap_num_endereco = models.CharField(max_length=20, null=True, blank=True)
+    snap_num_unidade = models.CharField(max_length=20, null=True, blank=True)
+    snap_bairro = models.CharField(max_length=100, null=True, blank=True)
+    snap_des_finalidade = models.CharField(max_length=255, null=True, blank=True)
+    snap_area_territorial = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    snap_area_construida = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    snap_exercicio_referencia = models.IntegerField(null=True, blank=True)
+    snap_num_versao = models.IntegerField(null=True, blank=True)
+    snap_rh_nome = models.CharField(max_length=20, null=True, blank=True)
+    snap_rh_valor = models.IntegerField(null=True, blank=True)
+    snap_idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
+    snap_latitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    snap_longitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    snap_coord_x = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    snap_coord_y = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    snap_origem_dados = models.CharField(max_length=20, null=True, blank=True)
+    snap_data_importacao = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = "OS_IMOVEL"
@@ -578,6 +638,33 @@ class OsImovel(models.Model):
 
     def __str__(self):
         return f"{self.os} — {self.imovel}"
+
+    def capturar_snapshot(self, servidor=None):
+        imovel = self.imovel
+        self.snap_num_bloco = imovel.num_bloco
+        self.snap_inscricao_cadastral = imovel.inscricao_cadastral
+        self.snap_codigo_isic = imovel.codigo_isic
+        self.snap_cod_logradouro = imovel.cod_logradouro
+        self.snap_nom_logradouro = imovel.nom_logradouro
+        self.snap_num_endereco = imovel.num_endereco
+        self.snap_num_unidade = imovel.num_unidade
+        self.snap_bairro = imovel.bairro
+        self.snap_des_finalidade = imovel.des_finalidade
+        self.snap_area_territorial = imovel.area_territorial
+        self.snap_area_construida = imovel.area_construida
+        self.snap_exercicio_referencia = imovel.exercicio_referencia
+        self.snap_num_versao = imovel.num_versao
+        self.snap_rh_nome = imovel.rh_nome
+        self.snap_rh_valor = imovel.rh_valor
+        self.snap_idf_regiao_homogenea = imovel.idf_regiao_homogenea
+        self.snap_latitude = imovel.latitude
+        self.snap_longitude = imovel.longitude
+        self.snap_coord_x = imovel.coord_x
+        self.snap_coord_y = imovel.coord_y
+        self.snap_origem_dados = imovel.origem_dados
+        self.snap_data_importacao = imovel.data_ultima_importacao
+        self.vinculado_por = servidor
+        self.save()
 
 
 # ---------------------------------------------------------------------------

@@ -432,4 +432,7 @@ class ImovelForm(forms.Form):
 
 
 class SiatUploadForm(forms.Form):
-    arquivo = forms.FileField(label="Arquivo SIAT (.txt)")
+    arquivo = forms.FileField(
+        label="Arquivo SIAT (.txt)",
+        required=True,
+    )

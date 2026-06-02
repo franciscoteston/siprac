@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.urls import path
 
 from core.views import (
+    BuscarImoveisAPIView,
     DashboardView,
     EncaminhamentoCreateView,
     FinalidadesAPIView,
@@ -16,11 +17,13 @@ from core.views import (
     OSCreateView,
     OSDetailView,
     OSListView,
+    OSVincularImovelView,
     ProducaoCreateView,
     ProximoIsicAPIView,
     ProximoNumeroAPIView,
     SiatAtualizarInscricaoView,
     SiatCarregarArquivoView,
+    SiatProcessarArquivoView,
     SipracLoginView,
     SipracLogoutView,
     TiposDemandaAPIView,
@@ -34,6 +37,7 @@ urlpatterns = [
     path('os/<int:pk>/encaminhar/', EncaminhamentoCreateView.as_view(), name='os_encaminhar'),
     path('os/<int:pk>/producao/', ProducaoCreateView.as_view(), name='os_producao'),
     path('os/<int:pk>/encerrar/', OSEncerramentoView.as_view(), name='os_encerrar'),
+    path('os/<int:pk>/imoveis/vincular/', OSVincularImovelView.as_view(), name='os_vincular_imovel'),
     path('os/<int:pk>/', OSDetailView.as_view(), name='os_detalhe'),
     path('os/', OSListView.as_view(), name='os_list'),
     path('imoveis/novo/', ImovelCreateView.as_view(), name='imovel_novo'),
@@ -41,11 +45,13 @@ urlpatterns = [
     path('imoveis/<int:pk>/', ImovelDetailView.as_view(), name='imovel_detalhe'),
     path('imoveis/', ImovelListView.as_view(), name='imovel_list'),
     path('admin-siprac/carregar-siat/', SiatCarregarArquivoView.as_view(), name='siat_carregar'),
+    path('admin-siprac/processar-siat/', SiatProcessarArquivoView.as_view(), name='siat_processar'),
     path(
         'api/siat/atualizar-inscricao/<int:inscricao>/',
         SiatAtualizarInscricaoView.as_view(),
         name='api_siat_atualizar_inscricao',
     ),
+    path('api/buscar-imoveis/', BuscarImoveisAPIView.as_view(), name='api_buscar_imoveis'),
     path('api/tipos-demanda/', TiposDemandaAPIView.as_view(), name='api_tipos_demanda'),
     path('api/finalidades/', FinalidadesAPIView.as_view(), name='api_finalidades'),
     path('api/proximo-numero/', ProximoNumeroAPIView.as_view(), name='api_proximo_numero'),
