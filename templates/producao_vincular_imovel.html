@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+{% load siprac_filters %}
+
+{% block title %}Gerenciar imóveis — {{ producao.numero_producao|default:"Despacho" }} — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1 text-dark">Gerenciar imóveis da produção</h1>
+<p class="text-muted mb-3">
+  Produção:
+  {% if producao.numero_producao %}{{ producao.numero_producao }}{% elif producao.numero_sei %}{{ producao.numero_sei }}{% else %}Despacho{% endif %}
+  · OS: <a href="{% url 'os_detalhe' os.pk %}">{{ os.numero_os }}</a>
+</p>
+
+{% if producao_homologada %}
+<div class="alert alert-warning" role="alert">
+  Atenção: esta produção está homologada. Alterações serão registradas em auditoria.
+</div>
+<div class="mb-3">
+  <label for="justificativa" class="form-label">Justificativa <span class="text-danger">*</span></label>
+  <textarea id="justificativa" class="form-control" rows="2"
+            placeholder="Informe a justificativa para alterações nesta produção homologada"></textarea>
+</div>
+{% endif %}
+
+<div id="alert-feedback" class="alert d-none" role="status"></div>
+
+<div class="card siprac-card mb-4">
+  <div class="card-header bg-white fw-semibold">Imóveis disponíveis (OS)</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 3rem;">Sel.</th>
+            <th>Identificação</th>
+            <th>Endereço</th>
+            <th>Área</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-disponiveis">
+          {% for item in imoveis_disponiveis %}
+          <tr data-imovel-id="{{ item.imovel_id }}">
+            <td>
+              <input type="checkbox" class="form-check-input check-disponivel"
+                     value="{{ item.imovel_id }}">
+            </td>
+            <td>{{ item.identificacao }}</td>
+            <td>{{ item.endereco }}</td>
+            <td>{% if item.area_territorial %}{{ item.area_territorial|decimal_br }} m²{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr id="disponiveis-vazio">
+            <td colspan="4" class="text-muted text-center py-3">Nenhum imóvel disponível para adicionar.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white">
+      <button type="button" id="btn-adicionar-selecionados" class="btn btn-primary siprac-btn-primary btn-sm">
+        Adicionar selecionados à produção
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="card siprac-card mb-4">
+  <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="fw-semibold">Imóveis na produção</span>
+    {% if pode_agrupar %}
+    <button type="button" id="btn-agrupar-selecionados" class="btn btn-outline-primary btn-sm">
+      Agrupar selecionados (<span id="proximo-grupo-label">{{ proximo_grupo_ref }}</span>)
+    </button>
+    {% endif %}
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            {% if pode_agrupar %}<th style="width: 3rem;">Sel.</th>{% endif %}
+            <th>Identificação</th>
+            <th>Endereço</th>
+            <th>Área</th>
+            <th>Grupo</th>
+            <th style="width: 12rem;">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-producao">
+          {% for item in imoveis_producao %}
+          <tr data-producao-imovel-id="{{ item.id }}" data-imovel-id="{{ item.imovel_id }}">
+            {% if pode_agrupar %}
+            <td>
+              <input type="checkbox" class="form-check-input check-producao" value="{{ item.id }}">
+            </td>
+            {% endif %}
+            <td>{{ item.identificacao }}</td>
+            <td>{{ item.endereco }}</td>
+            <td>{% if item.area_territorial %}{{ item.area_territorial|decimal_br }} m²{% else %}—{% endif %}</td>
+            <td class="celula-grupo">
+              {% if item.grupo_ref %}
+                <span class="badge {{ item.grupo_ref|grupo_badge_class }}">{{ item.grupo_ref }}</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Individual</span>
+              {% endif %}
+            </td>
+            <td class="celula-acoes">
+              {% if pode_agrupar and item.grupo_ref %}
+              <button type="button" class="btn btn-outline-secondary btn-sm btn-remover-grupo">Remover do grupo</button>
+              {% endif %}
+              <button type="button" class="btn btn-outline-danger btn-sm btn-desvincular">Remover da produção</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="producao-vazio">
+            <td colspan="{% if pode_agrupar %}6{% else %}5{% endif %}" class="text-muted text-center py-3">
+              Nenhum imóvel vinculado à produção.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2">
+  <a href="{% url 'producao_detail' producao.pk %}" class="btn btn-outline-secondary">Voltar ao detalhe</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const urlPost = '{% url "producao_vincular_imovel" producao.pk %}';
+  const csrfToken = '{{ csrf_token }}';
+  const podeAgrupar = {{ pode_agrupar|yesno:"true,false" }};
+  const producaoHomologada = {{ producao_homologada|yesno:"true,false" }};
+  const justificativaEl = document.getElementById('justificativa');
+  const alertFeedback = document.getElementById('alert-feedback');
+  const tbodyDisponiveis = document.getElementById('tbody-disponiveis');
+  const tbodyProducao = document.getElementById('tbody-producao');
+  const proximoGrupoLabel = document.getElementById('proximo-grupo-label');
+
+  const GRUPO_BADGE_CLASSES = [
+    'text-bg-primary',
+    'text-bg-success',
+    'text-bg-info',
+    'text-bg-warning',
+    'text-bg-danger',
+  ];
+
+  function grupoBadgeClass(grupoRef) {
+    if (!grupoRef) {
+      return 'text-bg-secondary';
+    }
+    const numero = parseInt(String(grupoRef).replace('G', ''), 10);
+    if (Number.isNaN(numero)) {
+      return 'text-bg-dark';
+    }
+    return GRUPO_BADGE_CLASSES[(numero - 1) % GRUPO_BADGE_CLASSES.length];
+  }
+
+  function formatarArea(area) {
+    if (!area) {
+      return '—';
+    }
+    const partes = Number(area).toFixed(2).split('.');
+    const inteiro = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return inteiro + ',' + partes[1] + ' m²';
+  }
+
+  function renderBadgeGrupo(grupoRef) {
+    if (!grupoRef) {
+      return '<span class="badge text-bg-secondary">Individual</span>';
+    }
+    return '<span class="badge ' + grupoBadgeClass(grupoRef) + '">' + grupoRef + '</span>';
+  }
+
+  function mostrarAlerta(texto, tipo) {
+    alertFeedback.textContent = texto;
+    alertFeedback.className = 'alert alert-' + tipo;
+    alertFeedback.classList.remove('d-none');
+  }
+
+  function obterJustificativa() {
+    if (!producaoHomologada || !justificativaEl) {
+      return '';
+    }
+    return justificativaEl.value.trim();
+  }
+
+  function validarJustificativa() {
+    if (producaoHomologada && !obterJustificativa()) {
+      mostrarAlerta('Informe a justificativa para alterações em produção homologada.', 'warning');
+      if (justificativaEl) {
+        justificativaEl.focus();
+      }
+      return false;
+    }
+    return true;
+  }
+
+  async function executarAcoes(acoes) {
+    if (!validarJustificativa()) {
+      return null;
+    }
+
+    const response = await fetch(urlPost, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-CSRFToken': csrfToken,
+      },
+      body: JSON.stringify({
+        acoes: acoes,
+        justificativa: obterJustificativa(),
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.sucesso) {
+      mostrarAlerta(data.erro || 'Erro ao processar a solicitação.', 'danger');
+      return null;
+    }
+
+    if (data.mensagem) {
+      mostrarAlerta(data.mensagem, 'success');
+    }
+    if (proximoGrupoLabel && data.proximo_grupo_ref) {
+      proximoGrupoLabel.textContent = data.proximo_grupo_ref;
+    }
+    renderTabelas(data.imoveis_disponiveis, data.imoveis_producao);
+    return data;
+  }
+
+  function renderTabelas(disponiveis, producao) {
+    tbodyDisponiveis.innerHTML = '';
+    if (!disponiveis.length) {
+      tbodyDisponiveis.innerHTML =
+        '<tr id="disponiveis-vazio"><td colspan="4" class="text-muted text-center py-3">' +
+        'Nenhum imóvel disponível para adicionar.</td></tr>';
+    } else {
+      disponiveis.forEach(function (item) {
+        const tr = document.createElement('tr');
+        tr.dataset.imovelId = item.imovel_id;
+        tr.innerHTML =
+          '<td><input type="checkbox" class="form-check-input check-disponivel" value="' + item.imovel_id + '"></td>' +
+          '<td>' + item.identificacao + '</td>' +
+          '<td>' + item.endereco + '</td>' +
+          '<td>' + formatarArea(item.area_territorial) + '</td>';
+        tbodyDisponiveis.appendChild(tr);
+      });
+    }
+
+    tbodyProducao.innerHTML = '';
+    const colspan = podeAgrupar ? 6 : 5;
+    if (!producao.length) {
+      tbodyProducao.innerHTML =
+        '<tr id="producao-vazio"><td colspan="' + colspan + '" class="text-muted text-center py-3">' +
+        'Nenhum imóvel vinculado à produção.</td></tr>';
+      return;
+    }
+
+    producao.forEach(function (item) {
+      const tr = document.createElement('tr');
+      tr.dataset.producaoImovelId = item.id;
+      tr.dataset.imovelId = item.imovel_id;
+
+      let html = '';
+      if (podeAgrupar) {
+        html += '<td><input type="checkbox" class="form-check-input check-producao" value="' + item.id + '"></td>';
+      }
+      html +=
+        '<td>' + item.identificacao + '</td>' +
+        '<td>' + item.endereco + '</td>' +
+        '<td>' + formatarArea(item.area_territorial) + '</td>' +
+        '<td class="celula-grupo">' + renderBadgeGrupo(item.grupo_ref) + '</td>' +
+        '<td class="celula-acoes">';
+      if (podeAgrupar && item.grupo_ref) {
+        html += '<button type="button" class="btn btn-outline-secondary btn-sm btn-remover-grupo me-1">Remover do grupo</button>';
+      }
+      html += '<button type="button" class="btn btn-outline-danger btn-sm btn-desvincular">Remover da produção</button></td>';
+      tr.innerHTML = html;
+      tbodyProducao.appendChild(tr);
+    });
+  }
+
+  document.getElementById('btn-adicionar-selecionados').addEventListener('click', async function () {
+    const selecionados = Array.from(document.querySelectorAll('.check-disponivel:checked'));
+    if (!selecionados.length) {
+      mostrarAlerta('Selecione ao menos um imóvel para adicionar.', 'warning');
+      return;
+    }
+    const acoes = selecionados.map(function (checkbox) {
+      return { tipo: 'vincular', imovel_id: parseInt(checkbox.value, 10) };
+    });
+    await executarAcoes(acoes);
+  });
+
+  const btnAgrupar = document.getElementById('btn-agrupar-selecionados');
+  if (btnAgrupar) {
+    btnAgrupar.addEventListener('click', async function () {
+      const selecionados = Array.from(document.querySelectorAll('.check-producao:checked'));
+      if (selecionados.length < 2) {
+        mostrarAlerta('Selecione ao menos dois imóveis para agrupar.', 'warning');
+        return;
+      }
+      const ids = selecionados.map(function (checkbox) {
+        return parseInt(checkbox.value, 10);
+      });
+      await executarAcoes([{ tipo: 'novo_grupo', ids: ids }]);
+    });
+  }
+
+  tbodyProducao.addEventListener('click', async function (event) {
+    const btnRemoverGrupo = event.target.closest('.btn-remover-grupo');
+    if (btnRemoverGrupo) {
+      const row = btnRemoverGrupo.closest('tr');
+      await executarAcoes([{
+        tipo: 'remover_grupo',
+        producao_imovel_id: parseInt(row.dataset.producaoImovelId, 10),
+      }]);
+      return;
+    }
+
+    const btnDesvincular = event.target.closest('.btn-desvincular');
+    if (btnDesvincular) {
+      const row = btnDesvincular.closest('tr');
+      const identificacao = row.children[podeAgrupar ? 1 : 0].textContent.trim();
+      if (!window.confirm('Remover "' + identificacao + '" desta produção?')) {
+        return;
+      }
+      await executarAcoes([{
+        tipo: 'desvincular',
+        producao_imovel_id: parseInt(row.dataset.producaoImovelId, 10),
+      }]);
+    }
+  });
+});
+</script>
+{% endblock %}

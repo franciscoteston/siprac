@@ -176,7 +176,11 @@
             <tbody>
               {% for producao in producoes %}
               <tr>
-                <td>{% if producao.numero_producao %}{{ producao.numero_producao }}{% elif producao.numero_sei %}{{ producao.numero_sei }}{% else %}—{% endif %}</td>
+                <td>
+                  <a href="{% url 'producao_detail' producao.pk %}">
+                    {% if producao.numero_producao %}{{ producao.numero_producao }}{% elif producao.numero_sei %}{{ producao.numero_sei }}{% else %}—{% endif %}
+                  </a>
+                </td>
                 <td>{{ producao.tipo_producao.prefixo }}</td>
                 <td>{{ producao.status }}</td>
                 <td>{{ producao.data_criacao|date:"d/m/Y H:i" }}</td>

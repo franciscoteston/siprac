@@ -20,6 +20,16 @@ MACROETAPA_LABELS = {
 
 
 @register.filter
+def get_item(mapping, key):
+    if mapping is None:
+        return None
+    try:
+        return mapping.get(key)
+    except AttributeError:
+        return None
+
+
+@register.filter
 def prioridade_display(value):
     if not value:
         return "—"
@@ -31,6 +41,59 @@ def macroetapa_display(value):
     if not value:
         return "—"
     return MACROETAPA_LABELS.get(value, value)
+
+
+STATUS_PRODUCAO_LABELS = {
+    "EM_ELABORACAO": "Em elaboração",
+    "CONCLUIDO": "Concluído",
+    "HOMOLOGADO": "Homologado",
+    "CANCELADO": "Cancelado",
+}
+
+GRUPO_BADGE_CLASSES = (
+    "text-bg-primary",
+    "text-bg-success",
+    "text-bg-info",
+    "text-bg-warning",
+    "text-bg-danger",
+)
+
+GRUPO_CORES_FUNDO = (
+    "#cfe2ff",
+    "#d1e7dd",
+    "#cff4fc",
+    "#fff3cd",
+    "#f8d7da",
+)
+
+
+@register.filter
+def status_producao_display(value):
+    if not value:
+        return "—"
+    return STATUS_PRODUCAO_LABELS.get(value, value)
+
+
+@register.filter
+def grupo_badge_class(grupo_ref):
+    if not grupo_ref:
+        return "text-bg-secondary"
+    try:
+        numero = int(str(grupo_ref).replace("G", ""))
+        return GRUPO_BADGE_CLASSES[(numero - 1) % len(GRUPO_BADGE_CLASSES)]
+    except (ValueError, TypeError):
+        return "text-bg-dark"
+
+
+@register.filter
+def grupo_cor_fundo(grupo_ref):
+    if not grupo_ref:
+        return ""
+    try:
+        numero = int(str(grupo_ref).replace("G", ""))
+        return GRUPO_CORES_FUNDO[(numero - 1) % len(GRUPO_CORES_FUNDO)]
+    except (ValueError, TypeError):
+        return "#f8f9fa"
 
 
 @register.filter

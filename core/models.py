@@ -718,6 +718,32 @@ class Producao(models.Model):
         return f"Produção #{self.pk}"
 
 
+CAMPOS_SNAP_IMOVEL = (
+    "snap_num_bloco",
+    "snap_inscricao_cadastral",
+    "snap_codigo_isic",
+    "snap_cod_logradouro",
+    "snap_nom_logradouro",
+    "snap_num_endereco",
+    "snap_num_unidade",
+    "snap_bairro",
+    "snap_des_finalidade",
+    "snap_area_territorial",
+    "snap_area_construida",
+    "snap_exercicio_referencia",
+    "snap_num_versao",
+    "snap_rh_nome",
+    "snap_rh_valor",
+    "snap_idf_regiao_homogenea",
+    "snap_latitude",
+    "snap_longitude",
+    "snap_coord_x",
+    "snap_coord_y",
+    "snap_origem_dados",
+    "snap_data_importacao",
+)
+
+
 class ProducaoImovel(models.Model):
     """Imóvel abrangido por uma produção, com agrupamento opcional."""
 
@@ -734,6 +760,58 @@ class ProducaoImovel(models.Model):
     grupo_ref = models.CharField(max_length=255, null=True, blank=True)
     papel_no_grupo = models.CharField(max_length=255, null=True, blank=True)
     observacao = models.TextField(null=True, blank=True)
+    snap_num_bloco = models.CharField(max_length=12, null=True, blank=True)
+    snap_inscricao_cadastral = models.IntegerField(null=True, blank=True)
+    snap_codigo_isic = models.CharField(max_length=20, null=True, blank=True)
+    snap_cod_logradouro = models.IntegerField(null=True, blank=True)
+    snap_nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
+    snap_num_endereco = models.CharField(max_length=20, null=True, blank=True)
+    snap_num_unidade = models.CharField(max_length=20, null=True, blank=True)
+    snap_bairro = models.CharField(max_length=100, null=True, blank=True)
+    snap_des_finalidade = models.CharField(max_length=255, null=True, blank=True)
+    snap_area_territorial = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    snap_area_construida = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    snap_exercicio_referencia = models.IntegerField(null=True, blank=True)
+    snap_num_versao = models.IntegerField(null=True, blank=True)
+    snap_rh_nome = models.CharField(max_length=20, null=True, blank=True)
+    snap_rh_valor = models.IntegerField(null=True, blank=True)
+    snap_idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
+    snap_latitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    snap_longitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    snap_coord_x = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    snap_coord_y = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    snap_origem_dados = models.CharField(max_length=20, null=True, blank=True)
+    snap_data_importacao = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = "PRODUCAO_IMOVEL"
@@ -742,6 +820,11 @@ class ProducaoImovel(models.Model):
 
     def __str__(self):
         return f"{self.producao} — {self.imovel}"
+
+    def capturar_snapshot_de_osimovel(self, os_imovel):
+        for campo in CAMPOS_SNAP_IMOVEL:
+            setattr(self, campo, getattr(os_imovel, campo))
+        self.save()
 
 
 class ProducaoImovelDados(models.Model):

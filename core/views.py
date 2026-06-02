@@ -1,3 +1,6 @@
+import json
+from collections import defaultdict
+
 from django.contrib import messages
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
@@ -39,8 +42,10 @@ from core.models import (
     OsImovel,
     OsProcesso,
     ProcessoSei,
+    LogAuditoria,
     Producao,
     ProducaoImovel,
+    ProducaoImovelDados,
     Servidor,
     TarefaInterna,
     TipoDemanda,
@@ -943,6 +948,401 @@ def _formatar_endereco_imovel(imovel):
     if imovel.num_endereco:
         partes.append(imovel.num_endereco)
     return ", ".join(partes)
+
+
+def _proximo_grupo_ref(producao):
+    grupos = (
+        ProducaoImovel.objects.filter(
+            producao=producao,
+            grupo_ref__isnull=False,
+        )
+        .exclude(grupo_ref="")
+        .values_list("grupo_ref", flat=True)
+        .distinct()
+    )
+    numeros = []
+    for grupo in grupos:
+        try:
+            numeros.append(int(str(grupo).replace("G", "")))
+        except ValueError:
+            pass
+    proximo = max(numeros) + 1 if numeros else 1
+    return f"G{proximo:02d}"
+
+
+def _pode_agrupar_producao(request):
+    perfil = getattr(request, "perfil_acesso", None)
+    return perfil is not None and perfil.pode_homologar
+
+
+def _formatar_identificacao_snap(registro):
+    if registro.snap_inscricao_cadastral:
+        return str(registro.snap_inscricao_cadastral)
+    if registro.snap_codigo_isic:
+        return registro.snap_codigo_isic
+    return f"Imóvel #{registro.imovel_id}"
+
+
+def _formatar_endereco_snap(registro):
+    partes = []
+    if registro.snap_nom_logradouro:
+        partes.append(registro.snap_nom_logradouro)
+    if registro.snap_num_endereco:
+        partes.append(registro.snap_num_endereco)
+    return ", ".join(partes) or "—"
+
+
+def _formatar_area_snap(registro):
+    if registro.snap_area_territorial is not None:
+        return str(registro.snap_area_territorial)
+    return None
+
+
+def _serializar_os_imovel(vinculo):
+    return {
+        "imovel_id": vinculo.imovel_id,
+        "identificacao": _formatar_identificacao_snap(vinculo),
+        "endereco": _formatar_endereco_snap(vinculo),
+        "area_territorial": _formatar_area_snap(vinculo),
+    }
+
+
+def _serializar_producao_imovel(item):
+    return {
+        "id": item.pk,
+        "imovel_id": item.imovel_id,
+        "identificacao": _formatar_identificacao_snap(item),
+        "endereco": _formatar_endereco_snap(item),
+        "area_territorial": _formatar_area_snap(item),
+        "grupo_ref": item.grupo_ref or "",
+    }
+
+
+def _contexto_imoveis_producao(producao):
+    vinculados_ids = ProducaoImovel.objects.filter(producao=producao).values_list(
+        "imovel_id",
+        flat=True,
+    )
+    imoveis_disponiveis = [
+        _serializar_os_imovel(vinculo)
+        for vinculo in OsImovel.objects.filter(os=producao.os)
+        .exclude(imovel_id__in=vinculados_ids)
+        .select_related("imovel")
+        .order_by("snap_inscricao_cadastral", "snap_codigo_isic", "imovel_id")
+    ]
+    imoveis_producao = [
+        _serializar_producao_imovel(item)
+        for item in ProducaoImovel.objects.filter(producao=producao)
+        .select_related("imovel")
+        .order_by("grupo_ref", "pk")
+    ]
+    return imoveis_disponiveis, imoveis_producao
+
+
+def _validar_justificativa_homologada(producao, justificativa):
+    if producao.status == "HOMOLOGADO" and not (justificativa or "").strip():
+        return "Justificativa obrigatória para alterações em produção homologada."
+    return None
+
+
+def _registrar_auditoria_producao_imovel(
+    servidor,
+    producao_imovel,
+    justificativa,
+    *,
+    operacao="EDICAO_POS_HOMOLOGACAO",
+    campo_alterado=None,
+    valor_anterior=None,
+    valor_novo=None,
+):
+    LogAuditoria.objects.create(
+        servidor=servidor,
+        entidade="ProducaoImovel",
+        entidade_id=producao_imovel.pk,
+        operacao=operacao,
+        campo_alterado=campo_alterado,
+        valor_anterior=valor_anterior,
+        valor_novo=valor_novo,
+        justificativa=justificativa,
+    )
+
+
+class ProducaoDetailView(RequerLoginMixin, DetailView):
+    model = Producao
+    template_name = "producao_detail.html"
+    context_object_name = "producao"
+
+    def get_queryset(self):
+        return Producao.objects.select_related(
+            "os",
+            "tipo_producao",
+            "criado_por",
+            "homologado_por",
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        producao = self.object
+        imoveis = (
+            ProducaoImovel.objects.filter(producao=producao)
+            .select_related("imovel")
+            .order_by("grupo_ref", "pk")
+        )
+        dados_por_exercicio = defaultdict(list)
+        for dado in (
+            ProducaoImovelDados.objects.filter(producao_imovel__producao=producao)
+            .select_related("producao_imovel", "producao_imovel__imovel")
+            .order_by("producao_imovel_id", "exercicio")
+        ):
+            dados_por_exercicio[dado.producao_imovel_id].append(dado)
+
+        context["os"] = producao.os
+        context["imoveis"] = imoveis
+        context["dados_por_exercicio"] = dict(dados_por_exercicio)
+        context["tem_servidor"] = _obter_servidor(self.request.user) is not None
+        return context
+
+
+class ProducaoVincularImovelView(RequerLoginMixin, View):
+    template_name = "producao_vincular_imovel.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.producao_obj = get_object_or_404(
+            Producao.objects.select_related("os", "tipo_producao"),
+            pk=kwargs["pk"],
+        )
+        if _obter_servidor(request.user) is None:
+            if request.headers.get("Content-Type", "").startswith("application/json"):
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+        return super().dispatch(request, *args, **kwargs)
+
+    def _resposta_json(self, request, *, sucesso=True, status=200, **dados):
+        imoveis_disponiveis, imoveis_producao = _contexto_imoveis_producao(self.producao_obj)
+        payload = {
+            "sucesso": sucesso,
+            "imoveis_disponiveis": imoveis_disponiveis,
+            "imoveis_producao": imoveis_producao,
+            "proximo_grupo_ref": _proximo_grupo_ref(self.producao_obj),
+            "pode_agrupar": _pode_agrupar_producao(request),
+        }
+        payload.update(dados)
+        return JsonResponse(payload, status=status)
+
+    def get(self, request, *args, **kwargs):
+        imoveis_disponiveis, imoveis_producao = _contexto_imoveis_producao(self.producao_obj)
+        return render(
+            request,
+            self.template_name,
+            {
+                "producao": self.producao_obj,
+                "os": self.producao_obj.os,
+                "imoveis_disponiveis": imoveis_disponiveis,
+                "imoveis_producao": imoveis_producao,
+                "pode_agrupar": _pode_agrupar_producao(request),
+                "producao_homologada": self.producao_obj.status == "HOMOLOGADO",
+                "proximo_grupo_ref": _proximo_grupo_ref(self.producao_obj),
+            },
+        )
+
+    def _obter_producao_imovel(self, producao_imovel_id):
+        return get_object_or_404(
+            ProducaoImovel,
+            pk=producao_imovel_id,
+            producao=self.producao_obj,
+        )
+
+    def _auditar_se_homologada(self, servidor, producao_imovel, justificativa, **kwargs):
+        if self.producao_obj.status == "HOMOLOGADO":
+            _registrar_auditoria_producao_imovel(
+                servidor,
+                producao_imovel,
+                justificativa,
+                **kwargs,
+            )
+
+    def _processar_acao(self, request, acao, servidor, justificativa):
+        tipo = acao.get("tipo")
+        pode_agrupar = _pode_agrupar_producao(request)
+
+        if tipo == "vincular":
+            imovel_id = acao.get("imovel_id")
+            if not imovel_id:
+                return {"sucesso": False, "erro": "imovel_id é obrigatório."}
+
+            if ProducaoImovel.objects.filter(
+                producao=self.producao_obj,
+                imovel_id=imovel_id,
+            ).exists():
+                return {"sucesso": False, "erro": "Imóvel já vinculado à produção."}
+
+            os_imovel = OsImovel.objects.filter(
+                os=self.producao_obj.os,
+                imovel_id=imovel_id,
+            ).first()
+            if os_imovel is None:
+                return {"sucesso": False, "erro": "Imóvel não pertence à OS desta produção."}
+
+            producao_imovel = ProducaoImovel.objects.create(
+                producao=self.producao_obj,
+                imovel_id=imovel_id,
+            )
+            producao_imovel.capturar_snapshot_de_osimovel(os_imovel)
+            self._auditar_se_homologada(
+                servidor,
+                producao_imovel,
+                justificativa,
+                operacao="EDICAO_POS_HOMOLOGACAO",
+                campo_alterado="vinculo",
+                valor_novo=str(imovel_id),
+            )
+            return {
+                "sucesso": True,
+                "tipo": tipo,
+                "item": _serializar_producao_imovel(producao_imovel),
+            }
+
+        if tipo in {"agrupar", "novo_grupo", "remover_grupo"}:
+            if not pode_agrupar:
+                return {
+                    "sucesso": False,
+                    "erro": "Você não tem permissão para gerenciar agrupamentos.",
+                    "status": 403,
+                }
+
+        if tipo == "agrupar":
+            producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
+            grupo_ref = (acao.get("grupo_ref") or "").strip()
+            if not grupo_ref:
+                return {"sucesso": False, "erro": "grupo_ref é obrigatório."}
+
+            valor_anterior = producao_imovel.grupo_ref
+            producao_imovel.grupo_ref = grupo_ref
+            producao_imovel.save(update_fields=["grupo_ref"])
+            self._auditar_se_homologada(
+                servidor,
+                producao_imovel,
+                justificativa,
+                campo_alterado="grupo_ref",
+                valor_anterior=valor_anterior,
+                valor_novo=grupo_ref,
+            )
+            return {
+                "sucesso": True,
+                "tipo": tipo,
+                "item": _serializar_producao_imovel(producao_imovel),
+            }
+
+        if tipo == "novo_grupo":
+            ids = acao.get("ids") or []
+            if not ids:
+                return {"sucesso": False, "erro": "Informe ao menos um imóvel para agrupar."}
+
+            grupo_ref = _proximo_grupo_ref(self.producao_obj)
+            itens = []
+            for producao_imovel_id in ids:
+                producao_imovel = self._obter_producao_imovel(producao_imovel_id)
+                valor_anterior = producao_imovel.grupo_ref
+                producao_imovel.grupo_ref = grupo_ref
+                producao_imovel.save(update_fields=["grupo_ref"])
+                self._auditar_se_homologada(
+                    servidor,
+                    producao_imovel,
+                    justificativa,
+                    campo_alterado="grupo_ref",
+                    valor_anterior=valor_anterior,
+                    valor_novo=grupo_ref,
+                )
+                itens.append(_serializar_producao_imovel(producao_imovel))
+            return {"sucesso": True, "tipo": tipo, "grupo_ref": grupo_ref, "itens": itens}
+
+        if tipo == "remover_grupo":
+            producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
+            valor_anterior = producao_imovel.grupo_ref
+            producao_imovel.grupo_ref = None
+            producao_imovel.save(update_fields=["grupo_ref"])
+            self._auditar_se_homologada(
+                servidor,
+                producao_imovel,
+                justificativa,
+                campo_alterado="grupo_ref",
+                valor_anterior=valor_anterior,
+                valor_novo=None,
+            )
+            return {
+                "sucesso": True,
+                "tipo": tipo,
+                "item": _serializar_producao_imovel(producao_imovel),
+            }
+
+        if tipo == "desvincular":
+            producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
+            item_id = producao_imovel.pk
+            imovel_id = producao_imovel.imovel_id
+            self._auditar_se_homologada(
+                servidor,
+                producao_imovel,
+                justificativa,
+                operacao="EDICAO_POS_HOMOLOGACAO",
+                campo_alterado="vinculo",
+                valor_anterior=str(imovel_id),
+                valor_novo=None,
+            )
+            producao_imovel.delete()
+            return {"sucesso": True, "tipo": tipo, "id": item_id, "imovel_id": imovel_id}
+
+        return {"sucesso": False, "erro": f"Ação desconhecida: {tipo}"}
+
+    def post(self, request, *args, **kwargs):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({"sucesso": False, "erro": "JSON inválido."}, status=400)
+
+        acoes = payload.get("acoes") or []
+        if not acoes:
+            return JsonResponse({"sucesso": False, "erro": "Nenhuma ação informada."}, status=400)
+
+        justificativa = (payload.get("justificativa") or "").strip()
+        erro_justificativa = _validar_justificativa_homologada(
+            self.producao_obj,
+            justificativa,
+        )
+        if erro_justificativa:
+            return JsonResponse({"sucesso": False, "erro": erro_justificativa}, status=400)
+
+        resultados = []
+        with transaction.atomic():
+            for acao in acoes:
+                resultado = self._processar_acao(request, acao, servidor, justificativa)
+                if not resultado.get("sucesso"):
+                    status = resultado.pop("status", 400)
+                    return self._resposta_json(
+                        request,
+                        sucesso=False,
+                        status=status,
+                        erro=resultado.get("erro", "Erro ao processar ação."),
+                        resultados=resultados,
+                    )
+                resultados.append(resultado)
+
+        return self._resposta_json(
+            request,
+            sucesso=True,
+            mensagem="Alterações salvas com sucesso.",
+            resultados=resultados,
+        )
 
 
 class OSVincularImovelView(RequerLoginMixin, View):
