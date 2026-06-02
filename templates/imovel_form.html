@@ -1,94 +1,43 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% if editando %}Editar imóvel{% else %}Novo imóvel{% endif %} — SIPRAC{% endblock %}
+{% block title %}Novo imóvel ISIC — SIPRAC{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4 text-dark">{% if editando %}Editar imóvel{% else %}Novo imóvel{% endif %}</h1>
+<h1 class="h3 mb-1 text-dark">Novo imóvel sem inscrição cadastral (ISIC)</h1>
+<p class="text-muted mb-4">Será gerado: <strong>{{ proximo_codigo_isic }}</strong></p>
 
 <form method="post" id="imovel-form" novalidate>
   {% csrf_token %}
 
   <div class="card siprac-card mb-3">
     <div class="card-body">
-      <ul class="nav nav-tabs mb-3" id="imovel-tabs" role="tablist">
-        <li class="nav-item" role="presentation">
-          <button class="nav-link active" id="tab-identificacao" data-bs-toggle="tab"
-                  data-bs-target="#pane-identificacao" type="button" role="tab">Identificação</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-endereco" data-bs-toggle="tab"
-                  data-bs-target="#pane-endereco" type="button" role="tab">Endereço</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-cadastrais" data-bs-toggle="tab"
-                  data-bs-target="#pane-cadastrais" type="button" role="tab">Dados cadastrais</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-rh" data-bs-toggle="tab"
-                  data-bs-target="#pane-rh" type="button" role="tab">Região homogênea</button>
-        </li>
-        <li class="nav-item" role="presentation">
-          <button class="nav-link" id="tab-coordenadas" data-bs-toggle="tab"
-                  data-bs-target="#pane-coordenadas" type="button" role="tab">Coordenadas</button>
-        </li>
-      </ul>
-
-      <div class="tab-content">
-        <div class="tab-pane fade show active" id="pane-identificacao" role="tabpanel">
-          <div class="row g-3">
-            <div class="col-12">{{ form.tipo_identificacao|as_crispy_field }}</div>
-            <div class="col-md-6" id="campo-inscricao">
-              {{ form.inscricao_cadastral|as_crispy_field }}
-            </div>
-            <div class="col-md-6 d-none" id="preview-isic">
-              <div class="alert alert-light border mb-0" role="status">
-                <span class="text-muted">Será gerado:</span>
-                <strong id="preview-isic-valor">{% if editando and imovel.codigo_isic %}{{ imovel.codigo_isic }}{% endif %}</strong>
-              </div>
-            </div>
-            <div class="col-md-6">{{ form.num_bloco|as_crispy_field }}</div>
-          </div>
+      <div class="row g-3">
+        <div class="col-md-8">
+          {{ form.num_bloco|as_crispy_field }}
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="button" id="btn-buscar-coordenadas" class="btn btn-outline-primary w-100">
+            Buscar coordenadas
+          </button>
         </div>
 
-        <div class="tab-pane fade" id="pane-endereco" role="tabpanel">
-          <div class="row g-3">
-            <div class="col-md-4">{{ form.cod_logradouro|as_crispy_field }}</div>
-            <div class="col-md-8">{{ form.nom_logradouro|as_crispy_field }}</div>
-            <div class="col-md-4">{{ form.num_endereco|as_crispy_field }}</div>
-            <div class="col-md-4">{{ form.num_unidade|as_crispy_field }}</div>
-            <div class="col-md-4">{{ form.bairro|as_crispy_field }}</div>
-          </div>
+        <div class="col-12">
+          <div id="msg-coordenadas" class="alert d-none mb-0" role="status"></div>
         </div>
 
-        <div class="tab-pane fade" id="pane-cadastrais" role="tabpanel">
-          <div class="row g-3">
-            <div class="col-md-6">{{ form.des_finalidade|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.area_territorial|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.area_construida|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.exercicio_referencia|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.num_versao|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.origem_dados|as_crispy_field }}</div>
-            <div class="col-12">{{ form.observacao_interna|as_crispy_field }}</div>
-          </div>
-        </div>
-
-        <div class="tab-pane fade" id="pane-rh" role="tabpanel">
-          <div class="row g-3">
-            <div class="col-md-4">{{ form.rh_nome|as_crispy_field }}</div>
-            <div class="col-md-4">{{ form.rh_valor|as_crispy_field }}</div>
-            <div class="col-md-4">{{ form.idf_regiao_homogenea|as_crispy_field }}</div>
-          </div>
-        </div>
-
-        <div class="tab-pane fade" id="pane-coordenadas" role="tabpanel">
-          <div class="row g-3">
-            <div class="col-md-3">{{ form.latitude|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.longitude|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.coord_x|as_crispy_field }}</div>
-            <div class="col-md-3">{{ form.coord_y|as_crispy_field }}</div>
-          </div>
-        </div>
+        <div class="col-md-6">{{ form.nom_logradouro|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.num_endereco|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.num_unidade|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.bairro|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.des_finalidade|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.area_territorial|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.area_construida|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.latitude|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.longitude|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.coord_x|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.coord_y|as_crispy_field }}</div>
+        <div class="col-12">{{ form.observacao_interna|as_crispy_field }}</div>
       </div>
     </div>
   </div>
@@ -99,11 +48,7 @@
 
   <div class="d-flex gap-2">
     <button type="submit" class="btn btn-primary siprac-btn-primary">Salvar</button>
-    {% if editando %}
-    <a href="{% url 'imovel_detalhe' imovel.pk %}" class="btn btn-outline-secondary">Cancelar</a>
-    {% else %}
     <a href="{% url 'imovel_list' %}" class="btn btn-outline-secondary">Cancelar</a>
-    {% endif %}
   </div>
 </form>
 {% endblock %}
@@ -111,50 +56,66 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const tipoRadios = document.querySelectorAll('input[name="tipo_identificacao"]');
-  const campoInscricao = document.getElementById('campo-inscricao');
-  const previewIsic = document.getElementById('preview-isic');
-  const previewValor = document.getElementById('preview-isic-valor');
-  const urlProximoIsic = '{% url "api_proximo_isic" %}';
-  const codigoExistente = '{% if editando and imovel.codigo_isic %}{{ imovel.codigo_isic }}{% endif %}';
+  const btnBuscar = document.getElementById('btn-buscar-coordenadas');
+  const inputBloco = document.getElementById('id_num_bloco');
+  const msgBox = document.getElementById('msg-coordenadas');
+  const camposCoord = ['latitude', 'longitude', 'coord_x', 'coord_y'];
 
-  function tipoSelecionado() {
-    const checked = document.querySelector('input[name="tipo_identificacao"]:checked');
-    return checked ? checked.value : 'CADASTRAL';
-  }
-
-  function atualizarCampos() {
-    const tipo = tipoSelecionado();
-    if (tipo === 'ISIC') {
-      campoInscricao.classList.add('d-none');
-      previewIsic.classList.remove('d-none');
-      if (codigoExistente) {
-        previewValor.textContent = codigoExistente;
-        return;
+  function definirCoordenadasHabilitadas(habilitado) {
+    camposCoord.forEach(function (nome) {
+      const campo = document.getElementById('id_' + nome);
+      if (campo) {
+        campo.readOnly = !habilitado;
       }
-      fetch(urlProximoIsic, {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-      })
-        .then(function (response) { return response.json(); })
-        .then(function (data) {
-          if (data.codigo) {
-            previewValor.textContent = data.codigo;
-          }
-        })
-        .catch(function () {
-          previewValor.textContent = '—';
-        });
-    } else {
-      campoInscricao.classList.remove('d-none');
-      previewIsic.classList.add('d-none');
-    }
+    });
   }
 
-  tipoRadios.forEach(function (radio) {
-    radio.addEventListener('change', atualizarCampos);
+  function preencherCoordenadas(dados) {
+    camposCoord.forEach(function (nome) {
+      const campo = document.getElementById('id_' + nome);
+      if (campo && dados[nome] !== null && dados[nome] !== undefined) {
+        campo.value = dados[nome];
+      }
+    });
+  }
+
+  function mostrarMensagem(texto, tipo) {
+    msgBox.textContent = texto;
+    msgBox.className = 'alert alert-' + tipo + ' mb-0';
+    msgBox.classList.remove('d-none');
+  }
+
+  definirCoordenadasHabilitadas(true);
+
+  btnBuscar.addEventListener('click', function () {
+    const numBloco = inputBloco.value.trim();
+    msgBox.classList.add('d-none');
+    if (!numBloco) {
+      mostrarMensagem('Informe o Nº Lote Fiscal para buscar coordenadas.', 'warning');
+      return;
+    }
+
+    const urlBase = '{% url "api_siat_coordenadas_bloco" "LOTE" %}'.replace('LOTE', encodeURIComponent(numBloco));
+    fetch(urlBase, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.encontrado) {
+          preencherCoordenadas(data);
+          definirCoordenadasHabilitadas(false);
+          mostrarMensagem('Coordenadas preenchidas a partir do Lote Fiscal.', 'success');
+        } else {
+          definirCoordenadasHabilitadas(true);
+          mostrarMensagem('Lote Fiscal não encontrado no arquivo SIAT. Preencha as coordenadas manualmente.', 'warning');
+        }
+      })
+      .catch(function () {
+        definirCoordenadasHabilitadas(true);
+        mostrarMensagem('Erro ao buscar coordenadas no SIAT.', 'danger');
+      });
   });
-  atualizarCampos();
 });
 </script>
 {% endblock %}

@@ -15,6 +15,7 @@ from core.forms import (
     DESPACHO_VALUE,
     EncaminhamentoForm,
     ImovelForm,
+    ISICForm,
     OSEncerramentoForm,
     OSForm,
     ProducaoForm,
@@ -23,7 +24,11 @@ from core.forms import (
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
 from core.siat_config import SIAT_ARQUIVO_PATH
-from core.siat_service import atualizar_inscricao_do_arquivo, carregar_arquivo_siat
+from core.siat_service import (
+    atualizar_inscricao_do_arquivo,
+    carregar_arquivo_siat,
+    obter_coordenadas_bloco,
+)
 from core.models import (
     Encaminhamento,
     Finalidade,
@@ -230,6 +235,36 @@ def _salvar_imovel_from_form(dados, imovel=None):
     imovel.editado_manualmente = True
     imovel.save()
     return imovel
+
+
+def _salvar_isic_from_form(dados):
+    imovel = Imovel(
+        tipo_identificacao="ISIC",
+        codigo_isic=_gerar_codigo_isic(),
+        origem_dados="MANUAL",
+    )
+
+    for campo in ISICForm.CAMPOS_ISIC:
+        valor = dados.get(campo)
+        if campo == "observacao_interna":
+            valor = valor or None
+        setattr(imovel, campo, valor)
+
+    num_bloco = dados.get("num_bloco")
+    if num_bloco and SIAT_ARQUIVO_PATH.exists():
+        coordenadas = obter_coordenadas_bloco(num_bloco, SIAT_ARQUIVO_PATH)
+        if coordenadas:
+            for campo in ("latitude", "longitude", "coord_x", "coord_y"):
+                if getattr(imovel, campo) is None and coordenadas.get(campo) is not None:
+                    setattr(imovel, campo, coordenadas[campo])
+
+    imovel.editado_manualmente = True
+    imovel.save()
+    return imovel
+
+
+def _decimal_para_json(valor):
+    return str(valor) if valor is not None else None
 
 
 def _queryset_os_anotado():
@@ -726,10 +761,15 @@ class ImovelListView(RequerLoginMixin, ListView):
 
 class ImovelCreateView(RequerLoginMixin, FormView):
     template_name = "imovel_form.html"
-    form_class = ImovelForm
+    form_class = ISICForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["proximo_codigo_isic"] = _gerar_codigo_isic()
+        return context
 
     def form_valid(self, form):
-        imovel = _salvar_imovel_from_form(form.cleaned_data)
+        imovel = _salvar_isic_from_form(form.cleaned_data)
         messages.success(self.request, "Imóvel cadastrado com sucesso.")
         return redirect(reverse("imovel_detalhe", kwargs={"pk": imovel.pk}))
 
@@ -756,7 +796,7 @@ class ImovelDetailView(RequerLoginMixin, DetailView):
 
 
 class ImovelUpdateView(RequerLoginMixin, FormView):
-    template_name = "imovel_form.html"
+    template_name = "imovel_edit_form.html"
     form_class = ImovelForm
 
     def dispatch(self, request, *args, **kwargs):
@@ -943,22 +983,23 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
         if not busca:
             return JsonResponse([], safe=False)
 
-        filtros = (
-            Q(codigo_isic__icontains=busca)
-            | Q(nom_logradouro__icontains=busca)
-            | Q(bairro__icontains=busca)
-        )
+        filtros = Q(codigo_isic__icontains=busca) | Q(nom_logradouro__icontains=busca)
+        filtros |= Q(num_bloco=busca)
         try:
             filtros |= Q(inscricao_cadastral=int(busca))
         except ValueError:
             pass
 
         resultados = []
-        for imovel in Imovel.objects.filter(filtros).order_by("inscricao_cadastral", "codigo_isic")[:20]:
+        for imovel in Imovel.objects.filter(filtros).order_by(
+            "inscricao_cadastral",
+            "codigo_isic",
+        )[:20]:
             resultados.append(
                 {
                     "id": imovel.pk,
                     "identificacao": _formatar_identificacao_imovel(imovel),
+                    "num_bloco": imovel.num_bloco or "",
                     "endereco": _formatar_endereco_imovel(imovel),
                     "bairro": imovel.bairro or "",
                     "area_territorial": (
@@ -971,3 +1012,23 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
             )
 
         return JsonResponse(resultados, safe=False)
+
+
+class SiatCoordenadasBlocoView(RequerLoginJSONMixin, View):
+    def get(self, request, num_bloco):
+        if not SIAT_ARQUIVO_PATH.exists():
+            return JsonResponse({"encontrado": False})
+
+        coordenadas = obter_coordenadas_bloco(num_bloco, SIAT_ARQUIVO_PATH)
+        if not coordenadas:
+            return JsonResponse({"encontrado": False})
+
+        return JsonResponse(
+            {
+                "encontrado": True,
+                "latitude": _decimal_para_json(coordenadas.get("latitude")),
+                "longitude": _decimal_para_json(coordenadas.get("longitude")),
+                "coord_x": _decimal_para_json(coordenadas.get("coord_x")),
+                "coord_y": _decimal_para_json(coordenadas.get("coord_y")),
+            },
+        )

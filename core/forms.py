@@ -431,6 +431,96 @@ class ImovelForm(forms.Form):
         return cleaned_data
 
 
+class ISICForm(forms.Form):
+    num_bloco = forms.CharField(
+        label="Nº Lote Fiscal",
+        max_length=12,
+        required=False,
+    )
+    nom_logradouro = forms.CharField(
+        label="Logradouro",
+        max_length=255,
+        required=False,
+    )
+    num_endereco = forms.CharField(
+        label="Número",
+        max_length=20,
+        required=False,
+    )
+    num_unidade = forms.CharField(
+        label="Unidade",
+        max_length=20,
+        required=False,
+    )
+    bairro = forms.CharField(
+        label="Bairro",
+        max_length=100,
+        required=False,
+    )
+    des_finalidade = forms.CharField(
+        label="Finalidade/Uso",
+        max_length=255,
+        required=False,
+    )
+    area_territorial = forms.DecimalField(
+        label="Área territorial (m²)",
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+    )
+    area_construida = forms.DecimalField(
+        label="Área construída (m²)",
+        max_digits=12,
+        decimal_places=2,
+        required=False,
+    )
+    latitude = forms.DecimalField(
+        label="Latitude",
+        max_digits=12,
+        decimal_places=8,
+        required=False,
+    )
+    longitude = forms.DecimalField(
+        label="Longitude",
+        max_digits=12,
+        decimal_places=8,
+        required=False,
+    )
+    coord_x = forms.DecimalField(
+        label="Coordenada X",
+        max_digits=15,
+        decimal_places=6,
+        required=False,
+    )
+    coord_y = forms.DecimalField(
+        label="Coordenada Y",
+        max_digits=15,
+        decimal_places=6,
+        required=False,
+    )
+    observacao_interna = forms.CharField(
+        label="Observação interna",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+    CAMPOS_ISIC = (
+        "num_bloco",
+        "nom_logradouro",
+        "num_endereco",
+        "num_unidade",
+        "bairro",
+        "des_finalidade",
+        "area_territorial",
+        "area_construida",
+        "latitude",
+        "longitude",
+        "coord_x",
+        "coord_y",
+        "observacao_interna",
+    )
+
+
 class SiatUploadForm(forms.Form):
     arquivo = forms.FileField(
         label="Arquivo SIAT (.txt)",

@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Editar imóvel — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Editar imóvel</h1>
+
+<form method="post" id="imovel-form" novalidate>
+  {% csrf_token %}
+
+  <div class="card siprac-card mb-3">
+    <div class="card-body">
+      <ul class="nav nav-tabs mb-3" id="imovel-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-identificacao" data-bs-toggle="tab"
+                  data-bs-target="#pane-identificacao" type="button" role="tab">Identificação</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-endereco" data-bs-toggle="tab"
+                  data-bs-target="#pane-endereco" type="button" role="tab">Endereço</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-cadastrais" data-bs-toggle="tab"
+                  data-bs-target="#pane-cadastrais" type="button" role="tab">Dados cadastrais</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-rh" data-bs-toggle="tab"
+                  data-bs-target="#pane-rh" type="button" role="tab">Região homogênea</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-coordenadas" data-bs-toggle="tab"
+                  data-bs-target="#pane-coordenadas" type="button" role="tab">Coordenadas</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="pane-identificacao" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-12">{{ form.tipo_identificacao|as_crispy_field }}</div>
+            <div class="col-md-6" id="campo-inscricao">
+              {{ form.inscricao_cadastral|as_crispy_field }}
+            </div>
+            <div class="col-md-6 d-none" id="preview-isic">
+              <div class="alert alert-light border mb-0" role="status">
+                <span class="text-muted">Código:</span>
+                <strong id="preview-isic-valor">{{ imovel.codigo_isic }}</strong>
+              </div>
+            </div>
+            <div class="col-md-6">{{ form.num_bloco|as_crispy_field }}</div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-endereco" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-md-4">{{ form.cod_logradouro|as_crispy_field }}</div>
+            <div class="col-md-8">{{ form.nom_logradouro|as_crispy_field }}</div>
+            <div class="col-md-4">{{ form.num_endereco|as_crispy_field }}</div>
+            <div class="col-md-4">{{ form.num_unidade|as_crispy_field }}</div>
+            <div class="col-md-4">{{ form.bairro|as_crispy_field }}</div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-cadastrais" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-md-6">{{ form.des_finalidade|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.area_territorial|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.area_construida|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.exercicio_referencia|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.num_versao|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.origem_dados|as_crispy_field }}</div>
+            <div class="col-12">{{ form.observacao_interna|as_crispy_field }}</div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-rh" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-md-4">{{ form.rh_nome|as_crispy_field }}</div>
+            <div class="col-md-4">{{ form.rh_valor|as_crispy_field }}</div>
+            <div class="col-md-4">{{ form.idf_regiao_homogenea|as_crispy_field }}</div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-coordenadas" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-md-3">{{ form.latitude|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.longitude|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.coord_x|as_crispy_field }}</div>
+            <div class="col-md-3">{{ form.coord_y|as_crispy_field }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary siprac-btn-primary">Salvar</button>
+    <a href="{% url 'imovel_detalhe' imovel.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tipoRadios = document.querySelectorAll('input[name="tipo_identificacao"]');
+  const campoInscricao = document.getElementById('campo-inscricao');
+  const previewIsic = document.getElementById('preview-isic');
+
+  function atualizarCampos() {
+    const checked = document.querySelector('input[name="tipo_identificacao"]:checked');
+    const tipo = checked ? checked.value : 'CADASTRAL';
+    if (tipo === 'ISIC') {
+      campoInscricao.classList.add('d-none');
+      previewIsic.classList.remove('d-none');
+    } else {
+      campoInscricao.classList.remove('d-none');
+      previewIsic.classList.add('d-none');
+    }
+  }
+
+  tipoRadios.forEach(function (radio) {
+    radio.addEventListener('change', atualizarCampos);
+  });
+  atualizarCampos();
+});
+</script>
+{% endblock %}

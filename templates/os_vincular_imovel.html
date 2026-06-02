@@ -12,7 +12,7 @@
       <div class="col-md-10">
         <label for="busca-imovel" class="form-label">Buscar imóvel</label>
         <input type="search" id="busca-imovel" class="form-control"
-               placeholder="Inscrição cadastral, código ISIC, logradouro ou bairro">
+               placeholder="Inscrição cadastral, ISIC, nº lote fiscal ou logradouro">
       </div>
       <div class="col-md-2">
         <button type="button" id="btn-buscar-imovel" class="btn btn-primary siprac-btn-primary w-100">Buscar</button>
@@ -73,11 +73,13 @@ document.addEventListener('DOMContentLoaded', function () {
           elemento.className = 'list-group-item d-flex flex-wrap justify-content-between align-items-start gap-3';
 
           const area = item.area_territorial ? item.area_territorial + ' m²' : '—';
+          const bloco = item.num_bloco ? ' · Lote: ' + item.num_bloco : '';
           elemento.innerHTML =
             '<div>' +
               '<div class="fw-semibold">' + item.identificacao + '</div>' +
               '<div class="small text-muted">' +
                 (item.endereco || '—') +
+                bloco +
                 (item.bairro ? ' · ' + item.bairro : '') +
                 ' · Área: ' + area +
                 ' · Origem: ' + origemLabel(item.origem_dados) +

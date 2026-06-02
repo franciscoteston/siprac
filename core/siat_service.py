@@ -98,3 +98,34 @@ def atualizar_inscricao_do_arquivo(imovel, filepath):
     _aplicar_dados_siat(imovel, dados)
     imovel.save()
     return True
+
+
+def buscar_bloco_no_arquivo(num_bloco, filepath):
+    num_bloco = str(num_bloco).strip()
+    if not num_bloco:
+        return None
+
+    try:
+        registros = [
+            registro
+            for registro in parse_siat_file(filepath)
+            if str(registro.get("num_bloco", "")).strip() == num_bloco
+        ]
+    except OSError:
+        return None
+
+    return registros or None
+
+
+def obter_coordenadas_bloco(num_bloco, filepath):
+    registros = buscar_bloco_no_arquivo(num_bloco, filepath)
+    if not registros:
+        return None
+
+    primeiro = registros[0]
+    return {
+        "latitude": primeiro.get("latitude"),
+        "longitude": primeiro.get("longitude"),
+        "coord_x": primeiro.get("coord_x"),
+        "coord_y": primeiro.get("coord_y"),
+    }

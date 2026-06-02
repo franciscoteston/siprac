@@ -336,3 +336,21 @@ e nos snapshots de OsImovel, será possível implementar:
 - Base para análises espaciais de mercado imobiliário pela EPGV
 Bibliotecas candidatas: Leaflet.js (coordenadas geográficas WGS84)
 e/ou sistema TM POA (coord_x, coord_y) para mapas municipais.
+
+### 15.4 Informação de frentes por Lote Fiscal na View SIAT
+Atualmente a View SIAT não informa se um Lote Fiscal (NUM_BLOCO) possui uma ou mais
+frentes (logradouros). Isso impede o preenchimento automático seguro de logradouro,
+bairro e região homogênea ao criar um ISIC a partir de um NUM_BLOCO, pois um lote
+com múltiplas frentes pode ter mais de um logradouro, bairro e RH associados.
+
+Ação necessária: alterar os procedimentos de geração da View SIAT para incluir
+um campo indicando a quantidade de frentes do Lote Fiscal (ex: QTD_FRENTES).
+Com essa informação disponível:
+- QTD_FRENTES = 1: preenchimento automático seguro de logradouro, bairro e RH
+  ao informar NUM_BLOCO na criação de ISIC
+- QTD_FRENTES > 1: sistema alerta o usuário que há múltiplas frentes e solicita
+  preenchimento manual dos campos de endereço
+
+As coordenadas (latitude, longitude, coord_x, coord_y) podem ser preenchidas
+automaticamente a partir do NUM_BLOCO independentemente do número de frentes,
+pois representam o centroide do lote fiscal.
