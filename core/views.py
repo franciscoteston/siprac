@@ -74,6 +74,17 @@ def _contexto_dashboard_vazio():
     }
 
 
+def _producoes_pendentes_os(os):
+    """Produções ativas que ainda não foram homologadas nem canceladas."""
+    return (
+        Producao.objects.filter(os=os)
+        .exclude(
+            status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
+        )
+        .select_related("tipo_producao")
+    )
+
+
 def _obter_servidor(user):
     try:
         return user.servidor
@@ -518,6 +529,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
             .first()
         )
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
+        context["producoes_pendentes"] = _producoes_pendentes_os(os_obj)
         return context
 
 
@@ -669,9 +681,20 @@ class OSEncerramentoView(RequerLoginMixin, FormView):
             os=self.os_obj,
             data_encerramento__isnull=True,
         ).select_related("processo_sei")
+        context["producoes_pendentes"] = _producoes_pendentes_os(self.os_obj)
         return context
 
     def form_valid(self, form):
+        producoes_pendentes = _producoes_pendentes_os(self.os_obj)
+        if producoes_pendentes.exists():
+            total = producoes_pendentes.count()
+            messages.error(
+                self.request,
+                f"Não é possível encerrar a OS. Há {total} produção(ões) "
+                f"pendente(s) de homologação.",
+            )
+            return self.form_invalid(form)
+
         servidor = _obter_servidor(self.request.user)
         if servidor is None:
             messages.error(self.request, MSG_SEM_PERMISSAO)

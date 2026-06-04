@@ -28,7 +28,17 @@
     <a href="{% url 'os_producao' os.pk %}" class="btn btn-outline-primary btn-sm">Registrar produção</a>
     {% endif %}
     {% if request.perfil_acesso and request.perfil_acesso.pode_encerrar_os %}
-    <a href="{% url 'os_encerrar' os.pk %}" class="btn btn-outline-danger btn-sm">Encerrar OS</a>
+      {% if producoes_pendentes %}
+      <span class="d-inline-block" tabindex="0"
+            data-bs-toggle="tooltip" data-bs-placement="top"
+            title="Há produções pendentes">
+        <a href="{% url 'os_encerrar' os.pk %}"
+           class="btn btn-outline-secondary btn-sm disabled pe-none"
+           aria-disabled="true">Encerrar OS</a>
+      </span>
+      {% else %}
+      <a href="{% url 'os_encerrar' os.pk %}" class="btn btn-outline-danger btn-sm">Encerrar OS</a>
+      {% endif %}
     {% endif %}
   </div>
 </div>
