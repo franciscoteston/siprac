@@ -7,7 +7,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 import datetime
 from django.db import transaction
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -55,22 +55,68 @@ from core.models import (
     TarefaInterna,
     TipoDemanda,
     TipoProducao,
+    UnidadeInterna,
 )
 
 
 MSG_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação."
 
+NIVEL_VISAO_SISTEMICA = "SISTEMICA"
+NIVEL_VISAO_UNIDADE = "UNIDADE"
+NIVEL_VISAO_PESSOAL = "PESSOAL"
+
+PRIORIDADE_ORDEM = {
+    "URGENTE": 0,
+    "PRIORITARIO": 1,
+    "NORMAL": 2,
+}
+
+STATUS_PRODUCAO_FINAL = [
+    Producao.STATUS_HOMOLOGADO,
+    Producao.STATUS_CANCELADO,
+]
+
 logger = logging.getLogger(__name__)
+
+
+def _determinar_nivel_visao(perfil):
+    if perfil and perfil.visibilidade_total:
+        return NIVEL_VISAO_SISTEMICA
+    if perfil and perfil.pode_homologar:
+        return NIVEL_VISAO_UNIDADE
+    return NIVEL_VISAO_PESSOAL
 
 
 def _contexto_dashboard_vazio():
     return {
-        "os_abertas": 0,
-        "na_minha_fila": 0,
-        "aguard_retorno": 0,
-        "producao_mes": 0,
-        "fila_os": [],
-        "producoes_por_status": contar_producoes_por_status_unidades([]),
+        "nivel_visao": NIVEL_VISAO_PESSOAL,
+        "servidor_logado": None,
+        "total_os_ativas": 0,
+        "total_os_unidade": 0,
+        "os_por_unidade": [],
+        "os_prazo_proximo": [],
+        "os_aguardando_retorno": [],
+        "producao_por_tipo_mes": [],
+        "producao_por_semana": [],
+        "os_por_macroetapa": [],
+        "os_por_natureza": [],
+        "producoes_unidade_por_status": contar_producoes_por_status_unidades([]),
+        "producoes_minha_por_status": {
+            "ENTRADA": 0,
+            "DISTRIBUIDO": 0,
+            "EM_ELABORACAO": 0,
+            "PARA_REVISAO": 0,
+            "PARA_AJUSTES": 0,
+            "HOMOLOGADO_MES": 0,
+        },
+        "fila_unidade": [],
+        "fila_pessoal": [],
+        "dashboard_chart_data": {},
+        "card_aguard_retorno": 0,
+        "card_producao_mes": 0,
+        "card_prazo_proximo": 0,
+        "card_em_elaboracao": 0,
+        "card_para_revisao_ajustes": 0,
     }
 
 
@@ -100,16 +146,26 @@ def _obter_unidades_ativas(servidor):
 
 
 def _contar_os_abertas():
-    ultima_macroetapa = MacroetapaLog.objects.filter(
-        os_id=OuterRef("pk"),
-    ).order_by("-data_hora", "-id")
+    return _contar_os_ativas()
 
-    return (
-        OS.objects.annotate(
-            macroetapa_atual=Subquery(ultima_macroetapa.values("macroetapa")[:1]),
-        )
-        .exclude(macroetapa_atual="ENCERRADO")
-        .count()
+
+def _contar_os_ativas(os_ids=None):
+    qs = _queryset_os_anotado().exclude(macroetapa_atual="ENCERRADO")
+    if os_ids is not None:
+        if not os_ids:
+            return 0
+        qs = qs.filter(pk__in=os_ids)
+    return qs.count()
+
+
+def _obter_os_ids_unidades(unidades_ids):
+    if not unidades_ids:
+        return set()
+    return set(
+        TarefaInterna.objects.filter(unidade_id__in=unidades_ids)
+        .exclude(status="CONCLUIDO")
+        .values_list("os_id", flat=True)
+        .distinct(),
     )
 
 
@@ -166,6 +222,432 @@ def _montar_fila_os(unidades_ids):
         )
 
     return fila_os
+
+
+def _obter_os_prazo_proximo(os_ids=None):
+    """OSs com entrada na divisão há mais de 25 dias e não encerradas."""
+    hoje = timezone.localdate()
+    corte = hoje - datetime.timedelta(days=25)
+
+    ordens = (
+        _queryset_os_anotado()
+        .filter(prazo__lt=corte)
+        .exclude(prazo__isnull=True)
+        .exclude(macroetapa_atual="ENCERRADO")
+        .order_by("prazo")
+    )
+    if os_ids is not None:
+        if not os_ids:
+            return []
+        ordens = ordens.filter(pk__in=os_ids)
+
+    resultado = []
+    for os_obj in ordens:
+        dias = (hoje - os_obj.prazo).days
+        resultado.append(
+            {
+                "pk": os_obj.pk,
+                "numero_os": os_obj.numero_os,
+                "processo_sei": os_obj.processo_sei_numero or "—",
+                "dias": dias,
+            },
+        )
+    return sorted(resultado, key=lambda item: item["dias"], reverse=True)
+
+
+def _obter_os_aguardando_retorno():
+    encaminhamentos = (
+        Encaminhamento.objects.filter(
+            aguarda_retorno=True,
+            data_retorno_efetiva__isnull=True,
+        )
+        .select_related("os", "unidade_externa_destino")
+        .order_by("data_retorno_prevista", "os__numero_os")
+    )
+    return [
+        {
+            "os_pk": enc.os_id,
+            "numero_os": enc.os.numero_os,
+            "unidade_externa": (
+                enc.unidade_externa_destino.nome
+                if enc.unidade_externa_destino
+                else "—"
+            ),
+            "data_retorno_prevista": enc.data_retorno_prevista,
+        }
+        for enc in encaminhamentos
+    ]
+
+
+def _obter_producao_por_tipo_mes(os_ids=None):
+    hoje = timezone.localdate()
+    queryset = Producao.objects.filter(
+        status=Producao.STATUS_HOMOLOGADO,
+        data_homologacao__year=hoje.year,
+        data_homologacao__month=hoje.month,
+    )
+    if os_ids is not None:
+        if not os_ids:
+            return []
+        queryset = queryset.filter(os_id__in=os_ids)
+
+    linhas = (
+        queryset.values("tipo_producao__prefixo")
+        .annotate(total=Count("id"))
+        .order_by("tipo_producao__prefixo")
+    )
+    return [
+        {
+            "prefixo": linha["tipo_producao__prefixo"] or "—",
+            "total": linha["total"],
+        }
+        for linha in linhas
+    ]
+
+
+def _obter_producao_por_semana(os_ids=None):
+    hoje = timezone.localdate()
+    inicio = hoje - datetime.timedelta(days=7 * 8 - 1)
+    resultado = []
+    for indice in range(8):
+        semana_inicio = inicio + datetime.timedelta(days=7 * indice)
+        semana_fim = semana_inicio + datetime.timedelta(days=6)
+        queryset = Producao.objects.filter(
+            status=Producao.STATUS_HOMOLOGADO,
+            data_homologacao__gte=semana_inicio,
+            data_homologacao__lte=semana_fim,
+        )
+        if os_ids is not None:
+            if not os_ids:
+                resultado.append({"semana": f"S{indice + 1}", "total": 0})
+                continue
+            queryset = queryset.filter(os_id__in=os_ids)
+        resultado.append(
+            {"semana": f"S{indice + 1}", "total": queryset.count()},
+        )
+    return resultado
+
+
+def _contar_producao_homologada_mes(os_ids=None):
+    hoje = timezone.localdate()
+    queryset = Producao.objects.filter(
+        status=Producao.STATUS_HOMOLOGADO,
+        data_homologacao__year=hoje.year,
+        data_homologacao__month=hoje.month,
+    )
+    if os_ids is not None:
+        if not os_ids:
+            return 0
+        queryset = queryset.filter(os_id__in=os_ids)
+    return queryset.count()
+
+
+def _obter_os_por_macroetapa(os_ids=None):
+    qs = (
+        _queryset_os_anotado()
+        .exclude(macroetapa_atual="ENCERRADO")
+        .exclude(macroetapa_atual__isnull=True)
+    )
+    if os_ids is not None:
+        if not os_ids:
+            return []
+        qs = qs.filter(pk__in=os_ids)
+
+    linhas = (
+        qs.values("macroetapa_atual")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+    )
+    return [
+        {"macroetapa": linha["macroetapa_atual"], "total": linha["total"]}
+        for linha in linhas
+    ]
+
+
+def _obter_os_por_natureza(os_ids=None):
+    qs = _queryset_os_anotado().exclude(macroetapa_atual="ENCERRADO")
+    if os_ids is not None:
+        if not os_ids:
+            return []
+        qs = qs.filter(pk__in=os_ids)
+
+    linhas = (
+        qs.values("natureza__descricao")
+        .annotate(total=Count("id"))
+        .order_by("-total")
+    )
+    return [
+        {"natureza": linha["natureza__descricao"], "total": linha["total"]}
+        for linha in linhas
+    ]
+
+
+def _obter_os_por_unidade():
+    """OSs ativas e produções por unidade (via tarefa interna ativa)."""
+    hoje = timezone.localdate()
+    resultado = []
+
+    for unidade in UnidadeInterna.objects.order_by("sigla"):
+        os_ids = list(
+            TarefaInterna.objects.filter(unidade=unidade)
+            .exclude(status="CONCLUIDO")
+            .values_list("os_id", flat=True)
+            .distinct(),
+        )
+        if not os_ids:
+            continue
+
+        os_ativas_ids = list(
+            _queryset_os_anotado()
+            .filter(pk__in=os_ids)
+            .exclude(macroetapa_atual="ENCERRADO")
+            .values_list("pk", flat=True),
+        )
+        if not os_ativas_ids:
+            continue
+
+        producoes = Producao.objects.filter(os_id__in=os_ativas_ids)
+        resultado.append(
+            {
+                "sigla": unidade.sigla,
+                "total": len(os_ativas_ids),
+                "em_elaboracao": producoes.filter(
+                    status=Producao.STATUS_EM_ELABORACAO,
+                ).count(),
+                "para_revisao": producoes.filter(
+                    status=Producao.STATUS_PARA_REVISAO,
+                ).count(),
+                "homologadas_mes": producoes.filter(
+                    status=Producao.STATUS_HOMOLOGADO,
+                    data_homologacao__year=hoje.year,
+                    data_homologacao__month=hoje.month,
+                ).count(),
+            },
+        )
+
+    return resultado
+
+
+def _mapa_prazos_os(os_ids):
+    if not os_ids:
+        return {}
+    return {
+        vinculo.os_id: vinculo.data_entrada_divisao
+        for vinculo in OsProcesso.objects.filter(
+            os_id__in=os_ids,
+            tipo_vinculo="PRINCIPAL",
+        )
+        if vinculo.data_entrada_divisao
+    }
+
+
+def _serializar_fila_producoes(queryset):
+    producoes = _ordenar_producoes_fila(
+        queryset.select_related("os", "tipo_producao", "servidor_responsavel"),
+    )
+    os_ids = [producao.os_id for producao in producoes]
+    prazos = _mapa_prazos_os(os_ids)
+    fila = []
+    for producao in producoes:
+        fila.append(
+            {
+                "pk": producao.pk,
+                "os_pk": producao.os_id,
+                "numero_os": producao.os.numero_os,
+                "tipo": producao.tipo_producao.prefixo,
+                "status": producao.status,
+                "servidor_responsavel": (
+                    producao.servidor_responsavel.nome
+                    if producao.servidor_responsavel
+                    else "—"
+                ),
+                "prazo": prazos.get(producao.os_id),
+                "prioridade": producao.os.prioridade,
+            },
+        )
+    return fila
+
+
+def _ordenar_producoes_fila(queryset):
+    producoes = list(queryset)
+    producoes.sort(
+        key=lambda producao: (
+            PRIORIDADE_ORDEM.get(producao.os.prioridade, 9),
+            producao.data_criacao,
+        ),
+    )
+    return producoes
+
+
+def _queryset_fila_pessoal(servidor, unidades_ids, statuses_chefia):
+    filtro = Q(servidor_responsavel=servidor)
+    if statuses_chefia and unidades_ids:
+        os_ids = _obter_os_ids_unidades(unidades_ids)
+        if os_ids:
+            filtro |= Q(os_id__in=os_ids, status__in=statuses_chefia)
+
+    return (
+        Producao.objects.filter(filtro)
+        .exclude(status__in=STATUS_PRODUCAO_FINAL)
+    )
+
+
+def _obter_fila_pessoal_sistemica(servidor, unidades_ids):
+    return _serializar_fila_producoes(
+        _queryset_fila_pessoal(
+            servidor,
+            unidades_ids,
+            [Producao.STATUS_PARA_REVISAO],
+        ),
+    )
+
+
+def _obter_fila_pessoal_unidade(servidor, unidades_ids):
+    return _serializar_fila_producoes(
+        _queryset_fila_pessoal(
+            servidor,
+            unidades_ids,
+            [Producao.STATUS_PARA_REVISAO, Producao.STATUS_PARA_AJUSTES],
+        ),
+    )
+
+
+def _obter_fila_unidade(unidades_ids):
+    os_ids = _obter_os_ids_unidades(unidades_ids)
+    if not os_ids:
+        return []
+    return _serializar_fila_producoes(
+        Producao.objects.filter(os_id__in=os_ids).exclude(
+            status__in=STATUS_PRODUCAO_FINAL,
+        ),
+    )
+
+
+def _contar_producoes_minhas_por_status(servidor):
+    hoje = timezone.localdate()
+    resultado = {
+        "ENTRADA": 0,
+        "DISTRIBUIDO": 0,
+        "EM_ELABORACAO": 0,
+        "PARA_REVISAO": 0,
+        "PARA_AJUSTES": 0,
+        "HOMOLOGADO_MES": 0,
+    }
+    queryset = Producao.objects.filter(servidor_responsavel=servidor).exclude(
+        status=Producao.STATUS_CANCELADO,
+    )
+    for item in queryset.values("status").annotate(total=Count("id")):
+        if item["status"] in resultado:
+            resultado[item["status"]] = item["total"]
+
+    resultado["HOMOLOGADO_MES"] = queryset.filter(
+        status=Producao.STATUS_HOMOLOGADO,
+        data_homologacao__year=hoje.year,
+        data_homologacao__month=hoje.month,
+    ).count()
+    return resultado
+
+
+def _contexto_dashboard_sistemica(servidor, unidades_ids):
+    os_prazo_proximo = _obter_os_prazo_proximo()
+    os_aguardando_retorno = _obter_os_aguardando_retorno()
+    producao_por_tipo_mes = _obter_producao_por_tipo_mes()
+    producao_por_semana = _obter_producao_por_semana()
+    os_por_macroetapa = _obter_os_por_macroetapa()
+    os_por_natureza = _obter_os_por_natureza()
+
+    return {
+        "total_os_ativas": _contar_os_ativas(),
+        "os_por_unidade": _obter_os_por_unidade(),
+        "os_prazo_proximo": os_prazo_proximo,
+        "os_aguardando_retorno": os_aguardando_retorno,
+        "producao_por_tipo_mes": producao_por_tipo_mes,
+        "producao_por_semana": producao_por_semana,
+        "os_por_macroetapa": os_por_macroetapa,
+        "os_por_natureza": os_por_natureza,
+        "fila_pessoal": _obter_fila_pessoal_sistemica(servidor, unidades_ids),
+        "dashboard_chart_data": _montar_dashboard_chart_data(
+            producao_por_tipo_mes,
+            producao_por_semana,
+            os_por_macroetapa,
+            os_por_natureza,
+        ),
+        "card_aguard_retorno": len(os_aguardando_retorno),
+        "card_producao_mes": _contar_producao_homologada_mes(),
+        "card_prazo_proximo": len(os_prazo_proximo),
+    }
+
+
+def _contexto_dashboard_unidade(servidor, unidades_ids):
+    os_ids = _obter_os_ids_unidades(unidades_ids)
+    os_prazo_proximo = _obter_os_prazo_proximo(os_ids=os_ids)
+    producao_por_tipo_mes = _obter_producao_por_tipo_mes(os_ids=os_ids)
+    producao_por_semana = _obter_producao_por_semana(os_ids=os_ids)
+    producoes_unidade = contar_producoes_por_status_unidades(unidades_ids)
+
+    return {
+        "total_os_unidade": _contar_os_ativas(os_ids=os_ids),
+        "producoes_unidade_por_status": producoes_unidade,
+        "fila_unidade": _obter_fila_unidade(unidades_ids),
+        "os_prazo_proximo": os_prazo_proximo,
+        "producao_por_tipo_mes": producao_por_tipo_mes,
+        "producao_por_semana": producao_por_semana,
+        "fila_pessoal": _obter_fila_pessoal_unidade(servidor, unidades_ids),
+        "dashboard_chart_data": _montar_dashboard_chart_data(
+            producao_por_tipo_mes,
+            producao_por_semana,
+            [],
+            [],
+        ),
+        "card_em_elaboracao": producoes_unidade.get("EM_ELABORACAO", 0),
+        "card_para_revisao_ajustes": (
+            producoes_unidade.get("PARA_REVISAO", 0)
+            + producoes_unidade.get("PARA_AJUSTES", 0)
+        ),
+        "card_producao_mes": producoes_unidade.get("HOMOLOGADO_MES", 0),
+    }
+
+
+def _contexto_dashboard_pessoal(servidor):
+    return {
+        "producoes_minha_por_status": _contar_producoes_minhas_por_status(servidor),
+        "fila_pessoal": _serializar_fila_producoes(
+            Producao.objects.filter(servidor_responsavel=servidor).exclude(
+                status__in=STATUS_PRODUCAO_FINAL,
+            ),
+        ),
+    }
+
+
+def _montar_dashboard_chart_data(
+    producao_por_tipo_mes,
+    producao_por_semana,
+    os_por_macroetapa,
+    os_por_natureza,
+):
+    from core.templatetags.siprac_filters import MACROETAPA_LABELS
+
+    return {
+        "producao_tipo": {
+            "labels": [item["prefixo"] for item in producao_por_tipo_mes],
+            "data": [item["total"] for item in producao_por_tipo_mes],
+        },
+        "producao_semana": {
+            "labels": [item["semana"] for item in producao_por_semana],
+            "data": [item["total"] for item in producao_por_semana],
+        },
+        "os_macroetapa": {
+            "labels": [
+                MACROETAPA_LABELS.get(item["macroetapa"], item["macroetapa"])
+                for item in os_por_macroetapa
+            ],
+            "data": [item["total"] for item in os_por_macroetapa],
+        },
+        "os_natureza": {
+            "labels": [item["natureza"] for item in os_por_natureza],
+            "data": [item["total"] for item in os_por_natureza],
+        },
+    }
 
 
 def _gerar_numero_os():
@@ -368,33 +850,26 @@ class DashboardView(RequerLoginMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        perfil = getattr(self.request, "perfil_acesso", None)
         servidor = _obter_servidor(self.request.user)
 
         if servidor is None:
             context.update(_contexto_dashboard_vazio())
             return context
 
-        hoje = timezone.localdate()
+        nivel_visao = _determinar_nivel_visao(perfil)
         unidades_ids = list(_obter_unidades_ativas(servidor))
 
-        context["os_abertas"] = _contar_os_abertas()
-        context["na_minha_fila"] = TarefaInterna.objects.filter(
-            servidor=servidor,
-        ).exclude(status="CONCLUIDO").count()
-        context["aguard_retorno"] = Encaminhamento.objects.filter(
-            aguarda_retorno=True,
-            data_retorno_efetiva__isnull=True,
-        ).count()
-        context["producao_mes"] = Producao.objects.filter(
-            data_criacao__year=hoje.year,
-            data_criacao__month=hoje.month,
-        ).count()
-        context["fila_os"] = (
-            _montar_fila_os(unidades_ids) if unidades_ids else []
-        )
-        context["producoes_por_status"] = contar_producoes_por_status_unidades(
-            unidades_ids,
-        )
+        context["nivel_visao"] = nivel_visao
+        context["servidor_logado"] = servidor
+
+        if nivel_visao == NIVEL_VISAO_SISTEMICA:
+            context.update(_contexto_dashboard_sistemica(servidor, unidades_ids))
+        elif nivel_visao == NIVEL_VISAO_UNIDADE:
+            context.update(_contexto_dashboard_unidade(servidor, unidades_ids))
+        else:
+            context.update(_contexto_dashboard_pessoal(servidor))
+
         return context
 
 

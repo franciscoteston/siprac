@@ -11,50 +11,263 @@
   {% endif %}
 </div>
 
+{% if nivel_visao == 'SISTEMICA' %}
+
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
     <div class="card siprac-card h-100">
       <div class="card-body">
-        <p class="card-text text-muted mb-1">OSs abertas</p>
-        <p class="card-value mb-0">{{ os_abertas }}</p>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-xl-3">
-    <div class="card siprac-card card-verde h-100">
-      <div class="card-body">
-        <p class="card-text text-muted mb-1">Na minha fila</p>
-        <p class="card-value mb-0">{{ na_minha_fila }}</p>
+        <p class="card-text text-muted mb-1">OSs ativas</p>
+        <p class="card-value mb-0">{{ total_os_ativas }}</p>
       </div>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
     <div class="card siprac-card card-laranja h-100">
       <div class="card-body">
-        <p class="card-text text-muted mb-1">Aguard. retorno</p>
-        <p class="card-value mb-0">{{ aguard_retorno }}</p>
+        <p class="card-text text-muted mb-1">Aguard. retorno externo</p>
+        <p class="card-value mb-0">{{ card_aguard_retorno }}</p>
       </div>
     </div>
   </div>
   <div class="col-sm-6 col-xl-3">
     <div class="card siprac-card h-100">
       <div class="card-body">
-        <p class="card-text text-muted mb-1">Produção/mês</p>
-        <p class="card-value mb-0">{{ producao_mes }}</p>
+        <p class="card-text text-muted mb-1">Produção do mês</p>
+        <p class="card-value mb-0">{{ card_producao_mes }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">OSs com prazo próximo</p>
+        <p class="card-value mb-0">{{ card_prazo_proximo }}</p>
       </div>
     </div>
   </div>
 </div>
 
-<h2 class="h5 mb-3">Produções da minha unidade</h2>
+<h2 class="h5 mb-3">Distribuição por unidade</h2>
+<div class="card siprac-card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Unidade</th>
+            <th class="text-end">OSs ativas</th>
+            <th class="text-end">Em elaboração</th>
+            <th class="text-end">Para revisão</th>
+            <th class="text-end">Homologadas/mês</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in os_por_unidade %}
+          <tr>
+            <td class="fw-semibold">{{ linha.sigla }}</td>
+            <td class="text-end">{{ linha.total }}</td>
+            <td class="text-end">{{ linha.em_elaboracao }}</td>
+            <td class="text-end">{{ linha.para_revisao }}</td>
+            <td class="text-end">{{ linha.homologadas_mes }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-muted text-center py-3">Nenhuma OS ativa por unidade.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Gráficos</h2>
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white fw-semibold">Produção do mês por tipo</div>
+      <div class="card-body">
+        <canvas id="chartProducaoTipo" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white fw-semibold">Produção das últimas 8 semanas</div>
+      <div class="card-body">
+        <canvas id="chartProducaoSemana" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Distribuição</h2>
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white fw-semibold">OSs por macroetapa</div>
+      <div class="card-body">
+        <canvas id="chartOsMacroetapa" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white fw-semibold">OSs abertas por natureza</div>
+      <div class="card-body">
+        <canvas id="chartOsNatureza" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Minha fila</h2>
+<div class="table-responsive mb-4">
+  <table class="table table-hover siprac-table align-middle mb-0">
+    <thead>
+      <tr>
+        <th>OS</th>
+        <th>Tipo</th>
+        <th>Status</th>
+        <th>Responsável</th>
+        <th>Prazo OS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in fila_pessoal %}
+      <tr>
+        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}</a></td>
+        <td>{{ item.tipo }}</td>
+        <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
+        <td class="small">{{ item.servidor_responsavel }}</td>
+        <td class="small">{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-muted text-center py-4">Nenhuma produção na sua fila.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% elif nivel_visao == 'UNIDADE' %}
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">OSs ativas na unidade</p>
+        <p class="card-value mb-0">{{ total_os_unidade }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">Em elaboração</p>
+        <p class="card-value mb-0">{{ card_em_elaboracao }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card card-laranja h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">Para revisão/ajustes</p>
+        <p class="card-value mb-0">{{ card_para_revisao_ajustes }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card siprac-card card-verde h-100">
+      <div class="card-body">
+        <p class="card-text text-muted mb-1">Homologadas no mês</p>
+        <p class="card-value mb-0">{{ card_producao_mes }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Gráficos da unidade</h2>
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white fw-semibold">Produção do mês por tipo</div>
+      <div class="card-body">
+        <canvas id="chartProducaoTipo" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white fw-semibold">Produção das últimas 8 semanas</div>
+      <div class="card-body">
+        <canvas id="chartProducaoSemana" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Fila da unidade</h2>
+<div class="table-responsive mb-4">
+  <table class="table table-hover siprac-table align-middle mb-0">
+    <thead>
+      <tr>
+        <th>OS</th>
+        <th>Tipo</th>
+        <th>Status</th>
+        <th>Responsável</th>
+        <th>Prazo OS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in fila_unidade %}
+      <tr>
+        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}</a></td>
+        <td>{{ item.tipo }}</td>
+        <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
+        <td class="small">{{ item.servidor_responsavel }}</td>
+        <td class="small">{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-muted text-center py-4">Nenhuma produção ativa na unidade.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="h6 mb-3 text-muted">Minha fila</h2>
+<div class="table-responsive mb-4">
+  <table class="table table-sm table-hover siprac-table align-middle mb-0">
+    <thead>
+      <tr>
+        <th>OS</th>
+        <th>Tipo</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in fila_pessoal %}
+      <tr>
+        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}</a></td>
+        <td>{{ item.tipo }}</td>
+        <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="text-muted text-center py-3">Nenhuma produção atribuída a você.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% else %}
+
+<h2 class="h5 mb-3">Minhas produções</h2>
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-4 col-xl-2">
     <div class="card siprac-card h-100">
       <div class="card-body py-3">
         <p class="card-text text-muted small mb-1">Em entrada</p>
-        <p class="mb-0">
-          <span class="badge bg-secondary fs-6">{{ producoes_por_status.ENTRADA }}</span>
-        </p>
+        <p class="mb-0"><span class="badge bg-secondary fs-6">{{ producoes_minha_por_status.ENTRADA }}</span></p>
       </div>
     </div>
   </div>
@@ -62,9 +275,7 @@
     <div class="card siprac-card h-100">
       <div class="card-body py-3">
         <p class="card-text text-muted small mb-1">Distribuídas</p>
-        <p class="mb-0">
-          <span class="badge bg-info fs-6">{{ producoes_por_status.DISTRIBUIDO }}</span>
-        </p>
+        <p class="mb-0"><span class="badge bg-info fs-6">{{ producoes_minha_por_status.DISTRIBUIDO }}</span></p>
       </div>
     </div>
   </div>
@@ -72,9 +283,7 @@
     <div class="card siprac-card h-100">
       <div class="card-body py-3">
         <p class="card-text text-muted small mb-1">Em elaboração</p>
-        <p class="mb-0">
-          <span class="badge bg-primary fs-6">{{ producoes_por_status.EM_ELABORACAO }}</span>
-        </p>
+        <p class="mb-0"><span class="badge bg-primary fs-6">{{ producoes_minha_por_status.EM_ELABORACAO }}</span></p>
       </div>
     </div>
   </div>
@@ -82,9 +291,7 @@
     <div class="card siprac-card h-100">
       <div class="card-body py-3">
         <p class="card-text text-muted small mb-1">Para revisão</p>
-        <p class="mb-0">
-          <span class="badge bg-warning text-dark fs-6">{{ producoes_por_status.PARA_REVISAO }}</span>
-        </p>
+        <p class="mb-0"><span class="badge bg-warning text-dark fs-6">{{ producoes_minha_por_status.PARA_REVISAO }}</span></p>
       </div>
     </div>
   </div>
@@ -92,9 +299,7 @@
     <div class="card siprac-card h-100">
       <div class="card-body py-3">
         <p class="card-text text-muted small mb-1">Para ajustes</p>
-        <p class="mb-0">
-          <span class="badge fs-6" style="background-color: #fd7e14;">{{ producoes_por_status.PARA_AJUSTES }}</span>
-        </p>
+        <p class="mb-0"><span class="badge fs-6" style="background-color: #fd7e14;">{{ producoes_minha_por_status.PARA_AJUSTES }}</span></p>
       </div>
     </div>
   </div>
@@ -102,44 +307,31 @@
     <div class="card siprac-card h-100">
       <div class="card-body py-3">
         <p class="card-text text-muted small mb-1">Homologadas no mês</p>
-        <p class="mb-0">
-          <span class="badge bg-success fs-6">{{ producoes_por_status.HOMOLOGADO_MES }}</span>
-        </p>
+        <p class="mb-0"><span class="badge bg-success fs-6">{{ producoes_minha_por_status.HOMOLOGADO_MES }}</span></p>
       </div>
     </div>
   </div>
 </div>
 
-<h2 class="h5 mb-3">Fila de trabalho</h2>
-<div class="table-responsive">
+<h2 class="h5 mb-3">Meus trabalhos</h2>
+<div class="table-responsive mb-4">
   <table class="table table-hover siprac-table align-middle mb-0">
     <thead>
       <tr>
-        <th scope="col" style="width: 2rem;"></th>
-        <th scope="col">Nº OS</th>
-        <th scope="col">Processo SEI</th>
-        <th scope="col">Natureza</th>
-        <th scope="col">Etapa</th>
-        <th scope="col">Prazo</th>
-        <th scope="col">Prioridade</th>
+        <th>OS</th>
+        <th>Tipo</th>
+        <th>Status</th>
+        <th>Prazo OS</th>
+        <th>Prioridade</th>
       </tr>
     </thead>
     <tbody>
-      {% for item in fila_os %}
-      <tr class="siprac-fila-row" data-href="{% url 'os_detalhe' item.pk %}" style="cursor: pointer;">
-        <td onclick="event.stopPropagation();" data-bs-toggle="collapse"
-            data-bs-target="#fila-detalhe-{{ item.pk }}" role="button"
-            aria-expanded="false" aria-controls="fila-detalhe-{{ item.pk }}">
-          <span class="text-muted">▸</span>
-        </td>
-        <td>
-          <a href="{% url 'os_detalhe' item.pk %}" class="text-decoration-none fw-semibold"
-             onclick="event.stopPropagation();">{{ item.numero_os }}</a>
-        </td>
-        <td>{{ item.processo_sei }}</td>
-        <td>{{ item.natureza }}</td>
-        <td>{{ item.macroetapa|macroetapa_display }}</td>
-        <td>{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+      {% for item in fila_pessoal %}
+      <tr>
+        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}</a></td>
+        <td>{{ item.tipo }}</td>
+        <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
+        <td class="small">{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td>
           {% if item.prioridade == 'URGENTE' %}
           <span class="badge badge-prioridade-urgente">{{ item.prioridade|prioridade_display }}</span>
@@ -150,29 +342,117 @@
           {% endif %}
         </td>
       </tr>
-      <tr class="collapse siprac-row-expand" id="fila-detalhe-{{ item.pk }}">
-        <td colspan="7" class="small text-muted ps-4">
-          Detalhes da OS serão exibidos aqui (placeholder).
-        </td>
-      </tr>
       {% empty %}
-      <tr>
-        <td colspan="7" class="text-muted text-center py-4">
-          Nenhuma OS pendente na fila da sua unidade.
-        </td>
-      </tr>
+      <tr><td colspan="5" class="text-muted text-center py-4">Nenhum trabalho atribuído a você.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+{% if nivel_visao == 'SISTEMICA' or nivel_visao == 'UNIDADE' %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{{ dashboard_chart_data|json_script:"dashboard-chart-data" }}
 <script>
-document.querySelectorAll('.siprac-fila-row').forEach(function (row) {
-  row.addEventListener('click', function () {
-    window.location.href = row.dataset.href;
-  });
-});
+(function () {
+  var chartDataEl = document.getElementById('dashboard-chart-data');
+  if (!chartDataEl || typeof Chart === 'undefined') {
+    return;
+  }
+  var chartData = JSON.parse(chartDataEl.textContent);
+  var paleta = ['#1a3a5c', '#e87722', '#2e8b57', '#4a90c4', '#6c757d', '#ffc107'];
+
+  if (chartData.producao_tipo) {
+    new Chart(document.getElementById('chartProducaoTipo'), {
+      type: 'bar',
+      data: {
+        labels: chartData.producao_tipo.labels,
+        datasets: [{
+          label: 'Homologadas',
+          data: chartData.producao_tipo.data,
+          backgroundColor: chartData.producao_tipo.labels.map(function (_, i) {
+            return paleta[i % paleta.length];
+          }),
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      },
+    });
+  }
+
+  if (chartData.producao_semana) {
+    new Chart(document.getElementById('chartProducaoSemana'), {
+      type: 'line',
+      data: {
+        labels: chartData.producao_semana.labels,
+        datasets: [{
+          label: 'Homologadas',
+          data: chartData.producao_semana.data,
+          borderColor: '#1a3a5c',
+          backgroundColor: 'rgba(26, 58, 92, 0.1)',
+          fill: true,
+          tension: 0.3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      },
+    });
+  }
+
+  function criarDoughnut(canvasId, serie) {
+    if (!serie || !serie.labels.length) {
+      return;
+    }
+    new Chart(document.getElementById(canvasId), {
+      type: 'doughnut',
+      data: {
+        labels: serie.labels,
+        datasets: [{
+          data: serie.data,
+          backgroundColor: serie.labels.map(function (_, i) {
+            return paleta[i % paleta.length];
+          }),
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              generateLabels: function (chart) {
+                var data = chart.data;
+                return data.labels.map(function (label, i) {
+                  return {
+                    text: label + ' (' + data.datasets[0].data[i] + ')',
+                    fillStyle: data.datasets[0].backgroundColor[i],
+                    hidden: false,
+                    index: i,
+                  };
+                });
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  criarDoughnut('chartOsMacroetapa', chartData.os_macroetapa);
+  criarDoughnut('chartOsNatureza', chartData.os_natureza);
+})();
 </script>
+{% endif %}
 {% endblock %}
