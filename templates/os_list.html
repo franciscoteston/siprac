@@ -14,7 +14,7 @@
 <form method="get" class="card siprac-card mb-4">
   <div class="card-body">
     <div class="row g-3 align-items-end">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label for="macroetapa" class="form-label">Macroetapa</label>
         <select name="macroetapa" id="macroetapa" class="form-select form-select-sm">
           <option value="">Todas</option>
@@ -23,7 +23,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label for="natureza" class="form-label">Natureza</label>
         <select name="natureza" id="natureza" class="form-select form-select-sm">
           <option value="">Todas</option>
@@ -40,6 +40,15 @@
           <option value="">Todas</option>
           {% for prioridade in prioridades %}
           <option value="{{ prioridade }}"{% if filtro_prioridade == prioridade %} selected{% endif %}>{{ prioridade|prioridade_display }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="status_producao" class="form-label">Status da produção</label>
+        <select name="status_producao" id="status_producao" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          {% for valor, label in status_producao_opcoes %}
+          <option value="{{ valor }}"{% if filtro_status_producao == valor %} selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
@@ -102,7 +111,7 @@
   <ul class="pagination pagination-sm justify-content-center mb-0">
     {% if page_obj.has_previous %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&q={{ filtro_q }}">Anterior</a>
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}">Anterior</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -114,7 +123,7 @@
 
     {% if page_obj.has_next %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&q={{ filtro_q }}">Próxima</a>
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}">Próxima</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Próxima</span></li>

@@ -46,6 +46,70 @@
   </div>
 </div>
 
+<h2 class="h5 mb-3">Produções da minha unidade</h2>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card siprac-card h-100">
+      <div class="card-body py-3">
+        <p class="card-text text-muted small mb-1">Em entrada</p>
+        <p class="mb-0">
+          <span class="badge bg-secondary fs-6">{{ producoes_por_status.ENTRADA }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card siprac-card h-100">
+      <div class="card-body py-3">
+        <p class="card-text text-muted small mb-1">Distribuídas</p>
+        <p class="mb-0">
+          <span class="badge bg-info fs-6">{{ producoes_por_status.DISTRIBUIDO }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card siprac-card h-100">
+      <div class="card-body py-3">
+        <p class="card-text text-muted small mb-1">Em elaboração</p>
+        <p class="mb-0">
+          <span class="badge bg-primary fs-6">{{ producoes_por_status.EM_ELABORACAO }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card siprac-card h-100">
+      <div class="card-body py-3">
+        <p class="card-text text-muted small mb-1">Para revisão</p>
+        <p class="mb-0">
+          <span class="badge bg-warning text-dark fs-6">{{ producoes_por_status.PARA_REVISAO }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card siprac-card h-100">
+      <div class="card-body py-3">
+        <p class="card-text text-muted small mb-1">Para ajustes</p>
+        <p class="mb-0">
+          <span class="badge fs-6" style="background-color: #fd7e14;">{{ producoes_por_status.PARA_AJUSTES }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card siprac-card h-100">
+      <div class="card-body py-3">
+        <p class="card-text text-muted small mb-1">Homologadas no mês</p>
+        <p class="mb-0">
+          <span class="badge bg-success fs-6">{{ producoes_por_status.HOMOLOGADO_MES }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <h2 class="h5 mb-3">Fila de trabalho</h2>
 <div class="table-responsive">
   <table class="table table-hover siprac-table align-middle mb-0">

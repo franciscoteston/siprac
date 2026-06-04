@@ -29,6 +29,7 @@ from core.forms import (
 )
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
+from core.os_service import contar_producoes_por_status_unidades, derivar_macroetapa_os
 from core.siat_config import SIAT_ARQUIVO_PATH
 from core.siat_service import (
     atualizar_inscricao_do_arquivo,
@@ -69,6 +70,7 @@ def _contexto_dashboard_vazio():
         "aguard_retorno": 0,
         "producao_mes": 0,
         "fila_os": [],
+        "producoes_por_status": contar_producoes_por_status_unidades([]),
     }
 
 
@@ -331,6 +333,10 @@ def _aplicar_filtros_os(queryset, request):
             processos_vinculados__processo_sei__numero_processo__icontains=busca_processo,
         ).distinct()
 
+    status_producao = request.GET.get("status_producao", "").strip()
+    if status_producao:
+        queryset = queryset.filter(producoes__status=status_producao).distinct()
+
     return queryset
 
 
@@ -374,6 +380,9 @@ class DashboardView(RequerLoginMixin, TemplateView):
         ).count()
         context["fila_os"] = (
             _montar_fila_os(unidades_ids) if unidades_ids else []
+        )
+        context["producoes_por_status"] = contar_producoes_por_status_unidades(
+            unidades_ids,
         )
         return context
 
@@ -450,7 +459,9 @@ class OSListView(RequerLoginMixin, ListView):
         context["filtro_natureza"] = self.request.GET.get("natureza", "")
         context["filtro_prioridade"] = self.request.GET.get("prioridade", "")
         context["filtro_q"] = self.request.GET.get("q", "")
+        context["filtro_status_producao"] = self.request.GET.get("status_producao", "")
         context["naturezas"] = Natureza.objects.filter(ativa=True).order_by("descricao")
+        context["status_producao_opcoes"] = Producao.STATUS_CHOICES
         context["macroetapas"] = (
             MacroetapaLog.objects.values_list("macroetapa", flat=True)
             .distinct()
@@ -1408,6 +1419,7 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             request,
             f"Status alterado para {dict(Producao.STATUS_CHOICES).get(status_novo, status_novo)}.",
         )
+        derivar_macroetapa_os(self.producao_obj.os, servidor=servidor)
         return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
 
