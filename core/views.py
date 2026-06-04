@@ -658,6 +658,7 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
             observacao=dados.get("observacao") or None,
         )
 
+        derivar_macroetapa_os(producao.os, servidor=servidor)
         messages.success(self.request, "Produção registrada.")
         return redirect(reverse("producao_detail", kwargs={"pk": producao.pk}))
 
