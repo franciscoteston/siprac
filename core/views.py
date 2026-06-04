@@ -29,7 +29,13 @@ from core.forms import (
 )
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
-from core.os_service import contar_producoes_por_status_unidades, derivar_macroetapa_os
+from core.os_service import (
+    contar_producoes_por_os_ids,
+    contar_producoes_por_status_unidades,
+    derivar_macroetapa_os,
+    os_ativas_por_unidade,
+    os_da_unidade_atual,
+)
 from core.siat_config import SIAT_ARQUIVO_PATH
 from core.siat_service import (
     atualizar_inscricao_do_arquivo,
@@ -55,7 +61,6 @@ from core.models import (
     TarefaInterna,
     TipoDemanda,
     TipoProducao,
-    UnidadeInterna,
 )
 
 
@@ -87,10 +92,27 @@ def _determinar_nivel_visao(perfil):
     return NIVEL_VISAO_PESSOAL
 
 
+def _obter_unidade_principal_servidor(servidor):
+    vinculo = obter_vinculo_unidade_ativo(servidor)
+    return vinculo.unidade if vinculo else None
+
+
+def _obter_visao_label(nivel_visao, servidor):
+    if nivel_visao == NIVEL_VISAO_SISTEMICA:
+        return "Visão sistêmica — Divisão de Avaliação de Imóveis"
+    if nivel_visao == NIVEL_VISAO_UNIDADE:
+        unidade = _obter_unidade_principal_servidor(servidor)
+        if unidade:
+            return f"Visão da unidade — {unidade.sigla}"
+        return "Visão da unidade"
+    return f"Minha visão — {servidor.nome}"
+
+
 def _contexto_dashboard_vazio():
     return {
         "nivel_visao": NIVEL_VISAO_PESSOAL,
         "servidor_logado": None,
+        "visao_label": "",
         "total_os_ativas": 0,
         "total_os_unidade": 0,
         "os_por_unidade": [],
@@ -382,52 +404,6 @@ def _obter_os_por_natureza(os_ids=None):
     ]
 
 
-def _obter_os_por_unidade():
-    """OSs ativas e produções por unidade (via tarefa interna ativa)."""
-    hoje = timezone.localdate()
-    resultado = []
-
-    for unidade in UnidadeInterna.objects.order_by("sigla"):
-        os_ids = list(
-            TarefaInterna.objects.filter(unidade=unidade)
-            .exclude(status="CONCLUIDO")
-            .values_list("os_id", flat=True)
-            .distinct(),
-        )
-        if not os_ids:
-            continue
-
-        os_ativas_ids = list(
-            _queryset_os_anotado()
-            .filter(pk__in=os_ids)
-            .exclude(macroetapa_atual="ENCERRADO")
-            .values_list("pk", flat=True),
-        )
-        if not os_ativas_ids:
-            continue
-
-        producoes = Producao.objects.filter(os_id__in=os_ativas_ids)
-        resultado.append(
-            {
-                "sigla": unidade.sigla,
-                "total": len(os_ativas_ids),
-                "em_elaboracao": producoes.filter(
-                    status=Producao.STATUS_EM_ELABORACAO,
-                ).count(),
-                "para_revisao": producoes.filter(
-                    status=Producao.STATUS_PARA_REVISAO,
-                ).count(),
-                "homologadas_mes": producoes.filter(
-                    status=Producao.STATUS_HOMOLOGADO,
-                    data_homologacao__year=hoje.year,
-                    data_homologacao__month=hoje.month,
-                ).count(),
-            },
-        )
-
-    return resultado
-
-
 def _mapa_prazos_os(os_ids):
     if not os_ids:
         return {}
@@ -512,8 +488,10 @@ def _obter_fila_pessoal_unidade(servidor, unidades_ids):
     )
 
 
-def _obter_fila_unidade(unidades_ids):
-    os_ids = _obter_os_ids_unidades(unidades_ids)
+def _obter_fila_unidade(unidade):
+    if unidade is None:
+        return []
+    os_ids = os_da_unidade_atual(unidade).values_list("pk", flat=True)
     if not os_ids:
         return []
     return _serializar_fila_producoes(
@@ -558,7 +536,7 @@ def _contexto_dashboard_sistemica(servidor, unidades_ids):
 
     return {
         "total_os_ativas": _contar_os_ativas(),
-        "os_por_unidade": _obter_os_por_unidade(),
+        "os_por_unidade": os_ativas_por_unidade(),
         "os_prazo_proximo": os_prazo_proximo,
         "os_aguardando_retorno": os_aguardando_retorno,
         "producao_por_tipo_mes": producao_por_tipo_mes,
@@ -579,16 +557,17 @@ def _contexto_dashboard_sistemica(servidor, unidades_ids):
 
 
 def _contexto_dashboard_unidade(servidor, unidades_ids):
-    os_ids = _obter_os_ids_unidades(unidades_ids)
+    unidade = _obter_unidade_principal_servidor(servidor)
+    os_ids = set(os_da_unidade_atual(unidade).values_list("pk", flat=True))
     os_prazo_proximo = _obter_os_prazo_proximo(os_ids=os_ids)
     producao_por_tipo_mes = _obter_producao_por_tipo_mes(os_ids=os_ids)
     producao_por_semana = _obter_producao_por_semana(os_ids=os_ids)
-    producoes_unidade = contar_producoes_por_status_unidades(unidades_ids)
+    producoes_unidade = contar_producoes_por_os_ids(os_ids)
 
     return {
         "total_os_unidade": _contar_os_ativas(os_ids=os_ids),
         "producoes_unidade_por_status": producoes_unidade,
-        "fila_unidade": _obter_fila_unidade(unidades_ids),
+        "fila_unidade": _obter_fila_unidade(unidade),
         "os_prazo_proximo": os_prazo_proximo,
         "producao_por_tipo_mes": producao_por_tipo_mes,
         "producao_por_semana": producao_por_semana,
@@ -870,6 +849,7 @@ class DashboardView(RequerLoginMixin, TemplateView):
         else:
             context.update(_contexto_dashboard_pessoal(servidor))
 
+        context["visao_label"] = _obter_visao_label(nivel_visao, servidor)
         return context
 
 

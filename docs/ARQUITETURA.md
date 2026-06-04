@@ -354,3 +354,13 @@ Com essa informação disponível:
 As coordenadas (latitude, longitude, coord_x, coord_y) podem ser preenchidas
 automaticamente a partir do NUM_BLOCO independentemente do número de frentes,
 pois representam o centroide do lote fiscal.
+
+### 15.5 Marcador de acompanhamento especial
+Permitir que coordenadores e técnicos marquem OSs para acompanhamento especial,
+mesmo após encaminhamento para outra unidade. Funcionaria como filtro adicional
+nas listagens, permitindo:
+- Coordenação acompanhar OSs que passaram pela unidade mesmo após encaminhamento
+- Técnicos acompanharem OSs de seu interesse pessoal
+- Prazo interno em encaminhamentos entre unidades (data_retorno_prevista interno)
+A implementação seguirá o modelo de marcadores customizáveis por equipe,
+similar ao existente no SEI.

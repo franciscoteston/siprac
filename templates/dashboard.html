@@ -4,8 +4,13 @@
 {% block title %}Dashboard — SIPRAC{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h1 class="h3 mb-0 text-dark">Dashboard</h1>
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h1 class="h3 mb-1 text-dark">Dashboard</h1>
+    {% if visao_label %}
+    <p class="text-muted mb-0" style="font-size:13px;">{{ visao_label }}</p>
+    {% endif %}
+  </div>
   {% if request.perfil_acesso and request.perfil_acesso.pode_criar_os %}
   <a href="{% url 'os_nova' %}" class="btn btn-primary siprac-btn-primary">+ Nova OS</a>
   {% endif %}
@@ -55,7 +60,7 @@
       <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Unidade</th>
+            <th>Unidade / situação</th>
             <th class="text-end">OSs ativas</th>
             <th class="text-end">Em elaboração</th>
             <th class="text-end">Para revisão</th>
