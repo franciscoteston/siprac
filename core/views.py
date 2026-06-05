@@ -25,7 +25,13 @@ from core.forms import (
     OSEncerramentoForm,
     OSForm,
     ProducaoForm,
+    RelatorioProducaoForm,
     SiatUploadForm,
+)
+from core.relatorios import (
+    exportar_producao_excel,
+    linhas_relatorio_producao,
+    relatorio_producao_por_servidor,
 )
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
@@ -851,6 +857,76 @@ class DashboardView(RequerLoginMixin, TemplateView):
 
         context["visao_label"] = _obter_visao_label(nivel_visao, servidor)
         return context
+
+
+RELATORIOS_DISPONIVEIS = [
+    {
+        "titulo": "Produção por Servidor",
+        "descricao": (
+            "Produções homologadas agrupadas por autor do trabalho, com filtros "
+            "por período, tipo de produção e unidade."
+        ),
+        "url_name": "relatorio_producao",
+    },
+]
+
+
+def _filtros_relatorio_producao(form):
+    dados = form.cleaned_data
+    filtros = {}
+    if dados.get("servidor"):
+        filtros["servidor_id"] = dados["servidor"].pk
+    if dados.get("data_inicio"):
+        filtros["data_inicio"] = dados["data_inicio"]
+    if dados.get("data_fim"):
+        filtros["data_fim"] = dados["data_fim"]
+    if dados.get("tipo_producao"):
+        filtros["tipo_producao_id"] = dados["tipo_producao"].pk
+    if dados.get("unidade"):
+        filtros["unidade_id"] = dados["unidade"].pk
+    return filtros
+
+
+class RelatorioListView(RequerLoginMixin, TemplateView):
+    template_name = "relatorio_list.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["relatorios"] = RELATORIOS_DISPONIVEIS
+        return context
+
+
+class RelatorioProducaoView(RequerLoginMixin, View):
+    template_name = "relatorio_producao.html"
+
+    def _render(self, request, form, linhas=None, total=None):
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "linhas": linhas,
+                "total": total,
+                "exibir_resultados": linhas is not None,
+            },
+        )
+
+    def get(self, request):
+        return self._render(request, RelatorioProducaoForm())
+
+    def post(self, request):
+        form = RelatorioProducaoForm(request.POST)
+        if not form.is_valid():
+            return self._render(request, form)
+
+        queryset = relatorio_producao_por_servidor(_filtros_relatorio_producao(form))
+        acao = request.POST.get("action", "visualizar")
+
+        if acao == "exportar":
+            return exportar_producao_excel(queryset)
+
+        linhas = linhas_relatorio_producao(queryset)
+        return self._render(request, form, linhas=linhas, total=len(linhas))
 
 
 class OSCreateView(RequerLoginMixin, FormView):

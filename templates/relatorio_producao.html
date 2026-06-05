@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Produção por Servidor — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div>
+    <h1 class="h3 mb-1 text-dark">Relatório de Produção por Servidor</h1>
+    <p class="text-muted small mb-0">
+      <a href="{% url 'relatorio_list' %}" class="text-decoration-none">← Voltar aos relatórios</a>
+    </p>
+  </div>
+</div>
+
+<div class="card siprac-card mb-4">
+  <div class="card-header bg-white fw-semibold">Filtros</div>
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-6">{{ form.servidor|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.data_inicio|as_crispy_field }}</div>
+        <div class="col-md-3">{{ form.data_fim|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.tipo_producao|as_crispy_field }}</div>
+        <div class="col-md-6">{{ form.unidade|as_crispy_field }}</div>
+      </div>
+      {% if form.non_field_errors %}
+      <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button type="submit" name="action" value="visualizar" class="btn btn-primary siprac-btn-primary">
+          Visualizar
+        </button>
+        <button type="submit" name="action" value="exportar" class="btn btn-outline-success">
+          Exportar Excel
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if exibir_resultados %}
+<div class="card siprac-card">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Prévia dos resultados</span>
+    <span class="text-muted small">{{ total }} registro{{ total|pluralize:"","s" }} encontrado{{ total|pluralize:"","s" }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if linhas %}
+    <div class="table-responsive">
+      <table class="table table-sm table-hover siprac-table mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Autor do trabalho</th>
+            <th>Tipo</th>
+            <th>Número produção</th>
+            <th>OS vinculada</th>
+            <th>Natureza</th>
+            <th>Processo SEI</th>
+            <th>Data homologação</th>
+            <th>Homologado por</th>
+            <th>Unidade</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+          <tr>
+            <td>{{ linha.autor }}</td>
+            <td>{{ linha.tipo }}</td>
+            <td>{{ linha.numero_producao }}</td>
+            <td>{{ linha.numero_os }}</td>
+            <td>{{ linha.natureza }}</td>
+            <td>{{ linha.processo_sei }}</td>
+            <td>{% if linha.data_homologacao %}{{ linha.data_homologacao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+            <td>{{ linha.homologado_por }}</td>
+            <td>{{ linha.unidade }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-4 mb-0">
+      Nenhuma produção homologada encontrada com os filtros informados.
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

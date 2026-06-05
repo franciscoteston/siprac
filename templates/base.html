@@ -62,7 +62,8 @@
         <a class="nav-link{% if request.resolver_match.url_name == 'imovel_list' or request.resolver_match.url_name == 'imovel_novo' or request.resolver_match.url_name == 'imovel_detalhe' or request.resolver_match.url_name == 'imovel_editar' %} active{% endif %}"
            href="{% url 'imovel_list' %}">Imóveis</a>
         <a class="nav-link" href="#">Produções</a>
-        <a class="nav-link" href="#">Relatórios</a>
+        <a class="nav-link{% if request.resolver_match.url_name == 'relatorio_list' or request.resolver_match.url_name == 'relatorio_producao' %} active{% endif %}"
+           href="{% url 'relatorio_list' %}">Relatórios</a>
         {% if request.perfil_acesso and request.perfil_acesso.admin_sistema %}
         <a class="nav-link" href="{% url 'admin:index' %}">Administração</a>
         <a class="nav-link ps-4{% if request.resolver_match.url_name == 'siat_carregar' %} active{% endif %}"

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatórios — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Relatórios</h1>
+
+<div class="row g-3">
+  {% for relatorio in relatorios %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card siprac-card h-100">
+      <div class="card-body d-flex flex-column">
+        <h2 class="h6 fw-semibold mb-2">{{ relatorio.titulo }}</h2>
+        <p class="text-muted small flex-grow-1 mb-3">{{ relatorio.descricao }}</p>
+        <a href="{% url relatorio.url_name %}" class="btn btn-outline-primary btn-sm align-self-start">
+          Abrir relatório
+        </a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <p class="text-muted">Nenhum relatório disponível.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

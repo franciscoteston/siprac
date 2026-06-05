@@ -526,3 +526,34 @@ class SiatUploadForm(forms.Form):
         label="Arquivo SIAT (.txt)",
         required=True,
     )
+
+
+class RelatorioProducaoForm(forms.Form):
+    servidor = forms.ModelChoiceField(
+        label="Autor do trabalho",
+        queryset=Servidor.objects.all().order_by("nome"),
+        required=False,
+        empty_label="Todos",
+    )
+    data_inicio = forms.DateField(
+        label="Data inicial (homologação)",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    data_fim = forms.DateField(
+        label="Data final (homologação)",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    tipo_producao = forms.ModelChoiceField(
+        label="Tipo de produção",
+        queryset=TipoProducao.objects.filter(ativo=True).order_by("prefixo"),
+        required=False,
+        empty_label="Todos",
+    )
+    unidade = forms.ModelChoiceField(
+        label="Unidade",
+        queryset=UnidadeInterna.objects.all().order_by("sigla"),
+        required=False,
+        empty_label="Todas",
+    )

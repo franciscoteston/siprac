@@ -23,6 +23,8 @@ from core.views import (
     ProducaoDetailView,
     ProducaoVincularImovelView,
     ProximoIsicAPIView,
+    RelatorioListView,
+    RelatorioProducaoView,
     ProximoNumeroAPIView,
     SiatAtualizarInscricaoView,
     SiatCarregarArquivoView,
@@ -59,6 +61,12 @@ urlpatterns = [
     path('imoveis/<int:pk>/editar/', ImovelUpdateView.as_view(), name='imovel_editar'),
     path('imoveis/<int:pk>/', ImovelDetailView.as_view(), name='imovel_detalhe'),
     path('imoveis/', ImovelListView.as_view(), name='imovel_list'),
+    path('relatorios/', RelatorioListView.as_view(), name='relatorio_list'),
+    path(
+        'relatorios/producao/',
+        RelatorioProducaoView.as_view(),
+        name='relatorio_producao',
+    ),
     path('admin-siprac/carregar-siat/', SiatCarregarArquivoView.as_view(), name='siat_carregar'),
     path('admin-siprac/processar-siat/', SiatProcessarArquivoView.as_view(), name='siat_processar'),
     path(
