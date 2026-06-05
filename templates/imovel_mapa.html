@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}Mapa de imóveis — SIPRAC{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  #mapa-geral-container { height: 500px; border-radius: 8px; }
+  .leaflet-marker-cadastral { background: #4a90c4; border: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; }
+  .leaflet-marker-isic { background: #e87722; border: 2px solid #fff; border-radius: 50%; width: 14px; height: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4 text-dark">Mapa de imóveis</h1>
+
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div id="mapa-geral-container" class="border"></div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card siprac-card">
+      <div class="card-header bg-white fw-semibold">Resumo</div>
+      <div class="card-body small">
+        <dl class="mb-3">
+          <dt class="text-muted">Total de imóveis</dt>
+          <dd class="mb-2">{{ total_imoveis }}</dd>
+          <dt class="text-muted">Com coordenadas</dt>
+          <dd class="mb-2">{{ total_com_coords }} ({{ pct_com_coords }}%)</dd>
+          <dt class="text-muted">Sem coordenadas</dt>
+          <dd class="mb-0">{{ total_sem_coords }}</dd>
+        </dl>
+        {% if total_sem_coords > 0 %}
+        <button class="btn btn-link btn-sm p-0 text-decoration-none"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#lista-sem-coords">
+          Ver imóveis sem coordenadas ▼
+        </button>
+        <div class="collapse mt-2" id="lista-sem-coords">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Identificação</th>
+                  <th>Endereço</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in imoveis_sem_coords_lista %}
+                <tr>
+                  <td>{{ item.id }}</td>
+                  <td>
+                    {% if item.inscricao_cadastral %}
+                      {{ item.inscricao_cadastral }}
+                    {% elif item.codigo_isic %}
+                      {{ item.codigo_isic }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if item.nom_logradouro %}
+                      {{ item.nom_logradouro }}{% if item.num_endereco %}, {{ item.num_endereco }}{% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td>
+                    <a href="{% url 'imovel_editar' item.id %}" class="small">Editar</a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function () {
+  var imoveisCoords = {{ imoveis_coords_json|safe }};
+  if (!imoveisCoords.length || typeof L === 'undefined') {
+    return;
+  }
+
+  var mapa = L.map('mapa-geral-container');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+  }).addTo(mapa);
+
+  var bounds = [];
+  imoveisCoords.forEach(function (imovel) {
+    var cor = imovel.tipo_identificacao === 'ISIC' ? '#e87722' : '#4a90c4';
+    var classe = imovel.tipo_identificacao === 'ISIC' ? 'leaflet-marker-isic' : 'leaflet-marker-cadastral';
+    var icon = L.divIcon({
+      className: classe,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+    var marker = L.marker([imovel.lat, imovel.lng], { icon: icon }).addTo(mapa);
+    marker.bindPopup(
+      '<strong>' + imovel.identificacao + '</strong> (' + imovel.tipo_identificacao + ')<br>' +
+      imovel.endereco + '<br>' +
+      (imovel.bairro !== '—' ? imovel.bairro + '<br>' : '') +
+      'Área: ' + imovel.area + ' m²<br>' +
+      '<a href="/imoveis/' + imovel.id + '/">Ver detalhe</a>'
+    );
+    bounds.push([imovel.lat, imovel.lng]);
+  });
+
+  if (bounds.length === 1) {
+    mapa.setView(bounds[0], 16);
+  } else {
+    mapa.fitBounds(bounds, { padding: [24, 24] });
+  }
+})();
+</script>
+{% endblock %}

@@ -59,8 +59,17 @@
            href="{% url 'dashboard' %}">Dashboard</a>
         <a class="nav-link{% if request.resolver_match.url_name == 'os_list' %} active{% endif %}"
            href="{% url 'os_list' %}">Ordens de serviço</a>
-        <a class="nav-link{% if request.resolver_match.url_name == 'imovel_list' or request.resolver_match.url_name == 'imovel_novo' or request.resolver_match.url_name == 'imovel_detalhe' or request.resolver_match.url_name == 'imovel_editar' %} active{% endif %}"
-           href="{% url 'imovel_list' %}">Imóveis</a>
+        <div class="dropdown">
+          <a class="nav-link dropdown-toggle{% if request.resolver_match.url_name == 'imovel_list' or request.resolver_match.url_name == 'imovel_mapa' or request.resolver_match.url_name == 'imovel_novo' or request.resolver_match.url_name == 'imovel_detalhe' or request.resolver_match.url_name == 'imovel_editar' %} active{% endif %}"
+             href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Imóveis
+          </a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'imovel_list' %}">Listagem</a></li>
+            <li><a class="dropdown-item" href="{% url 'imovel_mapa' %}">Mapa</a></li>
+            <li><a class="dropdown-item" href="{% url 'imovel_novo' %}">Novo imóvel (ISIC)</a></li>
+          </ul>
+        </div>
         <a class="nav-link" href="#">Produções</a>
         <a class="nav-link{% if request.resolver_match.url_name == 'relatorio_list' or request.resolver_match.url_name == 'relatorio_producao' %} active{% endif %}"
            href="{% url 'relatorio_list' %}">Relatórios</a>

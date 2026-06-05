@@ -758,6 +758,99 @@ def _decimal_para_json(valor):
     return str(valor) if valor is not None else None
 
 
+def _format_area_mapa(area):
+    if area is None:
+        return "—"
+    try:
+        from decimal import Decimal
+
+        value = Decimal(str(area))
+        parts = f"{value:,.2f}".split(".")
+        inteiro = parts[0].replace(",", ".")
+        return f"{inteiro},{parts[1]}"
+    except Exception:
+        return str(area)
+
+
+def _endereco_imovel(imovel):
+    if imovel.nom_logradouro:
+        endereco = imovel.nom_logradouro
+        if imovel.num_endereco:
+            endereco = f"{endereco}, {imovel.num_endereco}"
+        return endereco
+    return "—"
+
+
+def _endereco_os_imovel(vinculo):
+    if vinculo.snap_nom_logradouro:
+        endereco = vinculo.snap_nom_logradouro
+        if vinculo.snap_num_endereco:
+            endereco = f"{endereco}, {vinculo.snap_num_endereco}"
+        return endereco
+    return "—"
+
+
+def _identificacao_imovel(imovel):
+    if imovel.inscricao_cadastral:
+        return str(imovel.inscricao_cadastral)
+    if imovel.codigo_isic:
+        return imovel.codigo_isic
+    return "—"
+
+
+def _identificacao_os_imovel(vinculo):
+    if vinculo.snap_inscricao_cadastral:
+        return str(vinculo.snap_inscricao_cadastral)
+    if vinculo.snap_codigo_isic:
+        return vinculo.snap_codigo_isic
+    return "—"
+
+
+def _coords_os_imovel(vinculo):
+    lat = vinculo.snap_latitude
+    lng = vinculo.snap_longitude
+    if (lat is None or lng is None) and vinculo.imovel_id:
+        lat = lat or vinculo.imovel.latitude
+        lng = lng or vinculo.imovel.longitude
+    if lat is None or lng is None:
+        return None, None
+    return float(lat), float(lng)
+
+
+def _montar_imoveis_coords_os(vinculos):
+    com_coords = []
+    sem_coords = 0
+    for vinculo in vinculos:
+        lat, lng = _coords_os_imovel(vinculo)
+        if lat is None or lng is None:
+            sem_coords += 1
+            continue
+        com_coords.append(
+            {
+                "id": vinculo.imovel_id,
+                "identificacao": _identificacao_os_imovel(vinculo),
+                "endereco": _endereco_os_imovel(vinculo),
+                "area": _format_area_mapa(vinculo.snap_area_territorial),
+                "lat": lat,
+                "lng": lng,
+            },
+        )
+    return com_coords, sem_coords
+
+
+def _imovel_para_mapa(imovel):
+    return {
+        "id": imovel.pk,
+        "identificacao": _identificacao_imovel(imovel),
+        "endereco": _endereco_imovel(imovel),
+        "bairro": imovel.bairro or "—",
+        "area": _format_area_mapa(imovel.area_territorial),
+        "tipo_identificacao": imovel.tipo_identificacao,
+        "lat": float(imovel.latitude),
+        "lng": float(imovel.longitude),
+    }
+
+
 def _queryset_os_anotado():
     ultima_macroetapa = MacroetapaLog.objects.filter(
         os_id=OuterRef("pk"),
@@ -1047,9 +1140,19 @@ class OSDetailView(RequerLoginMixin, DetailView):
             )
             .order_by("data_hora")
         )
-        context["imoveis"] = OsImovel.objects.filter(os=os_obj).select_related(
+        imoveis_vinculados = OsImovel.objects.filter(os=os_obj).select_related(
             "imovel",
             "vinculado_por",
+        )
+        context["imoveis"] = imoveis_vinculados
+        imoveis_com_coords, imoveis_sem_coordenadas = _montar_imoveis_coords_os(
+            imoveis_vinculados,
+        )
+        context["imoveis_com_coords"] = imoveis_com_coords
+        context["imoveis_sem_coordenadas"] = imoveis_sem_coordenadas
+        context["imoveis_coords_json"] = json.dumps(
+            imoveis_com_coords,
+            ensure_ascii=False,
         )
         context["producoes"] = Producao.objects.filter(os=os_obj).select_related(
             "tipo_producao",
@@ -1303,6 +1406,48 @@ class FinalidadesAPIView(RequerLoginJSONMixin, View):
             .values("id", "descricao")
         )
         return JsonResponse(finalidades, safe=False)
+
+
+class ImovelMapaView(RequerLoginMixin, TemplateView):
+    template_name = "imovel_mapa.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        total_imoveis = Imovel.objects.count()
+        imoveis_plotaveis = Imovel.objects.filter(
+            latitude__isnull=False,
+            longitude__isnull=False,
+        )
+        total_com_coords = imoveis_plotaveis.count()
+        total_sem_coords = total_imoveis - total_com_coords
+        imoveis_com_coords = [
+            _imovel_para_mapa(imovel) for imovel in imoveis_plotaveis.order_by("id")
+        ]
+
+        context["imoveis_com_coords"] = imoveis_com_coords
+        context["total_imoveis"] = total_imoveis
+        context["total_com_coords"] = total_com_coords
+        context["total_sem_coords"] = total_sem_coords
+        context["pct_com_coords"] = (
+            round(total_com_coords * 100 / total_imoveis, 1)
+            if total_imoveis
+            else 0
+        )
+        context["imoveis_coords_json"] = json.dumps(
+            imoveis_com_coords,
+            ensure_ascii=False,
+        )
+        context["imoveis_sem_coords_lista"] = list(
+            Imovel.objects.filter(latitude__isnull=True).values(
+                "id",
+                "inscricao_cadastral",
+                "codigo_isic",
+                "nom_logradouro",
+                "num_endereco",
+                "bairro",
+            )[:50],
+        )
+        return context
 
 
 class ImovelListView(RequerLoginMixin, ListView):
