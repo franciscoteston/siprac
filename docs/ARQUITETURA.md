@@ -364,3 +364,44 @@ nas listagens, permitindo:
 - Prazo interno em encaminhamentos entre unidades (data_retorno_prevista interno)
 A implementação seguirá o modelo de marcadores customizáveis por equipe,
 similar ao existente no SEI.
+
+### 15.6 Módulo de Pesquisa de Dados
+Módulo independente para gerenciamento de pesquisas de dados de mercado
+(ofertas de venda, ofertas de aluguel, guias de ITBI). Funciona em paralelo
+às Ordens de Serviço mas com ciclo de vida próprio, centrado na
+Demanda de Pesquisa como entidade principal.
+
+**Entidade central: Demanda de Pesquisa**
+- Pode ter ou não vínculo com processo SEI
+- Pode ter ou não vínculo com imóveis específicos
+- Tem um solicitante (qualquer servidor, inclusive de outra unidade)
+- Passa pelo Supervisor de Pesquisa antes de chegar ao pesquisador
+- Pode ser recorrente (proposta pela chefia) ou pontual
+
+**Fluxo:**
+Solicitação (qualquer servidor ou chefia) → Supervisor analisa e distribui
+→ Pesquisador(es) executam → Supervisor homologa/encerra
+
+**Tipos de demanda:**
+- Sem demanda específica: pesquisador decide dentro da meta
+- Com demanda específica da chefia: recorrente ou pontual
+- Com demanda de outro servidor/unidade: obrigatório passar pelo Supervisor
+
+**Perfis envolvidos:**
+- Solicitante: qualquer servidor, inclusive de outras unidades
+- Supervisor de Pesquisa: Técnico com FG (atualmente cargo de Supervisor na ESJL)
+- Pesquisador: Auxiliar Administrativo — Pesquisa (ESJL)
+
+**Visão do pesquisador:**
+- Número do processo SEI e dados dos imóveis vinculados (inscrição, endereço, área)
+- Visualização restrita a processos com inscrições do SIAT
+- Futuramente: lista de finalidades que necessitam dados de mercado como filtro
+
+**Metas:**
+- Definidas pelo Supervisor de Pesquisa (Técnico com FG ou substituto)
+- Individual e coletiva, por tipo de pesquisa ou agregada
+- Relatório semanal de entrega e apuração mensal vs. meta (exportável em Excel)
+
+**Tipos de pesquisa:** Guia de ITBI, Ofertas — Aluguel, Ofertas — Vendas
+
+**Implementação prevista para Fase 5 ou posterior.**
