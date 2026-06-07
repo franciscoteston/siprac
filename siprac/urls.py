@@ -30,6 +30,7 @@ from core.views import (
     SiatAtualizarInscricaoView,
     SiatCarregarArquivoView,
     SiatCoordenadasBlocoView,
+    SiatStatusView,
     SiatProcessarArquivoView,
     SipracLoginView,
     SipracLogoutView,
@@ -70,6 +71,7 @@ urlpatterns = [
         name='relatorio_producao',
     ),
     path('admin-siprac/carregar-siat/', SiatCarregarArquivoView.as_view(), name='siat_carregar'),
+    path('admin-siprac/siat-status/', SiatStatusView.as_view(), name='siat_status'),
     path('admin-siprac/processar-siat/', SiatProcessarArquivoView.as_view(), name='siat_processar'),
     path(
         'api/siat/atualizar-inscricao/<int:inscricao>/',

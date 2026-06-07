@@ -405,3 +405,18 @@ Solicitação (qualquer servidor ou chefia) → Supervisor analisa e distribui
 **Tipos de pesquisa:** Guia de ITBI, Ofertas — Aluguel, Ofertas — Vendas
 
 **Implementação prevista para Fase 5 ou posterior.**
+
+### 15.7 Otimização do mapa geral de imóveis
+Com volume de 280mil+ imóveis no banco, carregar todos os marcadores
+no mapa geral (/imoveis/mapa/) causa timeout e experiência ruim.
+
+Melhorias previstas:
+- Mapa inicia vazio, sem marcadores
+- Usuário pesquisa por inscrição, ISIC, logradouro, bairro ou lote fiscal
+- Resultados da pesquisa são plotados no mapa (máximo 200 marcadores por busca)
+- Implementar clustering de marcadores (Leaflet.MarkerCluster) para
+  visualização de grandes volumes sem degradação de performance
+- Paginação ou lazy loading dos resultados
+- Índices no banco PostgreSQL nos campos latitude, longitude,
+  nom_logradouro e bairro para acelerar as consultas geoespaciais
+- Considerar futuramente PostGIS para consultas geoespaciais avançadas

@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from collections import defaultdict
 
 from django.contrib import messages
@@ -47,6 +48,7 @@ from core.siat_service import (
     atualizar_inscricao_do_arquivo,
     carregar_arquivo_siat,
     obter_coordenadas_bloco,
+    obter_status_importacao_siat,
 )
 from core.models import (
     Encaminhamento,
@@ -1569,8 +1571,13 @@ def _contexto_arquivo_siat():
     }
 
 
-def _processar_arquivo_siat(request):
-    request.session["siat_relatorio"] = carregar_arquivo_siat(SIAT_ARQUIVO_PATH)
+def _executar_importacao_siat_em_background(filepath):
+    from django.db import connections
+
+    try:
+        carregar_arquivo_siat(filepath, use_cache=True)
+    finally:
+        connections.close_all()
 
 
 class SiatCarregarArquivoView(RequerAdminMixin, FormView):
@@ -1580,7 +1587,6 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(_contexto_arquivo_siat())
-        context["relatorio"] = self.request.session.pop("siat_relatorio", None)
         return context
 
     def form_valid(self, form):
@@ -1590,7 +1596,27 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
             for chunk in uploaded.chunks():
                 destino.write(chunk)
 
-        return redirect("siat_processar")
+        thread = threading.Thread(
+            target=_executar_importacao_siat_em_background,
+            args=(SIAT_ARQUIVO_PATH,),
+            daemon=True,
+        )
+        thread.start()
+        return JsonResponse({"iniciado": True})
+
+    def form_invalid(self, form):
+        return JsonResponse(
+            {"iniciado": False, "errors": form.errors},
+            status=400,
+        )
+
+
+class SiatStatusView(RequerLoginJSONMixin, View):
+    def get(self, request):
+        perfil = getattr(request, "perfil_acesso", None)
+        if perfil is None or not perfil.admin_sistema:
+            return JsonResponse({"error": "Sem permissão."}, status=403)
+        return JsonResponse(obter_status_importacao_siat())
 
 
 class SiatProcessarArquivoView(RequerAdminMixin, View):
@@ -1602,8 +1628,16 @@ class SiatProcessarArquivoView(RequerAdminMixin, View):
             )
             return redirect("siat_carregar")
 
-        _processar_arquivo_siat(request)
-        messages.success(request, "Arquivo SIAT processado com sucesso.")
+        thread = threading.Thread(
+            target=_executar_importacao_siat_em_background,
+            args=(SIAT_ARQUIVO_PATH,),
+            daemon=True,
+        )
+        thread.start()
+        messages.success(
+            request,
+            "Processamento SIAT iniciado. Acompanhe o progresso na tela de carregamento.",
+        )
         return redirect("siat_carregar")
 
 
