@@ -94,6 +94,25 @@ def status_producao_cor(value):
     return STATUS_PRODUCAO_CORES.get(value, "secondary")
 
 
+NATUREZA_BADGE_CLASSES = (
+    "text-bg-primary",
+    "text-bg-success",
+    "text-bg-info",
+    "text-bg-warning",
+    "text-bg-danger",
+)
+
+
+@register.filter
+def natureza_badge_class(natureza_id):
+    if not natureza_id:
+        return "text-bg-secondary"
+    try:
+        return NATUREZA_BADGE_CLASSES[(int(natureza_id) - 1) % len(NATUREZA_BADGE_CLASSES)]
+    except (ValueError, TypeError):
+        return "text-bg-secondary"
+
+
 @register.filter
 def grupo_badge_class(grupo_ref):
     if not grupo_ref:

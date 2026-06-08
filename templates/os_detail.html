@@ -85,7 +85,11 @@
             <tbody>
               {% for vinculo in processos %}
               <tr>
-                <td>{{ vinculo.processo_sei.numero_processo }}</td>
+                <td>
+                  <a href="{% url 'processo_detail' vinculo.processo_sei.pk %}" class="text-decoration-none">
+                    {{ vinculo.processo_sei.numero_processo }}
+                  </a>
+                </td>
                 <td>{{ vinculo.tipo_vinculo }}</td>
                 <td>{% if vinculo.data_entrada_divisao %}{{ vinculo.data_entrada_divisao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                 <td>{% if vinculo.data_encerramento %}{{ vinculo.data_encerramento|date:"d/m/Y" }}{% else %}—{% endif %}</td>

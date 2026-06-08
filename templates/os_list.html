@@ -18,6 +18,7 @@
         <label for="macroetapa" class="form-label">Macroetapa</label>
         <select name="macroetapa" id="macroetapa" class="form-select form-select-sm">
           <option value="">Todas</option>
+          <option value="ativas"{% if filtro_macroetapa == 'ativas' %} selected{% endif %}>Ativas (exceto encerradas)</option>
           {% for macro in macroetapas %}
           <option value="{{ macro }}"{% if filtro_macroetapa == macro %} selected{% endif %}>{{ macro|macroetapa_display }}</option>
           {% endfor %}
@@ -111,7 +112,7 @@
   <ul class="pagination pagination-sm justify-content-center mb-0">
     {% if page_obj.has_previous %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}">Anterior</a>
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}&aguarda_retorno={{ filtro_aguarda_retorno }}&prazo={{ filtro_prazo }}&unidade={{ filtro_unidade }}">Anterior</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -123,7 +124,7 @@
 
     {% if page_obj.has_next %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}">Próxima</a>
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}&aguarda_retorno={{ filtro_aguarda_retorno }}&prazo={{ filtro_prazo }}&unidade={{ filtro_unidade }}">Próxima</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Próxima</span></li>

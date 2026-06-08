@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load siprac_filters %}
+
+{% block title %}{{ processo.numero_processo }} — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h1 class="h3 mb-2 text-dark">{{ processo.numero_processo }}</h1>
+    <div class="d-flex flex-wrap gap-3 text-muted small">
+      <span>Situação: {% if processo.situacao %}{{ processo.situacao }}{% else %}—{% endif %}</span>
+      <span>Abertura SEI: {% if processo.data_abertura_sei %}{{ processo.data_abertura_sei|date:"d/m/Y" }}{% else %}—{% endif %}</span>
+    </div>
+  </div>
+  <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">Voltar</a>
+</div>
+
+<h2 class="h5 mb-3">Ordens de Serviço vinculadas</h2>
+<div class="card siprac-card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Nº OS</th>
+            <th>Vínculo</th>
+            <th>Entrada</th>
+            <th>Encerramento</th>
+            <th>Macroetapa atual</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in os_vinculadas %}
+          <tr>
+            <td>
+              <a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">
+                {{ item.numero_os }}
+              </a>
+            </td>
+            <td>
+              {% if item.tipo_vinculo == 'PRINCIPAL' %}
+              <span class="badge bg-primary">{{ item.tipo_vinculo }}</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ item.tipo_vinculo }}</span>
+              {% endif %}
+            </td>
+            <td>{% if item.data_entrada %}{{ item.data_entrada|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+            <td>{% if item.data_encerramento %}{{ item.data_encerramento|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+            <td>{% if item.macroetapa %}{{ item.macroetapa|macroetapa_display }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-muted text-center py-3">Nenhuma OS vinculada a este processo.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Produções geradas</h2>
+<div class="card siprac-card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Produção</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Autor</th>
+            <th>Homologação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for producao in producoes %}
+          <tr>
+            <td>
+              <a href="{% url 'producao_detail' producao.pk %}" class="fw-semibold text-decoration-none">
+                {% if producao.numero_producao %}{{ producao.numero_producao }}{% else %}#{{ producao.pk }}{% endif %}
+              </a>
+            </td>
+            <td>{{ producao.tipo_producao.prefixo }}</td>
+            <td>
+              <span class="badge bg-{{ producao.status|status_producao_cor }}">
+                {{ producao.status|status_producao_display }}
+              </span>
+            </td>
+            <td class="small">
+              {% if producao.autor_trabalho %}{{ producao.autor_trabalho.nome }}{% else %}—{% endif %}
+            </td>
+            <td class="small">
+              {% if producao.data_homologacao %}{{ producao.data_homologacao|date:"d/m/Y" }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-muted text-center py-3">Nenhuma produção vinculada.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<h2 class="h5 mb-3">Outros processos nos mesmos imóveis</h2>
+<div class="card siprac-card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Processo SEI</th>
+            <th>Nº OS</th>
+            <th>Período</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in outras_os_mesmo_imovel %}
+          <tr>
+            <td>
+              <a href="{% url 'processo_detail' item.processo_pk %}" class="fw-semibold text-decoration-none">
+                {{ item.numero_processo }}
+              </a>
+            </td>
+            <td>
+              <a href="{% url 'os_detalhe' item.os_pk %}" class="text-decoration-none">{{ item.numero_os }}</a>
+            </td>
+            <td class="small">
+              {% if item.periodo_inicio %}{{ item.periodo_inicio|date:"d/m/Y" }}{% else %}—{% endif %}
+              {% if item.periodo_fim %} — {{ item.periodo_fim|date:"d/m/Y" }}{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="text-muted text-center py-3">Nenhum outro processo nos mesmos imóveis.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load siprac_filters %}
+
+{% block title %}Produções — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0 text-dark">Produções</h1>
+  <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary btn-sm">Voltar</a>
+</div>
+
+<form method="get" class="card siprac-card mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-2">
+        <label for="status" class="form-label">Status</label>
+        <select name="status" id="status" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          {% for valor, label in status_opcoes %}
+          <option value="{{ valor }}"{% if filtro_status == valor %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="tipo_producao" class="form-label">Tipo</label>
+        <select name="tipo_producao" id="tipo_producao" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          {% for tipo in tipos_producao %}
+          <option value="{{ tipo.pk }}"{% if filtro_tipo_producao == tipo.pk|stringformat:"s" %} selected{% endif %}>
+            {{ tipo.prefixo }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="periodo" class="form-label">Período (homologação)</label>
+        <select name="periodo" id="periodo" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="mes_atual"{% if filtro_periodo == 'mes_atual' %} selected{% endif %}>Mês atual</option>
+        </select>
+      </div>
+      {% if exibir_filtro_unidade %}
+      <div class="col-md-2">
+        <label for="unidade" class="form-label">Unidade</label>
+        <select name="unidade" id="unidade" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          {% for unidade in unidades %}
+          <option value="{{ unidade.sigla }}"{% if filtro_unidade == unidade.sigla %} selected{% endif %}>
+            {{ unidade.sigla }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary siprac-btn-primary btn-sm w-100">Filtrar</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover siprac-table align-middle mb-0">
+    <thead>
+      <tr>
+        <th>Produção</th>
+        <th>OS vinculada</th>
+        <th>Tipo</th>
+        <th>Status</th>
+        <th>Responsável</th>
+        <th>Criação</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for producao in producoes %}
+      <tr class="siprac-producao-row" data-href="{% url 'producao_detail' producao.pk %}" style="cursor: pointer;">
+        <td>
+          <a href="{% url 'producao_detail' producao.pk %}" class="text-decoration-none fw-semibold"
+             onclick="event.stopPropagation();">
+            {% if producao.numero_producao %}
+              {{ producao.numero_producao }}
+            {% else %}
+              {{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}
+            {% endif %}
+          </a>
+        </td>
+        <td>
+          <a href="{% url 'os_detalhe' producao.os_id %}" class="text-decoration-none"
+             onclick="event.stopPropagation();">{{ producao.os.numero_os }}</a>
+        </td>
+        <td>{{ producao.tipo_producao.prefixo }}</td>
+        <td>
+          <span class="badge bg-{{ producao.status|status_producao_cor }}">
+            {{ producao.status|status_producao_display }}
+          </span>
+        </td>
+        <td class="small">
+          {% if producao.servidor_responsavel %}{{ producao.servidor_responsavel.nome }}{% else %}—{% endif %}
+        </td>
+        <td class="small">{{ producao.data_criacao|date:"d/m/Y H:i" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="text-muted text-center py-4">Nenhuma produção encontrada.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4" aria-label="Paginação de produções">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ filtro_status }}&tipo_producao={{ filtro_tipo_producao }}&periodo={{ filtro_periodo }}&unidade={{ filtro_unidade }}&responsavel={{ filtro_responsavel }}">Anterior</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    </li>
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ filtro_status }}&tipo_producao={{ filtro_tipo_producao }}&periodo={{ filtro_periodo }}&unidade={{ filtro_unidade }}&responsavel={{ filtro_responsavel }}">Próxima</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">Próxima</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.siprac-producao-row').forEach(function (row) {
+  row.addEventListener('click', function () {
+    window.location.href = row.dataset.href;
+  });
+});
+</script>
+{% endblock %}

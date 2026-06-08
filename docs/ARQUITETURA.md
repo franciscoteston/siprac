@@ -420,3 +420,25 @@ Melhorias previstas:
 - Índices no banco PostgreSQL nos campos latitude, longitude,
   nom_logradouro e bairro para acelerar as consultas geoespaciais
 - Considerar futuramente PostGIS para consultas geoespaciais avançadas
+
+### 15.8 Visão sistêmica mínima para todos os servidores
+Servidores com perfil operacional (Técnico, Aux. Adm.) devem ter acesso
+mínimo de visualização a informações gerais da Divisão, promovendo
+integração e colaboração. Funcionalidades previstas:
+- Painel público interno: OSs encerradas com produções homologadas
+  (sem dados sensíveis de tramitação interna)
+- Busca por imóvel: qualquer servidor pode consultar o histórico de
+  OSs que envolveram determinada inscrição ou ISIC
+- Mural de produções: listagem de trabalhos homologados, filtráveis
+  por tipo, período e unidade — sem detalhes de tramitação interna
+- Configurável pelo administrador: quais informações ficam visíveis
+  para perfis operacionais
+
+### 15.9 Função Gratificada e identificação de cargo na interface
+Adicionar ao modelo ServidorUnidade um campo para identificar
+se o vínculo possui Função Gratificada (FG) e qual é a função:
+- fg_ativa: BooleanField (default False)
+- descricao_fg: CharField opcional (ex: Coordenador, Supervisor,
+  Auxiliar Técnico)
+- Exibir na interface: nome do usuário + cargo + FG quando aplicável
+- Útil para rastreio de responsabilidades em homologações e revisões
