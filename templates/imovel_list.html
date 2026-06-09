@@ -38,7 +38,7 @@
     </thead>
     <tbody>
       {% for imovel in imoveis %}
-      {% for versao in imovel.versoes.all %}
+      {% for vinculo in imovel.os_imoveis.all %}
       {% if forloop.first %}
       <tr class="siprac-imovel-row" data-href="{% url 'imovel_detalhe' imovel.pk %}" style="cursor: pointer;">
         <td>
@@ -54,10 +54,10 @@
             {% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}—{% endif %}
           </a>
         </td>
-        <td>{% if versao.nom_logradouro %}{{ versao.nom_logradouro }}{% else %}—{% endif %}</td>
-        <td>{% if versao.bairro %}{{ versao.bairro }}{% else %}—{% endif %}</td>
-        <td>{% if versao.area_territorial %}{{ versao.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
-        <td>{% if versao.exercicio %}{{ versao.exercicio }}{% else %}—{% endif %}</td>
+        <td>{% if vinculo.nom_logradouro %}{{ vinculo.nom_logradouro }}{% else %}—{% endif %}</td>
+        <td>{% if vinculo.bairro %}{{ vinculo.bairro }}{% else %}—{% endif %}</td>
+        <td>{% if vinculo.area_territorial %}{{ vinculo.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
+        <td>{% if vinculo.exercicio_referencia %}{{ vinculo.exercicio_referencia }}{% else %}—{% endif %}</td>
       </tr>
       {% endif %}
       {% empty %}
@@ -75,7 +75,7 @@
             {% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}—{% endif %}
           </a>
         </td>
-        <td colspan="4" class="text-muted">Sem versão cadastral</td>
+        <td colspan="4" class="text-muted">Sem vínculo em OS</td>
       </tr>
       {% endfor %}
       {% empty %}

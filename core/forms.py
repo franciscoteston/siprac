@@ -397,24 +397,20 @@ class ImovelForm(forms.Form):
         self.imovel = imovel
         super().__init__(*args, **kwargs)
         if imovel and not self.data:
-            from core.models import ImovelVersao
+            from core.models import OsImovel
 
-            versao = (
-                imovel.versoes.order_by("-exercicio", "-num_versao", "-pk").first()
+            os_imovel = (
+                OsImovel.objects.filter(imovel=imovel)
+                .order_by("-data_vinculo", "-pk")
+                .first()
             )
             self.fields["tipo_identificacao"].initial = imovel.tipo_identificacao
             self.fields["inscricao_cadastral"].initial = imovel.inscricao_cadastral
             for campo in self.CAMPOS_IMOVEL:
                 if campo == "observacao_interna":
                     valor = imovel.observacao_interna
-                elif campo == "exercicio_referencia":
-                    valor = versao.exercicio if versao else None
-                elif campo == "origem_dados":
-                    valor = versao.origem_dados if versao else "MANUAL"
-                elif campo == "num_versao":
-                    valor = versao.num_versao if versao else 0
-                elif versao and hasattr(ImovelVersao, campo):
-                    valor = getattr(versao, campo)
+                elif os_imovel and hasattr(OsImovel, campo):
+                    valor = getattr(os_imovel, campo)
                 else:
                     valor = None
                 self.fields[campo].initial = valor

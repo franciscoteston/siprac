@@ -41,10 +41,10 @@
         </thead>
         <tbody id="tbody-disponiveis">
           {% for item in imoveis_disponiveis %}
-          <tr data-imovel-id="{{ item.imovel_id }}">
+          <tr data-os-imovel-id="{{ item.os_imovel_id }}">
             <td>
               <input type="checkbox" class="form-check-input check-disponivel"
-                     value="{{ item.imovel_id }}">
+                     value="{{ item.os_imovel_id }}">
             </td>
             <td>{{ item.identificacao }}</td>
             <td>{{ item.endereco }}</td>
@@ -90,7 +90,7 @@
         </thead>
         <tbody id="tbody-producao">
           {% for item in imoveis_producao %}
-          <tr data-producao-imovel-id="{{ item.id }}" data-imovel-id="{{ item.imovel_id }}">
+          <tr data-producao-imovel-id="{{ item.id }}" data-os-imovel-id="{{ item.os_imovel_id }}">
             {% if pode_agrupar %}
             <td>
               <input type="checkbox" class="form-check-input check-producao" value="{{ item.id }}">
@@ -286,9 +286,9 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       disponiveis.forEach(function (item) {
         const tr = document.createElement('tr');
-        tr.dataset.imovelId = item.imovel_id;
+        tr.dataset.osImovelId = item.os_imovel_id;
         tr.innerHTML =
-          '<td><input type="checkbox" class="form-check-input check-disponivel" value="' + item.imovel_id + '"></td>' +
+          '<td><input type="checkbox" class="form-check-input check-disponivel" value="' + item.os_imovel_id + '"></td>' +
           '<td>' + item.identificacao + '</td>' +
           '<td>' + item.endereco + '</td>' +
           '<td>' + formatarArea(item.area_territorial) + '</td>';
@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
     producao.forEach(function (item) {
       const tr = document.createElement('tr');
       tr.dataset.producaoImovelId = item.id;
-      tr.dataset.imovelId = item.imovel_id;
+      tr.dataset.osImovelId = item.os_imovel_id;
 
       let html = '';
       if (podeAgrupar) {
@@ -336,7 +336,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     const acoes = selecionados.map(function (checkbox) {
-      return { tipo: 'vincular', imovel_id: parseInt(checkbox.value, 10) };
+      return { tipo: 'vincular', os_imovel_id: parseInt(checkbox.value, 10) };
     });
     await executarAcoes(acoes);
   });

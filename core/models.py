@@ -262,89 +262,6 @@ class Imovel(models.Model):
         return self.codigo_isic or "Imóvel sem identificação"
 
 
-class ImovelVersao(models.Model):
-    """Dados cadastrais versionados do imóvel."""
-
-    ORIGEM_DADOS = [
-        ("SIAT", "SIAT"),
-        ("MANUAL", "Manual"),
-    ]
-
-    imovel = models.ForeignKey(
-        Imovel,
-        on_delete=models.PROTECT,
-        related_name="versoes",
-    )
-    exercicio = models.IntegerField(null=True, blank=True)
-    num_versao = models.IntegerField(default=0)
-    data_registro = models.DateField(auto_now_add=True)
-    num_bloco = models.CharField(max_length=12, null=True, blank=True)
-    cod_logradouro = models.IntegerField(null=True, blank=True)
-    nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
-    num_endereco = models.CharField(max_length=20, null=True, blank=True)
-    num_unidade = models.CharField(max_length=20, null=True, blank=True)
-    bairro = models.CharField(max_length=100, null=True, blank=True)
-    des_finalidade = models.CharField(max_length=255, null=True, blank=True)
-    area_territorial = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-    )
-    area_construida = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-    )
-    rh_nome = models.CharField(max_length=20, null=True, blank=True)
-    rh_valor = models.IntegerField(null=True, blank=True)
-    idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
-    latitude = models.DecimalField(
-        max_digits=12,
-        decimal_places=8,
-        null=True,
-        blank=True,
-    )
-    longitude = models.DecimalField(
-        max_digits=12,
-        decimal_places=8,
-        null=True,
-        blank=True,
-    )
-    coord_x = models.DecimalField(
-        max_digits=15,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    coord_y = models.DecimalField(
-        max_digits=15,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    origem_dados = models.CharField(
-        max_length=20,
-        choices=ORIGEM_DADOS,
-        default="SIAT",
-    )
-
-    class Meta:
-        db_table = "imovel_versao"
-        verbose_name = "Versão do imóvel"
-        verbose_name_plural = "Versões dos imóveis"
-        unique_together = [["imovel", "exercicio", "num_versao"]]
-        indexes = [
-            models.Index(fields=["nom_logradouro"]),
-            models.Index(fields=["bairro"]),
-            models.Index(fields=["num_bloco"]),
-        ]
-
-    def __str__(self):
-        return f"{self.imovel} — {self.exercicio}/{self.num_versao}"
-
-
 class TipoProducao(models.Model):
     """Tipo de produção técnica (LA, PT, PF, despacho, etc.)."""
 
@@ -608,7 +525,12 @@ class TarefaInterna(models.Model):
 
 
 class OsImovel(models.Model):
-    """Vínculo entre uma OS e um imóvel de referência."""
+    """Vínculo entre uma OS e um imóvel, com dados cadastrais do momento."""
+
+    ORIGEM_DADOS = [
+        ("SIAT", "SIAT"),
+        ("MANUAL", "Manual"),
+    ]
 
     os = models.ForeignKey(
         OS,
@@ -620,13 +542,6 @@ class OsImovel(models.Model):
         on_delete=models.PROTECT,
         related_name="os_imoveis",
     )
-    imovel_versao = models.ForeignKey(
-        ImovelVersao,
-        on_delete=models.PROTECT,
-        related_name="os_imoveis",
-        null=True,
-        blank=True,
-    )
     data_vinculo = models.DateTimeField(auto_now_add=True)
     vinculado_por = models.ForeignKey(
         Servidor,
@@ -634,6 +549,58 @@ class OsImovel(models.Model):
         null=True,
         blank=True,
         related_name="imoveis_vinculados_os",
+    )
+    num_bloco = models.CharField(max_length=12, null=True, blank=True)
+    cod_logradouro = models.IntegerField(null=True, blank=True)
+    nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
+    num_endereco = models.CharField(max_length=20, null=True, blank=True)
+    num_unidade = models.CharField(max_length=20, null=True, blank=True)
+    bairro = models.CharField(max_length=100, null=True, blank=True)
+    des_finalidade = models.CharField(max_length=255, null=True, blank=True)
+    area_territorial = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    area_construida = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    rh_nome = models.CharField(max_length=20, null=True, blank=True)
+    rh_valor = models.IntegerField(null=True, blank=True)
+    idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
+    latitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    longitude = models.DecimalField(
+        max_digits=12,
+        decimal_places=8,
+        null=True,
+        blank=True,
+    )
+    coord_x = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    coord_y = models.DecimalField(
+        max_digits=15,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    exercicio_referencia = models.IntegerField(null=True, blank=True)
+    origem_dados = models.CharField(
+        max_length=20,
+        choices=ORIGEM_DADOS,
+        default="SIAT",
     )
 
     class Meta:
@@ -779,27 +746,19 @@ class ProducaoStatusLog(models.Model):
 
 
 class ProducaoImovel(models.Model):
-    """Imóvel abrangido por uma produção, com agrupamento opcional."""
+    """Imóvel abrangido por uma produção, referenciando o vínculo na OS."""
 
     producao = models.ForeignKey(
         Producao,
         on_delete=models.PROTECT,
         related_name="producao_imoveis",
     )
-    imovel = models.ForeignKey(
-        Imovel,
+    os_imovel = models.ForeignKey(
+        OsImovel,
         on_delete=models.PROTECT,
         related_name="producao_imoveis",
-    )
-    imovel_versao = models.ForeignKey(
-        ImovelVersao,
-        on_delete=models.PROTECT,
-        related_name="producao_imoveis",
-        null=True,
-        blank=True,
     )
     grupo_ref = models.CharField(max_length=10, null=True, blank=True)
-    papel_no_grupo = models.CharField(max_length=100, null=True, blank=True)
     observacao = models.TextField(null=True, blank=True)
 
     class Meta:
@@ -808,7 +767,7 @@ class ProducaoImovel(models.Model):
         verbose_name_plural = "Imóveis da produção"
 
     def __str__(self):
-        return f"{self.producao} — {self.imovel}"
+        return f"{self.producao} — {self.os_imovel.imovel}"
 
 
 class ProducaoAtributo(models.Model):

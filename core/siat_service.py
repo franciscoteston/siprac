@@ -3,12 +3,12 @@ import os
 
 from django.db.models import Exists, OuterRef
 
-from core.models import Imovel, ImovelVersao, OsImovel, ProducaoImovel
-from core.siat_parser import SIAT_COLUMN_MAP, parse_linha_siat, parse_siat_file
+from core.models import Imovel, OsImovel
+from core.siat_parser import parse_linha_siat, parse_siat_file
 
 CAMPOS_CABECALHO_ESPERADOS = ("NUM_BLOCO", "NUM_INSCRICAO", "NME_ENDLOC_LOGRADOURO")
 
-CAMPOS_VERSAO_SIAT = (
+CAMPOS_OS_IMOVEL_SIAT = (
     "num_bloco",
     "cod_logradouro",
     "nom_logradouro",
@@ -25,6 +25,7 @@ CAMPOS_VERSAO_SIAT = (
     "longitude",
     "coord_x",
     "coord_y",
+    "exercicio_referencia",
 )
 
 
@@ -72,58 +73,69 @@ def obter_status_arquivo_siat(filepath):
     }
 
 
-def _defaults_versao_siat(dados_siat):
-    defaults = {campo: dados_siat.get(campo) for campo in CAMPOS_VERSAO_SIAT}
-    defaults["origem_dados"] = "SIAT"
-    return defaults
-
-
-def obter_ou_criar_versao(dados_siat):
+def vincular_imovel_a_os(os, dados_siat, servidor=None):
     """
-    Busca ou cria Imovel + ImovelVersao a partir dos dados do arquivo SIAT.
-    Retorna tupla (imovel, imovel_versao, criado).
+    Vincula imóvel cadastral a uma OS com dados do SIAT.
+    Cria Imovel se não existir (apenas identidade).
+    Cria OsImovel com todos os dados cadastrais.
+    Retorna OsImovel criado.
     """
     inscricao = dados_siat.get("inscricao_cadastral")
-    exercicio = dados_siat.get("exercicio_referencia")
-    num_versao = dados_siat.get("num_versao", 0)
-
     imovel, _ = Imovel.objects.get_or_create(
         inscricao_cadastral=inscricao,
         defaults={"tipo_identificacao": "CADASTRAL"},
     )
 
-    versao, criada = ImovelVersao.objects.get_or_create(
+    return OsImovel.objects.create(
+        os=os,
         imovel=imovel,
-        exercicio=exercicio,
-        num_versao=num_versao,
-        defaults=_defaults_versao_siat(dados_siat),
+        vinculado_por=servidor,
+        num_bloco=dados_siat.get("num_bloco"),
+        cod_logradouro=dados_siat.get("cod_logradouro"),
+        nom_logradouro=dados_siat.get("nom_logradouro"),
+        num_endereco=dados_siat.get("num_endereco"),
+        num_unidade=dados_siat.get("num_unidade"),
+        bairro=dados_siat.get("bairro"),
+        des_finalidade=dados_siat.get("des_finalidade"),
+        area_territorial=dados_siat.get("area_territorial"),
+        area_construida=dados_siat.get("area_construida"),
+        rh_nome=dados_siat.get("rh_nome"),
+        rh_valor=dados_siat.get("rh_valor"),
+        idf_regiao_homogenea=dados_siat.get("idf_regiao_homogenea"),
+        latitude=dados_siat.get("latitude"),
+        longitude=dados_siat.get("longitude"),
+        coord_x=dados_siat.get("coord_x"),
+        coord_y=dados_siat.get("coord_y"),
+        exercicio_referencia=dados_siat.get("exercicio_referencia"),
+        origem_dados="SIAT",
     )
 
-    return imovel, versao, criada
 
-
-def obter_ou_criar_versao_isic(dados_manuais):
-    """Cria Imovel ISIC + ImovelVersao a partir de dados manuais."""
+def vincular_isic_a_os(os, dados_manuais, servidor=None):
+    """Vincula imóvel ISIC a uma OS com dados manuais."""
     codigo_isic = dados_manuais.get("codigo_isic")
     imovel, _ = Imovel.objects.get_or_create(
         codigo_isic=codigo_isic,
         defaults={"tipo_identificacao": "ISIC"},
     )
 
-    campos_versao = {
+    campos_cadastrais = {
         campo: dados_manuais.get(campo)
-        for campo in CAMPOS_VERSAO_SIAT
+        for campo in CAMPOS_OS_IMOVEL_SIAT
         if campo in dados_manuais
     }
-    versao = ImovelVersao.objects.create(
-        imovel=imovel,
-        exercicio=dados_manuais.get("exercicio", datetime.date.today().year),
-        num_versao=dados_manuais.get("num_versao", 0),
-        origem_dados="MANUAL",
-        **campos_versao,
-    )
 
-    return imovel, versao
+    return OsImovel.objects.create(
+        os=os,
+        imovel=imovel,
+        vinculado_por=servidor,
+        exercicio_referencia=dados_manuais.get(
+            "exercicio_referencia",
+            datetime.date.today().year,
+        ),
+        origem_dados="MANUAL",
+        **campos_cadastrais,
+    )
 
 
 def buscar_inscricao_no_arquivo(inscricao_cadastral, filepath):
@@ -170,15 +182,12 @@ def buscar_por_logradouro_no_arquivo(termo, filepath, limite=20):
 
 
 def atualizar_inscricao_do_arquivo(imovel, filepath):
+    """Verifica se a inscrição existe no arquivo SIAT."""
     if not imovel.inscricao_cadastral:
         return False
 
     dados = buscar_inscricao_no_arquivo(imovel.inscricao_cadastral, filepath)
-    if not dados:
-        return False
-
-    obter_ou_criar_versao(dados)
-    return True
+    return dados is not None
 
 
 def buscar_bloco_no_arquivo(num_bloco, filepath):
@@ -213,11 +222,9 @@ def obter_coordenadas_bloco(num_bloco, filepath):
 
 
 def queryset_imoveis_siat_orfaos():
-    """Imóveis sem vínculo em OS ou produção."""
+    """Imóveis sem vínculo em OS."""
     return Imovel.objects.exclude(
         Exists(OsImovel.objects.filter(imovel_id=OuterRef("pk"))),
-    ).exclude(
-        Exists(ProducaoImovel.objects.filter(imovel_id=OuterRef("pk"))),
     )
 
 

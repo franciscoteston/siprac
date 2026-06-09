@@ -137,7 +137,7 @@
             <th>Identificação</th>
             <th>Endereço</th>
             <th>Área</th>
-            <th>Exercício / Versão</th>
+            <th>Exercício</th>
           </tr>
         </thead>
         <tbody>
@@ -151,25 +151,25 @@
               {% endif %}
             </td>
             <td>
-              {% if item.imovel.inscricao_cadastral %}
-                {{ item.imovel.inscricao_cadastral }}
-              {% elif item.imovel.codigo_isic %}
-                {{ item.imovel.codigo_isic }}
+              {% if item.os_imovel.imovel.inscricao_cadastral %}
+                {{ item.os_imovel.imovel.inscricao_cadastral }}
+              {% elif item.os_imovel.imovel.codigo_isic %}
+                {{ item.os_imovel.imovel.codigo_isic }}
               {% else %}
-                Imóvel #{{ item.imovel_id }}
+                Imóvel #{{ item.os_imovel.imovel_id }}
               {% endif %}
             </td>
             <td>
-              {% if item.imovel_versao and item.imovel_versao.nom_logradouro %}
-                {{ item.imovel_versao.nom_logradouro }}{% if item.imovel_versao.num_endereco %}, {{ item.imovel_versao.num_endereco }}{% endif %}
+              {% if item.os_imovel.nom_logradouro %}
+                {{ item.os_imovel.nom_logradouro }}{% if item.os_imovel.num_endereco %}, {{ item.os_imovel.num_endereco }}{% endif %}
               {% else %}—{% endif %}
             </td>
             <td>
-              {% if item.imovel_versao and item.imovel_versao.area_territorial %}{{ item.imovel_versao.area_territorial|decimal_br }} m²{% else %}—{% endif %}
+              {% if item.os_imovel.area_territorial %}{{ item.os_imovel.area_territorial|decimal_br }} m²{% else %}—{% endif %}
             </td>
             <td>
-              {% if item.imovel_versao %}
-                {{ item.imovel_versao.exercicio|default:"—" }} / {{ item.imovel_versao.num_versao }}
+              {% if item.os_imovel.exercicio_referencia %}
+                {{ item.os_imovel.exercicio_referencia }}
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}

@@ -5,7 +5,6 @@ from core.models import (
     Encaminhamento,
     Finalidade,
     Imovel,
-    ImovelVersao,
     LogAuditoria,
     MacroetapaLog,
     MetaPesquisa,
@@ -76,7 +75,7 @@ class OsImovelInline(admin.TabularInline):
 class ProducaoImovelInline(admin.TabularInline):
     model = ProducaoImovel
     extra = 0
-    autocomplete_fields = ("imovel",)
+    autocomplete_fields = ("os_imovel",)
     verbose_name = "imóvel na produção"
     verbose_name_plural = "imóveis na produção"
 
@@ -242,14 +241,6 @@ class CombinacaoValidaAdmin(admin.ModelAdmin):
 # ---------------------------------------------------------------------------
 
 
-class ImovelVersaoInline(admin.TabularInline):
-    model = ImovelVersao
-    extra = 0
-    readonly_fields = ("data_registro",)
-    verbose_name = "versão"
-    verbose_name_plural = "versões"
-
-
 @admin.register(Imovel)
 class ImovelAdmin(admin.ModelAdmin):
     """Identidade do imóvel (inscrição cadastral ou ISIC)."""
@@ -265,41 +256,29 @@ class ImovelAdmin(admin.ModelAdmin):
         "codigo_isic",
     )
     ordering = ("inscricao_cadastral", "codigo_isic")
-    inlines = (ImovelVersaoInline,)
-
-
-@admin.register(ImovelVersao)
-class ImovelVersaoAdmin(admin.ModelAdmin):
-    """Versões cadastrais do imóvel."""
-
-    list_display = (
-        "imovel",
-        "exercicio",
-        "num_versao",
-        "nom_logradouro",
-        "bairro",
-        "origem_dados",
-        "data_registro",
-    )
-    list_filter = ("origem_dados", "exercicio")
-    search_fields = (
-        "imovel__inscricao_cadastral",
-        "imovel__codigo_isic",
-        "nom_logradouro",
-        "bairro",
-        "num_bloco",
-    )
-    autocomplete_fields = ("imovel",)
-    ordering = ("-exercicio", "-num_versao")
 
 
 @admin.register(OsImovel)
 class OsImovelAdmin(admin.ModelAdmin):
-    """Vínculos OS-imóvel (também editável via inline na OS)."""
+    """Vínculos OS-imóvel com dados cadastrais."""
 
-    list_display = ("os", "imovel", "imovel_versao")
-    search_fields = ("os__numero_os", "imovel__inscricao_cadastral", "imovel__codigo_isic")
-    autocomplete_fields = ("os", "imovel", "imovel_versao")
+    list_display = (
+        "os",
+        "imovel",
+        "nom_logradouro",
+        "bairro",
+        "exercicio_referencia",
+        "origem_dados",
+    )
+    list_filter = ("origem_dados",)
+    search_fields = (
+        "os__numero_os",
+        "imovel__inscricao_cadastral",
+        "imovel__codigo_isic",
+        "nom_logradouro",
+        "bairro",
+    )
+    autocomplete_fields = ("os", "imovel", "vinculado_por")
     ordering = ("os", "imovel")
 
 
@@ -307,16 +286,16 @@ class OsImovelAdmin(admin.ModelAdmin):
 class ProducaoImovelAdmin(admin.ModelAdmin):
     """Imóveis abrangidos por uma produção."""
 
-    list_display = ("producao", "imovel", "imovel_versao", "grupo_ref", "papel_no_grupo")
+    list_display = ("producao", "os_imovel", "grupo_ref")
     list_filter = ("grupo_ref",)
     search_fields = (
         "producao__numero_producao",
-        "imovel__inscricao_cadastral",
-        "imovel__codigo_isic",
+        "os_imovel__imovel__inscricao_cadastral",
+        "os_imovel__imovel__codigo_isic",
         "grupo_ref",
     )
-    autocomplete_fields = ("producao", "imovel", "imovel_versao")
-    ordering = ("producao", "imovel")
+    autocomplete_fields = ("producao", "os_imovel")
+    ordering = ("producao", "os_imovel")
 
 
 # ---------------------------------------------------------------------------

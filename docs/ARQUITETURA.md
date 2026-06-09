@@ -135,9 +135,11 @@ Quando um ISIC for regularizado e receber inscrição cadastral no SIAT, o siste
 
 Os dados do imóvel existem em dois contextos com propósitos distintos:
 
-**Identidade** (entidade `IMOVEL`) — inscrição cadastral ou código ISIC, mais observação interna. Não armazena dados cadastrais versionados.
+**Identidade** (entidade `IMOVEL`) — inscrição cadastral ou código ISIC, mais observação interna. Não armazena dados cadastrais.
 
-**Dados cadastrais versionados** (entidade `IMOVEL_VERSAO`) — endereço, áreas, região homogênea e coordenadas por exercício/versão. Criados a partir do SIAT (sob demanda) ou manualmente (ISIC). Cada vínculo em `OS_IMOVEL` ou `PRODUCAO_IMOVEL` aponta para a `IMOVEL_VERSAO` vigente no momento do vínculo, preservando o histórico sem campos snapshot duplicados.
+**Dados cadastrais no vínculo** (entidade `OS_IMOVEL`) — endereço, áreas, região homogênea e coordenadas registrados no momento em que o imóvel é vinculado à OS, a partir do SIAT ou de cadastro manual (ISIC). Cada vínculo preserva o snapshot dos dados daquele momento.
+
+**Produção** (entidade `PRODUCAO_IMOVEL`) — referencia o `OS_IMOVEL` correspondente, reutilizando os dados cadastrais já capturados na OS.
 
 ### 6.3 Agrupamentos
 
@@ -281,7 +283,7 @@ Campos livres como observações e anotações internas não são auditados.
 
 ---
 
-## 12. Inventário de entidades — 29 entidades
+## 12. Inventário de entidades — 28 entidades
 
 ### Estrutura e segurança
 `SERVIDOR` · `UNIDADE_INTERNA` · `SERVIDOR_UNIDADE` · `PERFIL_ACESSO` · `PERMISSAO_ESPECIAL`
@@ -293,7 +295,7 @@ Campos livres como observações e anotações internas não são auditados.
 `NATUREZA` · `TIPO_DEMANDA` · `FINALIDADE` · `COMBINACAO_VALIDA`
 
 ### Imóveis
-`IMOVEL` · `IMOVEL_VERSAO` · `OS_IMOVEL` · `PRODUCAO_IMOVEL`
+`IMOVEL` · `OS_IMOVEL` · `PRODUCAO_IMOVEL`
 
 ### OS e ciclo de vida
 `OS` · `PROCESSO_SEI` · `OS_PROCESSO` · `MACROETAPA_LOG` · `ENCAMINHAMENTO` · `TAREFA_INTERNA`

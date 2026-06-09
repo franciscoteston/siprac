@@ -141,18 +141,18 @@
                   </a>
                 </td>
                 <td>
-                  {% if vinculo.imovel_versao and vinculo.imovel_versao.nom_logradouro %}
-                    {{ vinculo.imovel_versao.nom_logradouro }}{% if vinculo.imovel_versao.num_endereco %}, {{ vinculo.imovel_versao.num_endereco }}{% endif %}
+                  {% if vinculo.nom_logradouro %}
+                    {{ vinculo.nom_logradouro }}{% if vinculo.num_endereco %}, {{ vinculo.num_endereco }}{% endif %}
                   {% else %}
                     —
                   {% endif %}
                 </td>
-                <td>{% if vinculo.imovel_versao and vinculo.imovel_versao.bairro %}{{ vinculo.imovel_versao.bairro }}{% else %}—{% endif %}</td>
-                <td>{% if vinculo.imovel_versao and vinculo.imovel_versao.area_territorial %}{{ vinculo.imovel_versao.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
+                <td>{% if vinculo.bairro %}{{ vinculo.bairro }}{% else %}—{% endif %}</td>
+                <td>{% if vinculo.area_territorial %}{{ vinculo.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
                 <td>
-                  {% if vinculo.imovel_versao and vinculo.imovel_versao.origem_dados == 'SIAT' %}
+                  {% if vinculo.origem_dados == 'SIAT' %}
                   <span class="badge bg-info">SIAT</span>
-                  {% elif vinculo.imovel_versao and vinculo.imovel_versao.origem_dados == 'MANUAL' %}
+                  {% elif vinculo.origem_dados == 'MANUAL' %}
                   <span class="badge bg-secondary">Manual</span>
                   {% else %}
                   <span class="badge bg-light text-dark">—</span>
