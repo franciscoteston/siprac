@@ -139,9 +139,28 @@ def vincular_isic_a_os(os, dados_manuais, servidor=None):
 
 
 def buscar_inscricao_no_arquivo(inscricao_cadastral, filepath):
-    for registro in parse_siat_file(filepath):
-        if registro.get("inscricao_cadastral") == inscricao_cadastral:
-            return registro
+    """Busca uma inscrição no arquivo SIAT (comparação por inteiro)."""
+    if not os.path.exists(filepath):
+        return None
+
+    try:
+        inscricao = int(inscricao_cadastral)
+    except (TypeError, ValueError):
+        return None
+
+    with open(filepath, "r", encoding="utf-8", errors="replace") as arquivo:
+        cabecalho = [
+            coluna.strip()
+            for coluna in arquivo.readline().strip().split("|")
+        ]
+        for linha in arquivo:
+            valores = linha.strip().split("|")
+            if len(valores) < len(cabecalho):
+                continue
+            registro = parse_linha_siat(cabecalho, valores)
+            if registro.get("inscricao_cadastral") == inscricao:
+                return registro
+
     return None
 
 
@@ -190,21 +209,39 @@ def atualizar_inscricao_do_arquivo(imovel, filepath):
     return dados is not None
 
 
-def buscar_bloco_no_arquivo(num_bloco, filepath):
+def buscar_bloco_no_arquivo(num_bloco, filepath, limite=20):
+    """Busca registros pelo NUM_BLOCO (string de 12 dígitos, com zeros à esquerda)."""
     num_bloco = str(num_bloco).strip()
-    if not num_bloco:
+    if not num_bloco or not os.path.exists(filepath):
         return None
 
+    resultados = []
+
     try:
-        registros = [
-            registro
-            for registro in parse_siat_file(filepath)
-            if str(registro.get("num_bloco", "")).strip() == num_bloco
-        ]
+        with open(filepath, "r", encoding="utf-8", errors="replace") as arquivo:
+            cabecalho = [
+                coluna.strip()
+                for coluna in arquivo.readline().strip().split("|")
+            ]
+            for linha in arquivo:
+                valores = linha.strip().split("|")
+                if len(valores) < len(cabecalho):
+                    continue
+                linha_dict = {
+                    cabecalho[indice]: valores[indice] if indice < len(valores) else ""
+                    for indice in range(len(cabecalho))
+                }
+                if str(linha_dict.get("NUM_BLOCO", "")).strip() != num_bloco:
+                    continue
+                registro = parse_linha_siat(cabecalho, valores)
+                if registro:
+                    resultados.append(registro)
+                if len(resultados) >= limite:
+                    break
     except OSError:
         return None
 
-    return registros or None
+    return resultados or None
 
 
 def obter_coordenadas_bloco(num_bloco, filepath):

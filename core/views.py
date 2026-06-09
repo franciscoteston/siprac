@@ -46,6 +46,7 @@ from core.os_service import (
 from core.siat_config import SIAT_ARQUIVO_PATH
 from core.siat_service import (
     atualizar_inscricao_do_arquivo,
+    buscar_bloco_no_arquivo,
     buscar_inscricao_no_arquivo,
     buscar_por_logradouro_no_arquivo,
     carregar_arquivo_siat,
@@ -2848,6 +2849,15 @@ class OSVincularImovelView(RequerLoginMixin, View):
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
 
+def _adicionar_resultado_siat(resultados, vistos, dados):
+    chave = f"siat:{dados.get('inscricao_cadastral')}"
+    if chave in vistos:
+        return False
+    vistos.add(chave)
+    resultados.append(_montar_resultado_busca(dados, "siat"))
+    return True
+
+
 class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
     def get(self, request):
         busca = request.GET.get("q", "").strip()
@@ -2857,17 +2867,26 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
         resultados = []
         vistos = set()
 
-        try:
-            inscricao = int(busca)
-        except ValueError:
-            inscricao = None
+        if SIAT_ARQUIVO_PATH.exists():
+            # num_bloco: 12 dígitos numéricos (preserva zeros à esquerda)
+            if busca.isdigit() and len(busca) == 12:
+                registros = buscar_bloco_no_arquivo(busca, SIAT_ARQUIVO_PATH, limite=20)
+                if registros:
+                    for dados in registros:
+                        _adicionar_resultado_siat(resultados, vistos, dados)
+                return JsonResponse(resultados[:20], safe=False)
 
-        if inscricao is not None:
-            if SIAT_ARQUIVO_PATH.exists():
+            # inscrição cadastral: termo convertível para inteiro
+            try:
+                inscricao = int(busca)
+            except ValueError:
+                inscricao = None
+
+            if inscricao is not None:
                 dados = buscar_inscricao_no_arquivo(inscricao, SIAT_ARQUIVO_PATH)
                 if dados:
-                    resultados.append(_montar_resultado_busca(dados, "siat"))
-            return JsonResponse(resultados, safe=False)
+                    _adicionar_resultado_siat(resultados, vistos, dados)
+                return JsonResponse(resultados, safe=False)
 
         for imovel in Imovel.objects.filter(
             tipo_identificacao="ISIC",
@@ -2881,14 +2900,14 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
                 resultados.append(_montar_resultado_busca(dados, "isic"))
 
         if SIAT_ARQUIVO_PATH.exists():
-            for dados in buscar_por_logradouro_no_arquivo(busca, SIAT_ARQUIVO_PATH, limite=20):
-                chave = f"siat:{dados.get('inscricao_cadastral')}"
-                if chave in vistos:
-                    continue
-                vistos.add(chave)
-                resultados.append(_montar_resultado_busca(dados, "siat"))
-                if len(resultados) >= 20:
-                    break
+            for dados in buscar_por_logradouro_no_arquivo(
+                busca,
+                SIAT_ARQUIVO_PATH,
+                limite=20,
+            ):
+                if _adicionar_resultado_siat(resultados, vistos, dados):
+                    if len(resultados) >= 20:
+                        break
 
         return JsonResponse(resultados[:20], safe=False)
 
