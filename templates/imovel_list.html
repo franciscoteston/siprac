@@ -6,7 +6,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1 class="h3 mb-0 text-dark">Imóveis</h1>
-  <a href="{% url 'imovel_novo' %}" class="btn btn-primary siprac-btn-primary">+ Novo imóvel</a>
+  <a href="{% url 'imovel_novo' %}" class="btn btn-primary siprac-btn-primary">+ Novo imóvel (ISIC)</a>
 </div>
 
 <form method="get" class="card siprac-card mb-4">
@@ -14,11 +14,11 @@
     <div class="row g-3 align-items-end">
       <div class="col-md-10">
         <label for="q" class="form-label">Buscar</label>
-        <input type="search" name="q" id="q" class="form-control form-control-sm"
-               value="{{ filtro_q }}" placeholder="Inscrição cadastral, código ISIC, logradouro ou bairro">
+        <input type="search" name="q" id="q" class="form-control"
+               value="{{ filtro_q }}" placeholder="Inscrição, ISIC, logradouro ou bairro">
       </div>
       <div class="col-md-2">
-        <button type="submit" class="btn btn-primary siprac-btn-primary btn-sm w-100">Buscar</button>
+        <button type="submit" class="btn btn-primary siprac-btn-primary w-100">Filtrar</button>
       </div>
     </div>
   </div>
@@ -28,16 +28,18 @@
   <table class="table table-hover siprac-table align-middle mb-0">
     <thead>
       <tr>
-        <th scope="col">Tipo</th>
-        <th scope="col">Identificação</th>
-        <th scope="col">Logradouro</th>
-        <th scope="col">Bairro</th>
-        <th scope="col">Área terr. (m²)</th>
-        <th scope="col">Exercício</th>
+        <th>Tipo</th>
+        <th>Identificação</th>
+        <th>Logradouro</th>
+        <th>Bairro</th>
+        <th>Área (m²)</th>
+        <th>Exercício</th>
       </tr>
     </thead>
     <tbody>
       {% for imovel in imoveis %}
+      {% for versao in imovel.versoes.all %}
+      {% if forloop.first %}
       <tr class="siprac-imovel-row" data-href="{% url 'imovel_detalhe' imovel.pk %}" style="cursor: pointer;">
         <td>
           {% if imovel.tipo_identificacao == 'CADASTRAL' %}
@@ -52,11 +54,30 @@
             {% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}—{% endif %}
           </a>
         </td>
-        <td>{% if imovel.nom_logradouro %}{{ imovel.nom_logradouro }}{% else %}—{% endif %}</td>
-        <td>{% if imovel.bairro %}{{ imovel.bairro }}{% else %}—{% endif %}</td>
-        <td>{% if imovel.area_territorial %}{{ imovel.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
-        <td>{% if imovel.exercicio_referencia %}{{ imovel.exercicio_referencia }}{% else %}—{% endif %}</td>
+        <td>{% if versao.nom_logradouro %}{{ versao.nom_logradouro }}{% else %}—{% endif %}</td>
+        <td>{% if versao.bairro %}{{ versao.bairro }}{% else %}—{% endif %}</td>
+        <td>{% if versao.area_territorial %}{{ versao.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
+        <td>{% if versao.exercicio %}{{ versao.exercicio }}{% else %}—{% endif %}</td>
       </tr>
+      {% endif %}
+      {% empty %}
+      <tr class="siprac-imovel-row" data-href="{% url 'imovel_detalhe' imovel.pk %}" style="cursor: pointer;">
+        <td>
+          {% if imovel.tipo_identificacao == 'CADASTRAL' %}
+          <span class="badge badge-imovel-cadastral">CADASTRAL</span>
+          {% else %}
+          <span class="badge badge-imovel-isic">ISIC</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{% url 'imovel_detalhe' imovel.pk %}" class="text-decoration-none fw-semibold"
+             onclick="event.stopPropagation();">
+            {% if imovel.inscricao_cadastral %}{{ imovel.inscricao_cadastral }}{% elif imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}—{% endif %}
+          </a>
+        </td>
+        <td colspan="4" class="text-muted">Sem versão cadastral</td>
+      </tr>
+      {% endfor %}
       {% empty %}
       <tr>
         <td colspan="6" class="text-muted text-center py-4">Nenhum imóvel encontrado.</td>
@@ -76,11 +97,9 @@
     {% else %}
     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
     {% endif %}
-
     <li class="page-item disabled">
       <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
     </li>
-
     {% if page_obj.has_next %}
     <li class="page-item">
       <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ filtro_q }}">Próxima</a>

@@ -235,21 +235,49 @@ class CombinacaoValida(models.Model):
 
 
 class Imovel(models.Model):
-    """Dados de referência do imóvel (inscrição SIAT ou código ISIC)."""
+    """Identidade do imóvel (inscrição cadastral ou código ISIC)."""
 
     TIPO_IDENTIFICACAO = [
         ("CADASTRAL", "Cadastral"),
         ("ISIC", "ISIC"),
     ]
-    ORIGEM_DADOS = [
-        ("SIAT", "SIAT"),
-        ("MANUAL", "Manual"),
-        ("SIAT_EDITADO", "SIAT Editado"),
-    ]
 
     tipo_identificacao = models.CharField(max_length=10, choices=TIPO_IDENTIFICACAO)
     inscricao_cadastral = models.IntegerField(null=True, blank=True, unique=True)
     codigo_isic = models.CharField(max_length=20, null=True, blank=True, unique=True)
+    observacao_interna = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "imovel"
+        verbose_name = "Imóvel"
+        verbose_name_plural = "Imóveis"
+        indexes = [
+            models.Index(fields=["inscricao_cadastral"]),
+            models.Index(fields=["codigo_isic"]),
+        ]
+
+    def __str__(self):
+        if self.inscricao_cadastral:
+            return str(self.inscricao_cadastral)
+        return self.codigo_isic or "Imóvel sem identificação"
+
+
+class ImovelVersao(models.Model):
+    """Dados cadastrais versionados do imóvel."""
+
+    ORIGEM_DADOS = [
+        ("SIAT", "SIAT"),
+        ("MANUAL", "Manual"),
+    ]
+
+    imovel = models.ForeignKey(
+        Imovel,
+        on_delete=models.PROTECT,
+        related_name="versoes",
+    )
+    exercicio = models.IntegerField(null=True, blank=True)
+    num_versao = models.IntegerField(default=0)
+    data_registro = models.DateField(auto_now_add=True)
     num_bloco = models.CharField(max_length=12, null=True, blank=True)
     cod_logradouro = models.IntegerField(null=True, blank=True)
     nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
@@ -269,8 +297,6 @@ class Imovel(models.Model):
         null=True,
         blank=True,
     )
-    exercicio_referencia = models.IntegerField(null=True, blank=True)
-    num_versao = models.IntegerField(default=0)
     rh_nome = models.CharField(max_length=20, null=True, blank=True)
     rh_valor = models.IntegerField(null=True, blank=True)
     idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
@@ -301,21 +327,22 @@ class Imovel(models.Model):
     origem_dados = models.CharField(
         max_length=20,
         choices=ORIGEM_DADOS,
-        default="MANUAL",
+        default="SIAT",
     )
-    editado_manualmente = models.BooleanField(default=False)
-    data_ultima_importacao = models.DateField(null=True, blank=True)
-    observacao_interna = models.TextField(null=True, blank=True)
 
     class Meta:
-        db_table = "imovel"
-        verbose_name = "Imóvel"
-        verbose_name_plural = "Imóveis"
+        db_table = "imovel_versao"
+        verbose_name = "Versão do imóvel"
+        verbose_name_plural = "Versões dos imóveis"
+        unique_together = [["imovel", "exercicio", "num_versao"]]
+        indexes = [
+            models.Index(fields=["nom_logradouro"]),
+            models.Index(fields=["bairro"]),
+            models.Index(fields=["num_bloco"]),
+        ]
 
     def __str__(self):
-        if self.inscricao_cadastral:
-            return f"{self.inscricao_cadastral} — {self.nom_logradouro or ''}"
-        return self.codigo_isic or "Imóvel sem identificação"
+        return f"{self.imovel} — {self.exercicio}/{self.num_versao}"
 
 
 class TipoProducao(models.Model):
@@ -586,12 +613,19 @@ class OsImovel(models.Model):
     os = models.ForeignKey(
         OS,
         on_delete=models.PROTECT,
-        related_name="imoveis_vinculados",
+        related_name="os_imoveis",
     )
     imovel = models.ForeignKey(
         Imovel,
         on_delete=models.PROTECT,
-        related_name="vinculos_os",
+        related_name="os_imoveis",
+    )
+    imovel_versao = models.ForeignKey(
+        ImovelVersao,
+        on_delete=models.PROTECT,
+        related_name="os_imoveis",
+        null=True,
+        blank=True,
     )
     data_vinculo = models.DateTimeField(auto_now_add=True)
     vinculado_por = models.ForeignKey(
@@ -599,101 +633,17 @@ class OsImovel(models.Model):
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="imoveis_vinculados",
+        related_name="imoveis_vinculados_os",
     )
-    snap_num_bloco = models.CharField(max_length=12, null=True, blank=True)
-    snap_inscricao_cadastral = models.IntegerField(null=True, blank=True)
-    snap_codigo_isic = models.CharField(max_length=20, null=True, blank=True)
-    snap_cod_logradouro = models.IntegerField(null=True, blank=True)
-    snap_nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
-    snap_num_endereco = models.CharField(max_length=20, null=True, blank=True)
-    snap_num_unidade = models.CharField(max_length=20, null=True, blank=True)
-    snap_bairro = models.CharField(max_length=100, null=True, blank=True)
-    snap_des_finalidade = models.CharField(max_length=255, null=True, blank=True)
-    snap_area_territorial = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-    )
-    snap_area_construida = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-    )
-    snap_exercicio_referencia = models.IntegerField(null=True, blank=True)
-    snap_num_versao = models.IntegerField(null=True, blank=True)
-    snap_rh_nome = models.CharField(max_length=20, null=True, blank=True)
-    snap_rh_valor = models.IntegerField(null=True, blank=True)
-    snap_idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
-    snap_latitude = models.DecimalField(
-        max_digits=12,
-        decimal_places=8,
-        null=True,
-        blank=True,
-    )
-    snap_longitude = models.DecimalField(
-        max_digits=12,
-        decimal_places=8,
-        null=True,
-        blank=True,
-    )
-    snap_coord_x = models.DecimalField(
-        max_digits=15,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    snap_coord_y = models.DecimalField(
-        max_digits=15,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    snap_origem_dados = models.CharField(max_length=20, null=True, blank=True)
-    snap_data_importacao = models.DateField(null=True, blank=True)
 
     class Meta:
-        db_table = "OS_IMOVEL"
-        verbose_name = "vínculo OS-imóvel"
-        verbose_name_plural = "vínculos OS-imóvel"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["os", "imovel"],
-                name="os_imovel_unico",
-            ),
-        ]
+        db_table = "os_imovel"
+        verbose_name = "Imóvel da OS"
+        verbose_name_plural = "Imóveis da OS"
+        unique_together = [["os", "imovel"]]
 
     def __str__(self):
         return f"{self.os} — {self.imovel}"
-
-    def capturar_snapshot(self, servidor=None):
-        imovel = self.imovel
-        self.snap_num_bloco = imovel.num_bloco
-        self.snap_inscricao_cadastral = imovel.inscricao_cadastral
-        self.snap_codigo_isic = imovel.codigo_isic
-        self.snap_cod_logradouro = imovel.cod_logradouro
-        self.snap_nom_logradouro = imovel.nom_logradouro
-        self.snap_num_endereco = imovel.num_endereco
-        self.snap_num_unidade = imovel.num_unidade
-        self.snap_bairro = imovel.bairro
-        self.snap_des_finalidade = imovel.des_finalidade
-        self.snap_area_territorial = imovel.area_territorial
-        self.snap_area_construida = imovel.area_construida
-        self.snap_exercicio_referencia = imovel.exercicio_referencia
-        self.snap_num_versao = imovel.num_versao
-        self.snap_rh_nome = imovel.rh_nome
-        self.snap_rh_valor = imovel.rh_valor
-        self.snap_idf_regiao_homogenea = imovel.idf_regiao_homogenea
-        self.snap_latitude = imovel.latitude
-        self.snap_longitude = imovel.longitude
-        self.snap_coord_x = imovel.coord_x
-        self.snap_coord_y = imovel.coord_y
-        self.snap_origem_dados = imovel.origem_dados
-        self.snap_data_importacao = imovel.data_ultima_importacao
-        self.vinculado_por = servidor
-        self.save()
 
 
 # ---------------------------------------------------------------------------
@@ -828,151 +778,37 @@ class ProducaoStatusLog(models.Model):
         return f"{self.producao} — {self.status_anterior} → {self.status_novo}"
 
 
-CAMPOS_SNAP_IMOVEL = (
-    "snap_num_bloco",
-    "snap_inscricao_cadastral",
-    "snap_codigo_isic",
-    "snap_cod_logradouro",
-    "snap_nom_logradouro",
-    "snap_num_endereco",
-    "snap_num_unidade",
-    "snap_bairro",
-    "snap_des_finalidade",
-    "snap_area_territorial",
-    "snap_area_construida",
-    "snap_exercicio_referencia",
-    "snap_num_versao",
-    "snap_rh_nome",
-    "snap_rh_valor",
-    "snap_idf_regiao_homogenea",
-    "snap_latitude",
-    "snap_longitude",
-    "snap_coord_x",
-    "snap_coord_y",
-    "snap_origem_dados",
-    "snap_data_importacao",
-)
-
-
 class ProducaoImovel(models.Model):
     """Imóvel abrangido por uma produção, com agrupamento opcional."""
 
     producao = models.ForeignKey(
         Producao,
         on_delete=models.PROTECT,
-        related_name="imoveis",
+        related_name="producao_imoveis",
     )
     imovel = models.ForeignKey(
         Imovel,
         on_delete=models.PROTECT,
-        related_name="producoes",
+        related_name="producao_imoveis",
     )
-    grupo_ref = models.CharField(max_length=255, null=True, blank=True)
-    papel_no_grupo = models.CharField(max_length=255, null=True, blank=True)
+    imovel_versao = models.ForeignKey(
+        ImovelVersao,
+        on_delete=models.PROTECT,
+        related_name="producao_imoveis",
+        null=True,
+        blank=True,
+    )
+    grupo_ref = models.CharField(max_length=10, null=True, blank=True)
+    papel_no_grupo = models.CharField(max_length=100, null=True, blank=True)
     observacao = models.TextField(null=True, blank=True)
-    snap_num_bloco = models.CharField(max_length=12, null=True, blank=True)
-    snap_inscricao_cadastral = models.IntegerField(null=True, blank=True)
-    snap_codigo_isic = models.CharField(max_length=20, null=True, blank=True)
-    snap_cod_logradouro = models.IntegerField(null=True, blank=True)
-    snap_nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
-    snap_num_endereco = models.CharField(max_length=20, null=True, blank=True)
-    snap_num_unidade = models.CharField(max_length=20, null=True, blank=True)
-    snap_bairro = models.CharField(max_length=100, null=True, blank=True)
-    snap_des_finalidade = models.CharField(max_length=255, null=True, blank=True)
-    snap_area_territorial = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-    )
-    snap_area_construida = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-    )
-    snap_exercicio_referencia = models.IntegerField(null=True, blank=True)
-    snap_num_versao = models.IntegerField(null=True, blank=True)
-    snap_rh_nome = models.CharField(max_length=20, null=True, blank=True)
-    snap_rh_valor = models.IntegerField(null=True, blank=True)
-    snap_idf_regiao_homogenea = models.IntegerField(null=True, blank=True)
-    snap_latitude = models.DecimalField(
-        max_digits=12,
-        decimal_places=8,
-        null=True,
-        blank=True,
-    )
-    snap_longitude = models.DecimalField(
-        max_digits=12,
-        decimal_places=8,
-        null=True,
-        blank=True,
-    )
-    snap_coord_x = models.DecimalField(
-        max_digits=15,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    snap_coord_y = models.DecimalField(
-        max_digits=15,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    snap_origem_dados = models.CharField(max_length=20, null=True, blank=True)
-    snap_data_importacao = models.DateField(null=True, blank=True)
 
     class Meta:
-        db_table = "PRODUCAO_IMOVEL"
-        verbose_name = "imóvel na produção"
-        verbose_name_plural = "imóveis na produção"
+        db_table = "producao_imovel"
+        verbose_name = "Imóvel da produção"
+        verbose_name_plural = "Imóveis da produção"
 
     def __str__(self):
         return f"{self.producao} — {self.imovel}"
-
-    def capturar_snapshot_de_osimovel(self, os_imovel):
-        for campo in CAMPOS_SNAP_IMOVEL:
-            setattr(self, campo, getattr(os_imovel, campo))
-        self.save()
-
-
-class ProducaoImovelDados(models.Model):
-    """Dados de trabalho do imóvel por exercício, homologados na produção."""
-
-    producao_imovel = models.ForeignKey(
-        ProducaoImovel,
-        on_delete=models.PROTECT,
-        related_name="dados_trabalho",
-    )
-    exercicio = models.IntegerField()
-    area_trabalho = models.FloatField(null=True, blank=True)
-    endereco_trabalho = models.CharField(max_length=255, null=True, blank=True)
-    fonte = models.CharField(max_length=255, null=True, blank=True)
-    data_referencia = models.DateField()
-    observacao_tecnica = models.TextField(null=True, blank=True)
-    editado_por = models.ForeignKey(
-        Servidor,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="dados_producao_editados",
-    )
-    data_edicao = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = "PRODUCAO_IMOVEL_DADOS"
-        verbose_name = "dados de trabalho do imóvel"
-        verbose_name_plural = "dados de trabalho dos imóveis"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["producao_imovel", "exercicio"],
-                name="producao_imovel_exercicio_unico",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.producao_imovel} — exercício {self.exercicio}"
 
 
 class ProducaoAtributo(models.Model):

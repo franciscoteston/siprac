@@ -76,6 +76,22 @@ def _parse_field(campo, valor):
     return texto or None
 
 
+def parse_linha_siat(cabecalho, valores):
+    """Converte uma linha bruta do arquivo SIAT em dict mapeado."""
+    linha_dict = {
+        cabecalho[indice]: valores[indice] if indice < len(valores) else ""
+        for indice in range(len(cabecalho))
+    }
+    registro = {}
+    for coluna_siat, campo in SIAT_COLUMN_MAP.items():
+        if coluna_siat not in linha_dict:
+            continue
+        valor = _parse_field(campo, linha_dict[coluna_siat])
+        if valor is not None:
+            registro[campo] = valor
+    return registro
+
+
 def parse_siat_file(filepath):
     """Lê arquivo SIAT delimitado por | e retorna lista de dicts mapeados."""
     registros = []
@@ -89,20 +105,7 @@ def parse_siat_file(filepath):
     cabecalho = [_normalizar_valor(coluna) for coluna in linhas[0].split("|")]
 
     for linha in linhas[1:]:
-        valores = linha.split("|")
-        linha_dict = {
-            cabecalho[indice]: valores[indice] if indice < len(valores) else ""
-            for indice in range(len(cabecalho))
-        }
-
-        registro = {}
-        for coluna_siat, campo in SIAT_COLUMN_MAP.items():
-            if coluna_siat not in linha_dict:
-                continue
-            valor = _parse_field(campo, linha_dict[coluna_siat])
-            if valor is not None:
-                registro[campo] = valor
-
+        registro = parse_linha_siat(cabecalho, linha.split("|"))
         if registro:
             registros.append(registro)
 

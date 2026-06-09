@@ -45,6 +45,9 @@
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-siat" type="button" role="tab">Dados SIAT</button>
   </li>
   <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-versoes" type="button" role="tab">Versões</button>
+  </li>
+  <li class="nav-item" role="presentation">
     <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-vinculos" type="button" role="tab">Vínculos</button>
   </li>
 </ul>
@@ -52,7 +55,7 @@
 <div class="tab-content">
   <div class="tab-pane fade show active" id="pane-resumo" role="tabpanel">
     <div class="card siprac-card">
-      <div class="card-header bg-white fw-semibold">Identificação e endereço</div>
+      <div class="card-header bg-white fw-semibold">Identificação e endereço{% if versao_atual %} (versão {{ versao_atual.exercicio|default:"—" }}/{{ versao_atual.num_versao }}){% endif %}</div>
       <div class="card-body">
         <dl class="row mb-0 small">
           <dt class="col-sm-3">Inscrição cadastral</dt>
@@ -60,23 +63,25 @@
           <dt class="col-sm-3">Código ISIC</dt>
           <dd class="col-sm-9">{% if imovel.codigo_isic %}{{ imovel.codigo_isic }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Bloco</dt>
-          <dd class="col-sm-9">{% if imovel.num_bloco %}{{ imovel.num_bloco }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual and versao_atual.num_bloco %}{{ versao_atual.num_bloco }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Logradouro</dt>
-          <dd class="col-sm-9">{% if imovel.nom_logradouro %}{{ imovel.nom_logradouro }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual and versao_atual.nom_logradouro %}{{ versao_atual.nom_logradouro }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Número / Unidade</dt>
           <dd class="col-sm-9">
-            {% if imovel.num_endereco or imovel.num_unidade %}
-              {{ imovel.num_endereco|default:"" }}{% if imovel.num_unidade %} / {{ imovel.num_unidade }}{% endif %}
+            {% if versao_atual and versao_atual.num_endereco or versao_atual and versao_atual.num_unidade %}
+              {{ versao_atual.num_endereco|default:"" }}{% if versao_atual.num_unidade %} / {{ versao_atual.num_unidade }}{% endif %}
             {% else %}—{% endif %}
           </dd>
           <dt class="col-sm-3">Bairro</dt>
-          <dd class="col-sm-9">{% if imovel.bairro %}{{ imovel.bairro }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual and versao_atual.bairro %}{{ versao_atual.bairro }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Finalidade</dt>
-          <dd class="col-sm-9">{% if imovel.des_finalidade %}{{ imovel.des_finalidade }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual and versao_atual.des_finalidade %}{{ versao_atual.des_finalidade }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Área territorial</dt>
-          <dd class="col-sm-9">{% if imovel.area_territorial %}{{ imovel.area_territorial|decimal_br }} m²{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual and versao_atual.area_territorial %}{{ versao_atual.area_territorial|decimal_br }} m²{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Área construída</dt>
-          <dd class="col-sm-9">{% if imovel.area_construida %}{{ imovel.area_construida|decimal_br }} m²{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual and versao_atual.area_construida %}{{ versao_atual.area_construida|decimal_br }} m²{% else %}—{% endif %}</dd>
+          <dt class="col-sm-3">Observação interna</dt>
+          <dd class="col-sm-9">{% if imovel.observacao_interna %}{{ imovel.observacao_interna }}{% else %}—{% endif %}</dd>
         </dl>
       </div>
     </div>
@@ -84,40 +89,92 @@
 
   <div class="tab-pane fade" id="pane-siat" role="tabpanel">
     <div class="card siprac-card">
-      <div class="card-header bg-white fw-semibold">Dados SIAT</div>
+      <div class="card-header bg-white fw-semibold">Dados SIAT{% if versao_atual %} (versão {{ versao_atual.exercicio|default:"—" }}/{{ versao_atual.num_versao }}){% endif %}</div>
       <div class="card-body">
+        {% if versao_atual %}
         <dl class="row mb-0 small">
           <dt class="col-sm-3">Região homogênea</dt>
           <dd class="col-sm-9">
-            {% if imovel.rh_nome or imovel.rh_valor %}
-              {{ imovel.rh_nome|default:"" }}{% if imovel.rh_valor %} ({{ imovel.rh_valor }}){% endif %}
+            {% if versao_atual.rh_nome or versao_atual.rh_valor %}
+              {{ versao_atual.rh_nome|default:"" }}{% if versao_atual.rh_valor %} ({{ versao_atual.rh_valor }}){% endif %}
             {% else %}—{% endif %}
           </dd>
           <dt class="col-sm-3">ID região homogênea</dt>
-          <dd class="col-sm-9">{% if imovel.idf_regiao_homogenea %}{{ imovel.idf_regiao_homogenea }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual.idf_regiao_homogenea %}{{ versao_atual.idf_regiao_homogenea }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Latitude / Longitude</dt>
           <dd class="col-sm-9">
-            {% if imovel.latitude or imovel.longitude %}
-              {{ imovel.latitude|decimal_br }} / {{ imovel.longitude|decimal_br }}
+            {% if versao_atual.latitude or versao_atual.longitude %}
+              {{ versao_atual.latitude|decimal_br }} / {{ versao_atual.longitude|decimal_br }}
             {% else %}—{% endif %}
           </dd>
           <dt class="col-sm-3">Coord. X / Y</dt>
           <dd class="col-sm-9">
-            {% if imovel.coord_x or imovel.coord_y %}
-              {{ imovel.coord_x|decimal_br }} / {{ imovel.coord_y|decimal_br }}
+            {% if versao_atual.coord_x or versao_atual.coord_y %}
+              {{ versao_atual.coord_x|decimal_br }} / {{ versao_atual.coord_y|decimal_br }}
             {% else %}—{% endif %}
           </dd>
           <dt class="col-sm-3">Exercício</dt>
-          <dd class="col-sm-9">{% if imovel.exercicio_referencia %}{{ imovel.exercicio_referencia }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{% if versao_atual.exercicio %}{{ versao_atual.exercicio }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-3">Versão</dt>
-          <dd class="col-sm-9">{{ imovel.num_versao }}</dd>
+          <dd class="col-sm-9">{{ versao_atual.num_versao }}</dd>
           <dt class="col-sm-3">Origem dos dados</dt>
-          <dd class="col-sm-9">{{ imovel.get_origem_dados_display }}</dd>
-          <dt class="col-sm-3">Última importação</dt>
-          <dd class="col-sm-9">{% if imovel.data_ultima_importacao %}{{ imovel.data_ultima_importacao|date:"d/m/Y" }}{% else %}—{% endif %}</dd>
-          <dt class="col-sm-3">Observação interna</dt>
-          <dd class="col-sm-9">{% if imovel.observacao_interna %}{{ imovel.observacao_interna }}{% else %}—{% endif %}</dd>
+          <dd class="col-sm-9">{{ versao_atual.get_origem_dados_display }}</dd>
+          <dt class="col-sm-3">Data de registro</dt>
+          <dd class="col-sm-9">{{ versao_atual.data_registro|date:"d/m/Y" }}</dd>
         </dl>
+        {% else %}
+        <p class="text-muted mb-0">Nenhuma versão cadastral registrada.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="pane-versoes" role="tabpanel">
+    <div class="card siprac-card">
+      <div class="card-header bg-white fw-semibold">Versões cadastrais</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Exercício</th>
+                <th>Versão</th>
+                <th>Logradouro</th>
+                <th>Bairro</th>
+                <th>Área (m²)</th>
+                <th>Origem</th>
+                <th>Registro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for versao in versoes %}
+              <tr>
+                <td>{{ versao.exercicio|default:"—" }}</td>
+                <td>{{ versao.num_versao }}</td>
+                <td>
+                  {% if versao.nom_logradouro %}
+                    {{ versao.nom_logradouro }}{% if versao.num_endereco %}, {{ versao.num_endereco }}{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+                <td>{% if versao.bairro %}{{ versao.bairro }}{% else %}—{% endif %}</td>
+                <td>{% if versao.area_territorial %}{{ versao.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
+                <td>
+                  {% if versao.origem_dados == 'SIAT' %}
+                  <span class="badge bg-info">SIAT</span>
+                  {% else %}
+                  <span class="badge bg-secondary">Manual</span>
+                  {% endif %}
+                </td>
+                <td>{{ versao.data_registro|date:"d/m/Y" }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7" class="text-muted text-center py-3">Nenhuma versão cadastrada.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -132,6 +189,8 @@
               <tr>
                 <th>Nº OS</th>
                 <th>Data criação</th>
+                <th>Exercício / Versão</th>
+                <th>Endereço (snapshot)</th>
               </tr>
             </thead>
             <tbody>
@@ -143,10 +202,20 @@
                   </a>
                 </td>
                 <td>{{ vinculo.os.data_criacao_sgbd|date:"d/m/Y" }}</td>
+                <td>
+                  {% if vinculo.imovel_versao %}
+                    {{ vinculo.imovel_versao.exercicio|default:"—" }} / {{ vinculo.imovel_versao.num_versao }}
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if vinculo.imovel_versao and vinculo.imovel_versao.nom_logradouro %}
+                    {{ vinculo.imovel_versao.nom_logradouro }}{% if vinculo.imovel_versao.num_endereco %}, {{ vinculo.imovel_versao.num_endereco }}{% endif %}
+                  {% else %}—{% endif %}
+                </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="2" class="text-muted text-center py-3">Nenhuma OS vinculada.</td>
+                <td colspan="4" class="text-muted text-center py-3">Nenhuma OS vinculada.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -166,13 +235,14 @@
                 <th>Tipo</th>
                 <th>OS</th>
                 <th>Status</th>
+                <th>Exercício / Versão</th>
               </tr>
             </thead>
             <tbody>
               {% for vinculo in vinculos_producao %}
               <tr>
                 <td>
-                  <a href="#" class="text-decoration-none text-muted" title="Detalhe em breve">
+                  <a href="{% url 'producao_detail' vinculo.producao.pk %}" class="text-decoration-none fw-semibold">
                     {% if vinculo.producao.numero_producao %}{{ vinculo.producao.numero_producao }}{% elif vinculo.producao.numero_sei %}{{ vinculo.producao.numero_sei }}{% else %}—{% endif %}
                   </a>
                 </td>
@@ -183,10 +253,15 @@
                   </a>
                 </td>
                 <td>{{ vinculo.producao.status }}</td>
+                <td>
+                  {% if vinculo.imovel_versao %}
+                    {{ vinculo.imovel_versao.exercicio|default:"—" }} / {{ vinculo.imovel_versao.num_versao }}
+                  {% else %}—{% endif %}
+                </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="4" class="text-muted text-center py-3">Nenhuma produção vinculada.</td>
+                <td colspan="5" class="text-muted text-center py-3">Nenhuma produção vinculada.</td>
               </tr>
               {% endfor %}
             </tbody>

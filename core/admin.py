@@ -5,6 +5,7 @@ from core.models import (
     Encaminhamento,
     Finalidade,
     Imovel,
+    ImovelVersao,
     LogAuditoria,
     MacroetapaLog,
     MetaPesquisa,
@@ -18,7 +19,6 @@ from core.models import (
     Producao,
     ProducaoAtributo,
     ProducaoImovel,
-    ProducaoImovelDados,
     RegistroPesquisa,
     Servidor,
     ServidorUnidade,
@@ -79,14 +79,6 @@ class ProducaoImovelInline(admin.TabularInline):
     autocomplete_fields = ("imovel",)
     verbose_name = "imóvel na produção"
     verbose_name_plural = "imóveis na produção"
-
-
-class ProducaoImovelDadosInline(admin.TabularInline):
-    model = ProducaoImovelDados
-    extra = 0
-    autocomplete_fields = ("editado_por",)
-    verbose_name = "dado de trabalho"
-    verbose_name_plural = "dados de trabalho"
 
 
 # ---------------------------------------------------------------------------
@@ -250,37 +242,64 @@ class CombinacaoValidaAdmin(admin.ModelAdmin):
 # ---------------------------------------------------------------------------
 
 
+class ImovelVersaoInline(admin.TabularInline):
+    model = ImovelVersao
+    extra = 0
+    readonly_fields = ("data_registro",)
+    verbose_name = "versão"
+    verbose_name_plural = "versões"
+
+
 @admin.register(Imovel)
 class ImovelAdmin(admin.ModelAdmin):
-    """Imóveis de referência (SIAT / ISIC)."""
+    """Identidade do imóvel (inscrição cadastral ou ISIC)."""
 
     list_display = (
         "tipo_identificacao",
         "inscricao_cadastral",
         "codigo_isic",
-        "nom_logradouro",
-        "bairro",
-        "exercicio_referencia",
-        "editado_manualmente",
     )
-    list_filter = ("tipo_identificacao", "editado_manualmente", "origem_dados")
+    list_filter = ("tipo_identificacao",)
     search_fields = (
         "inscricao_cadastral",
         "codigo_isic",
-        "nom_logradouro",
-        "bairro",
     )
     ordering = ("inscricao_cadastral", "codigo_isic")
-    date_hierarchy = "data_ultima_importacao"
+    inlines = (ImovelVersaoInline,)
+
+
+@admin.register(ImovelVersao)
+class ImovelVersaoAdmin(admin.ModelAdmin):
+    """Versões cadastrais do imóvel."""
+
+    list_display = (
+        "imovel",
+        "exercicio",
+        "num_versao",
+        "nom_logradouro",
+        "bairro",
+        "origem_dados",
+        "data_registro",
+    )
+    list_filter = ("origem_dados", "exercicio")
+    search_fields = (
+        "imovel__inscricao_cadastral",
+        "imovel__codigo_isic",
+        "nom_logradouro",
+        "bairro",
+        "num_bloco",
+    )
+    autocomplete_fields = ("imovel",)
+    ordering = ("-exercicio", "-num_versao")
 
 
 @admin.register(OsImovel)
 class OsImovelAdmin(admin.ModelAdmin):
     """Vínculos OS-imóvel (também editável via inline na OS)."""
 
-    list_display = ("os", "imovel")
+    list_display = ("os", "imovel", "imovel_versao")
     search_fields = ("os__numero_os", "imovel__inscricao_cadastral", "imovel__codigo_isic")
-    autocomplete_fields = ("os", "imovel")
+    autocomplete_fields = ("os", "imovel", "imovel_versao")
     ordering = ("os", "imovel")
 
 
@@ -288,7 +307,7 @@ class OsImovelAdmin(admin.ModelAdmin):
 class ProducaoImovelAdmin(admin.ModelAdmin):
     """Imóveis abrangidos por uma produção."""
 
-    list_display = ("producao", "imovel", "grupo_ref", "papel_no_grupo")
+    list_display = ("producao", "imovel", "imovel_versao", "grupo_ref", "papel_no_grupo")
     list_filter = ("grupo_ref",)
     search_fields = (
         "producao__numero_producao",
@@ -296,31 +315,8 @@ class ProducaoImovelAdmin(admin.ModelAdmin):
         "imovel__codigo_isic",
         "grupo_ref",
     )
-    autocomplete_fields = ("producao", "imovel")
-    inlines = (ProducaoImovelDadosInline,)
+    autocomplete_fields = ("producao", "imovel", "imovel_versao")
     ordering = ("producao", "imovel")
-
-
-@admin.register(ProducaoImovelDados)
-class ProducaoImovelDadosAdmin(admin.ModelAdmin):
-    """Dados de trabalho do imóvel por exercício."""
-
-    list_display = (
-        "producao_imovel",
-        "exercicio",
-        "area_trabalho",
-        "data_referencia",
-        "editado_por",
-        "data_edicao",
-    )
-    list_filter = ("exercicio",)
-    search_fields = (
-        "producao_imovel__producao__numero_producao",
-        "endereco_trabalho",
-    )
-    autocomplete_fields = ("producao_imovel", "editado_por")
-    ordering = ("-exercicio",)
-    date_hierarchy = "data_referencia"
 
 
 # ---------------------------------------------------------------------------

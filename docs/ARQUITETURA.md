@@ -135,9 +135,9 @@ Quando um ISIC for regularizado e receber inscrição cadastral no SIAT, o siste
 
 Os dados do imóvel existem em dois contextos com propósitos distintos:
 
-**Dados de referência** (entidade `IMOVEL`) — identificam e localizam o imóvel para fins de gerenciamento. Um exercício vigente. Podem ser atualizados pelo usuário via reimportação do SIAT quando conveniente.
+**Identidade** (entidade `IMOVEL`) — inscrição cadastral ou código ISIC, mais observação interna. Não armazena dados cadastrais versionados.
 
-**Dados de trabalho** (entidade `PRODUCAO_IMOVEL_DADOS`) — registram as características técnicas do imóvel na data-base do trabalho, com precisão revisada e homologada. Podem abranger múltiplos exercícios. Não são atualizados automaticamente. Após homologação, só podem ser editados de forma controlada, com registro obrigatório em auditoria e justificativa.
+**Dados cadastrais versionados** (entidade `IMOVEL_VERSAO`) — endereço, áreas, região homogênea e coordenadas por exercício/versão. Criados a partir do SIAT (sob demanda) ou manualmente (ISIC). Cada vínculo em `OS_IMOVEL` ou `PRODUCAO_IMOVEL` aponta para a `IMOVEL_VERSAO` vigente no momento do vínculo, preservando o histórico sem campos snapshot duplicados.
 
 ### 6.3 Agrupamentos
 
@@ -271,7 +271,7 @@ Escopo do log de auditoria:
 - Vinculação e desvinculação de processo SEI
 - Mudança de macroetapa
 - Criação, edição e cancelamento de produção
-- Edição de `PRODUCAO_IMOVEL_DADOS` após homologação (com justificativa obrigatória)
+- Edição de dados de imóvel em produção homologada (com justificativa obrigatória)
 - Concessão e revogação de permissões especiais
 - Alteração de prioridade da OS
 - Confirmação de OS interna sem processo SEI
@@ -281,7 +281,7 @@ Campos livres como observações e anotações internas não são auditados.
 
 ---
 
-## 12. Inventário de entidades — 28 entidades
+## 12. Inventário de entidades — 29 entidades
 
 ### Estrutura e segurança
 `SERVIDOR` · `UNIDADE_INTERNA` · `SERVIDOR_UNIDADE` · `PERFIL_ACESSO` · `PERMISSAO_ESPECIAL`
@@ -293,7 +293,7 @@ Campos livres como observações e anotações internas não são auditados.
 `NATUREZA` · `TIPO_DEMANDA` · `FINALIDADE` · `COMBINACAO_VALIDA`
 
 ### Imóveis
-`IMOVEL` · `OS_IMOVEL` · `PRODUCAO_IMOVEL` · `PRODUCAO_IMOVEL_DADOS`
+`IMOVEL` · `IMOVEL_VERSAO` · `OS_IMOVEL` · `PRODUCAO_IMOVEL`
 
 ### OS e ciclo de vida
 `OS` · `PROCESSO_SEI` · `OS_PROCESSO` · `MACROETAPA_LOG` · `ENCAMINHAMENTO` · `TAREFA_INTERNA`

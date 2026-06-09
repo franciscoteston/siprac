@@ -131,30 +131,28 @@
               <tr>
                 <td>
                   <a href="{% url 'imovel_detalhe' vinculo.imovel.pk %}" class="text-decoration-none fw-semibold">
-                    {% if vinculo.snap_inscricao_cadastral %}
-                      {{ vinculo.snap_inscricao_cadastral }}
-                    {% elif vinculo.snap_codigo_isic %}
-                      {{ vinculo.snap_codigo_isic }}
+                    {% if vinculo.imovel.inscricao_cadastral %}
+                      {{ vinculo.imovel.inscricao_cadastral }}
+                    {% elif vinculo.imovel.codigo_isic %}
+                      {{ vinculo.imovel.codigo_isic }}
                     {% else %}
                       —
                     {% endif %}
                   </a>
                 </td>
                 <td>
-                  {% if vinculo.snap_nom_logradouro %}
-                    {{ vinculo.snap_nom_logradouro }}{% if vinculo.snap_num_endereco %}, {{ vinculo.snap_num_endereco }}{% endif %}
+                  {% if vinculo.imovel_versao and vinculo.imovel_versao.nom_logradouro %}
+                    {{ vinculo.imovel_versao.nom_logradouro }}{% if vinculo.imovel_versao.num_endereco %}, {{ vinculo.imovel_versao.num_endereco }}{% endif %}
                   {% else %}
                     —
                   {% endif %}
                 </td>
-                <td>{% if vinculo.snap_bairro %}{{ vinculo.snap_bairro }}{% else %}—{% endif %}</td>
-                <td>{% if vinculo.snap_area_territorial %}{{ vinculo.snap_area_territorial|decimal_br }}{% else %}—{% endif %}</td>
+                <td>{% if vinculo.imovel_versao and vinculo.imovel_versao.bairro %}{{ vinculo.imovel_versao.bairro }}{% else %}—{% endif %}</td>
+                <td>{% if vinculo.imovel_versao and vinculo.imovel_versao.area_territorial %}{{ vinculo.imovel_versao.area_territorial|decimal_br }}{% else %}—{% endif %}</td>
                 <td>
-                  {% if vinculo.snap_origem_dados == 'SIAT' %}
+                  {% if vinculo.imovel_versao and vinculo.imovel_versao.origem_dados == 'SIAT' %}
                   <span class="badge bg-info">SIAT</span>
-                  {% elif vinculo.snap_origem_dados == 'SIAT_EDITADO' %}
-                  <span class="badge bg-warning text-dark">SIAT editado</span>
-                  {% elif vinculo.snap_origem_dados == 'MANUAL' %}
+                  {% elif vinculo.imovel_versao and vinculo.imovel_versao.origem_dados == 'MANUAL' %}
                   <span class="badge bg-secondary">Manual</span>
                   {% else %}
                   <span class="badge bg-light text-dark">—</span>

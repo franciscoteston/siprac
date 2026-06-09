@@ -2,14 +2,14 @@ import datetime
 import os
 
 from django.db.models import Exists, OuterRef
-from django.utils import timezone
 
-from core.models import Imovel, OsImovel, ProducaoImovel
-from core.siat_parser import parse_siat_file
+from core.models import Imovel, ImovelVersao, OsImovel, ProducaoImovel
+from core.siat_parser import SIAT_COLUMN_MAP, parse_linha_siat, parse_siat_file
 
-CAMPOS_SIAT = (
+CAMPOS_CABECALHO_ESPERADOS = ("NUM_BLOCO", "NUM_INSCRICAO", "NME_ENDLOC_LOGRADOURO")
+
+CAMPOS_VERSAO_SIAT = (
     "num_bloco",
-    "inscricao_cadastral",
     "cod_logradouro",
     "nom_logradouro",
     "num_endereco",
@@ -18,8 +18,6 @@ CAMPOS_SIAT = (
     "des_finalidade",
     "area_territorial",
     "area_construida",
-    "exercicio_referencia",
-    "num_versao",
     "rh_nome",
     "rh_valor",
     "idf_regiao_homogenea",
@@ -28,8 +26,6 @@ CAMPOS_SIAT = (
     "coord_x",
     "coord_y",
 )
-
-CAMPOS_CABECALHO_ESPERADOS = ("NUM_BLOCO", "NUM_INSCRICAO", "NME_ENDLOC_LOGRADOURO")
 
 
 def carregar_arquivo_siat(filepath):
@@ -76,12 +72,58 @@ def obter_status_arquivo_siat(filepath):
     }
 
 
-def _aplicar_dados_siat(imovel, dados):
-    for campo in CAMPOS_SIAT:
-        if campo in dados:
-            setattr(imovel, campo, dados[campo])
-    imovel.origem_dados = "SIAT"
-    imovel.data_ultima_importacao = timezone.localdate()
+def _defaults_versao_siat(dados_siat):
+    defaults = {campo: dados_siat.get(campo) for campo in CAMPOS_VERSAO_SIAT}
+    defaults["origem_dados"] = "SIAT"
+    return defaults
+
+
+def obter_ou_criar_versao(dados_siat):
+    """
+    Busca ou cria Imovel + ImovelVersao a partir dos dados do arquivo SIAT.
+    Retorna tupla (imovel, imovel_versao, criado).
+    """
+    inscricao = dados_siat.get("inscricao_cadastral")
+    exercicio = dados_siat.get("exercicio_referencia")
+    num_versao = dados_siat.get("num_versao", 0)
+
+    imovel, _ = Imovel.objects.get_or_create(
+        inscricao_cadastral=inscricao,
+        defaults={"tipo_identificacao": "CADASTRAL"},
+    )
+
+    versao, criada = ImovelVersao.objects.get_or_create(
+        imovel=imovel,
+        exercicio=exercicio,
+        num_versao=num_versao,
+        defaults=_defaults_versao_siat(dados_siat),
+    )
+
+    return imovel, versao, criada
+
+
+def obter_ou_criar_versao_isic(dados_manuais):
+    """Cria Imovel ISIC + ImovelVersao a partir de dados manuais."""
+    codigo_isic = dados_manuais.get("codigo_isic")
+    imovel, _ = Imovel.objects.get_or_create(
+        codigo_isic=codigo_isic,
+        defaults={"tipo_identificacao": "ISIC"},
+    )
+
+    campos_versao = {
+        campo: dados_manuais.get(campo)
+        for campo in CAMPOS_VERSAO_SIAT
+        if campo in dados_manuais
+    }
+    versao = ImovelVersao.objects.create(
+        imovel=imovel,
+        exercicio=dados_manuais.get("exercicio", datetime.date.today().year),
+        num_versao=dados_manuais.get("num_versao", 0),
+        origem_dados="MANUAL",
+        **campos_versao,
+    )
+
+    return imovel, versao
 
 
 def buscar_inscricao_no_arquivo(inscricao_cadastral, filepath):
@@ -89,6 +131,42 @@ def buscar_inscricao_no_arquivo(inscricao_cadastral, filepath):
         if registro.get("inscricao_cadastral") == inscricao_cadastral:
             return registro
     return None
+
+
+def buscar_por_logradouro_no_arquivo(termo, filepath, limite=20):
+    """
+    Busca registros no arquivo SIAT por nome de logradouro ou num_bloco.
+    Retorna lista de dicts com os primeiros `limite` resultados.
+    """
+    if not os.path.exists(filepath):
+        return []
+
+    resultados = []
+    termo_upper = termo.upper()
+
+    with open(filepath, "r", encoding="utf-8", errors="replace") as arquivo:
+        cabecalho = [
+            coluna.strip()
+            for coluna in arquivo.readline().strip().split("|")
+        ]
+        for linha in arquivo:
+            valores = linha.strip().split("|")
+            if len(valores) < len(cabecalho):
+                continue
+            linha_dict = {
+                cabecalho[indice]: valores[indice] if indice < len(valores) else ""
+                for indice in range(len(cabecalho))
+            }
+            logradouro = linha_dict.get("NME_ENDLOC_LOGRADOURO", "")
+            bloco = linha_dict.get("NUM_BLOCO", "")
+            if termo_upper in logradouro.upper() or termo == bloco:
+                registro = parse_linha_siat(cabecalho, valores)
+                if registro:
+                    resultados.append(registro)
+                if len(resultados) >= limite:
+                    break
+
+    return resultados
 
 
 def atualizar_inscricao_do_arquivo(imovel, filepath):
@@ -99,8 +177,7 @@ def atualizar_inscricao_do_arquivo(imovel, filepath):
     if not dados:
         return False
 
-    _aplicar_dados_siat(imovel, dados)
-    imovel.save()
+    obter_ou_criar_versao(dados)
     return True
 
 
@@ -136,8 +213,8 @@ def obter_coordenadas_bloco(num_bloco, filepath):
 
 
 def queryset_imoveis_siat_orfaos():
-    """Imóveis SIAT sem vínculo em OS ou produção."""
-    return Imovel.objects.filter(origem_dados="SIAT").exclude(
+    """Imóveis sem vínculo em OS ou produção."""
+    return Imovel.objects.exclude(
         Exists(OsImovel.objects.filter(imovel_id=OuterRef("pk"))),
     ).exclude(
         Exists(ProducaoImovel.objects.filter(imovel_id=OuterRef("pk"))),

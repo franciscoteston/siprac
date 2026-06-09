@@ -42,11 +42,36 @@ document.addEventListener('DOMContentLoaded', function () {
   const urlBusca = '{% url "api_buscar_imoveis" %}';
   const csrfToken = '{{ csrf_token }}';
 
-  function origemLabel(origem) {
-    if (origem === 'SIAT_EDITADO') return 'SIAT editado';
-    if (origem === 'MANUAL') return 'Manual';
-    if (origem === 'SIAT') return 'SIAT';
-    return origem || '—';
+  function badgeFonte(fonte) {
+    if (fonte === 'isic') {
+      return '<span class="badge" style="background-color:#e87722;">ISIC</span>';
+    }
+    return '<span class="badge bg-info">SIAT</span>';
+  }
+
+  function criarFormularioVinculo(item) {
+    const form = document.createElement('form');
+    form.method = 'post';
+
+    const csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrfmiddlewaretoken';
+    csrf.value = csrfToken;
+    form.appendChild(csrf);
+
+    const dados = document.createElement('input');
+    dados.type = 'hidden';
+    dados.name = 'dados_completos';
+    dados.value = JSON.stringify(item.dados_completos || item);
+    form.appendChild(dados);
+
+    const btn = document.createElement('button');
+    btn.type = 'submit';
+    btn.className = 'btn btn-sm btn-primary siprac-btn-primary';
+    btn.textContent = 'Vincular';
+    form.appendChild(btn);
+
+    return form;
   }
 
   function executarBusca() {
@@ -74,23 +99,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
           const area = item.area_territorial ? item.area_territorial + ' m²' : '—';
           const bloco = item.num_bloco ? ' · Lote: ' + item.num_bloco : '';
-          elemento.innerHTML =
-            '<div>' +
-              '<div class="fw-semibold">' + item.identificacao + '</div>' +
-              '<div class="small text-muted">' +
-                (item.endereco || '—') +
-                bloco +
-                (item.bairro ? ' · ' + item.bairro : '') +
-                ' · Área: ' + area +
-                ' · Origem: ' + origemLabel(item.origem_dados) +
-              '</div>' +
-            '</div>' +
-            '<form method="post">' +
-              '<input type="hidden" name="csrfmiddlewaretoken" value="' + csrfToken + '">' +
-              '<input type="hidden" name="imovel_id" value="' + item.id + '">' +
-              '<button type="submit" class="btn btn-sm btn-primary siprac-btn-primary">Vincular</button>' +
-            '</form>';
+          const exercicio = item.exercicio ? ' · Exercício: ' + item.exercicio : '';
+          const versao = item.num_versao !== undefined ? ' · Versão: ' + item.num_versao : '';
 
+          const info = document.createElement('div');
+          info.innerHTML =
+            '<div class="d-flex align-items-center gap-2 mb-1">' +
+              '<span class="fw-semibold">' + item.identificacao + '</span>' +
+              badgeFonte(item.fonte) +
+            '</div>' +
+            '<div class="small text-muted">' +
+              (item.endereco || '—') +
+              bloco +
+              (item.bairro ? ' · ' + item.bairro : '') +
+              ' · Área: ' + area +
+              exercicio + versao +
+            '</div>';
+
+          elemento.appendChild(info);
+          elemento.appendChild(criarFormularioVinculo(item));
           container.appendChild(elemento);
         });
       })

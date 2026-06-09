@@ -137,7 +137,7 @@
             <th>Identificação</th>
             <th>Endereço</th>
             <th>Área</th>
-            <th>Dados por exercício</th>
+            <th>Exercício / Versão</th>
           </tr>
         </thead>
         <tbody>
@@ -151,32 +151,28 @@
               {% endif %}
             </td>
             <td>
-              {% if item.snap_inscricao_cadastral %}
-                {{ item.snap_inscricao_cadastral }}
-              {% elif item.snap_codigo_isic %}
-                {{ item.snap_codigo_isic }}
+              {% if item.imovel.inscricao_cadastral %}
+                {{ item.imovel.inscricao_cadastral }}
+              {% elif item.imovel.codigo_isic %}
+                {{ item.imovel.codigo_isic }}
               {% else %}
                 Imóvel #{{ item.imovel_id }}
               {% endif %}
             </td>
             <td>
-              {% if item.snap_nom_logradouro %}
-                {{ item.snap_nom_logradouro }}{% if item.snap_num_endereco %}, {{ item.snap_num_endereco }}{% endif %}
+              {% if item.imovel_versao and item.imovel_versao.nom_logradouro %}
+                {{ item.imovel_versao.nom_logradouro }}{% if item.imovel_versao.num_endereco %}, {{ item.imovel_versao.num_endereco }}{% endif %}
               {% else %}—{% endif %}
             </td>
             <td>
-              {% if item.snap_area_territorial %}{{ item.snap_area_territorial|decimal_br }} m²{% else %}—{% endif %}
+              {% if item.imovel_versao and item.imovel_versao.area_territorial %}{{ item.imovel_versao.area_territorial|decimal_br }} m²{% else %}—{% endif %}
             </td>
             <td>
-              {% with dados=dados_por_exercicio|get_item:item.pk %}
-              {% if dados %}
-                {% for dado in dados %}
-                  <span class="badge bg-light text-dark border me-1">{{ dado.exercicio }}</span>
-                {% endfor %}
+              {% if item.imovel_versao %}
+                {{ item.imovel_versao.exercicio|default:"—" }} / {{ item.imovel_versao.num_versao }}
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}
-              {% endwith %}
             </td>
           </tr>
           {% empty %}

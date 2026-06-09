@@ -7,7 +7,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 import datetime
 from django.db import transaction
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -46,16 +46,21 @@ from core.os_service import (
 from core.siat_config import SIAT_ARQUIVO_PATH
 from core.siat_service import (
     atualizar_inscricao_do_arquivo,
+    buscar_inscricao_no_arquivo,
+    buscar_por_logradouro_no_arquivo,
     carregar_arquivo_siat,
     contar_imoveis_siat_orfaos,
     limpar_imoveis_siat_orfaos,
     obter_coordenadas_bloco,
+    obter_ou_criar_versao,
+    obter_ou_criar_versao_isic,
     obter_status_arquivo_siat,
 )
 from core.models import (
     Encaminhamento,
     Finalidade,
     Imovel,
+    ImovelVersao,
     MacroetapaLog,
     Natureza,
     OS,
@@ -65,7 +70,6 @@ from core.models import (
     LogAuditoria,
     Producao,
     ProducaoImovel,
-    ProducaoImovelDados,
     ProducaoStatusLog,
     Servidor,
     TarefaInterna,
@@ -766,20 +770,20 @@ def _gerar_codigo_isic():
     return f"ISIC_{maior_sequencia + 1:04d}"
 
 
+def _ultima_versao_imovel(imovel):
+    return imovel.versoes.order_by("-exercicio", "-num_versao", "-data_registro", "-pk").first()
+
+
+def _versao_vinculo(vinculo):
+    return vinculo.imovel_versao
+
+
 def _salvar_imovel_from_form(dados, imovel=None):
     if imovel is None:
-        imovel = Imovel()
+        imovel = Imovel(tipo_identificacao=dados["tipo_identificacao"])
 
     imovel.tipo_identificacao = dados["tipo_identificacao"]
-    for campo in ImovelForm.CAMPOS_IMOVEL:
-        valor = dados.get(campo)
-        if campo == "observacao_interna":
-            valor = valor or None
-        elif campo == "origem_dados":
-            valor = valor or "MANUAL"
-        elif campo == "num_versao" and valor is None:
-            valor = 0
-        setattr(imovel, campo, valor)
+    imovel.observacao_interna = dados.get("observacao_interna") or None
 
     if dados["tipo_identificacao"] == "ISIC":
         if not imovel.codigo_isic:
@@ -789,34 +793,49 @@ def _salvar_imovel_from_form(dados, imovel=None):
         imovel.inscricao_cadastral = dados["inscricao_cadastral"]
         imovel.codigo_isic = None
 
-    imovel.editado_manualmente = True
     imovel.save()
+
+    campos_versao = {}
+    for campo in ImovelForm.CAMPOS_IMOVEL:
+        if campo in ("origem_dados", "observacao_interna", "exercicio_referencia", "num_versao"):
+            continue
+        if hasattr(ImovelVersao, campo):
+            campos_versao[campo] = dados.get(campo)
+
+    ImovelVersao.objects.create(
+        imovel=imovel,
+        exercicio=dados.get("exercicio_referencia") or timezone.localdate().year,
+        num_versao=dados.get("num_versao") or 0,
+        origem_dados=dados.get("origem_dados") or "MANUAL",
+        **campos_versao,
+    )
     return imovel
 
 
 def _salvar_isic_from_form(dados):
-    imovel = Imovel(
-        tipo_identificacao="ISIC",
-        codigo_isic=_gerar_codigo_isic(),
-        origem_dados="MANUAL",
-    )
-
-    for campo in ISICForm.CAMPOS_ISIC:
-        valor = dados.get(campo)
-        if campo == "observacao_interna":
-            valor = valor or None
-        setattr(imovel, campo, valor)
+    dados_versao = {
+        campo: dados.get(campo)
+        for campo in ISICForm.CAMPOS_ISIC
+        if campo != "observacao_interna"
+    }
 
     num_bloco = dados.get("num_bloco")
     if num_bloco and SIAT_ARQUIVO_PATH.exists():
         coordenadas = obter_coordenadas_bloco(num_bloco, SIAT_ARQUIVO_PATH)
         if coordenadas:
             for campo in ("latitude", "longitude", "coord_x", "coord_y"):
-                if getattr(imovel, campo) is None and coordenadas.get(campo) is not None:
-                    setattr(imovel, campo, coordenadas[campo])
+                if dados_versao.get(campo) is None and coordenadas.get(campo) is not None:
+                    dados_versao[campo] = coordenadas[campo]
 
-    imovel.editado_manualmente = True
-    imovel.save()
+    imovel, _ = obter_ou_criar_versao_isic(
+        {
+            "codigo_isic": _gerar_codigo_isic(),
+            **dados_versao,
+        },
+    )
+    if dados.get("observacao_interna"):
+        imovel.observacao_interna = dados["observacao_interna"]
+        imovel.save()
     return imovel
 
 
@@ -838,22 +857,21 @@ def _format_area_mapa(area):
         return str(area)
 
 
+def _endereco_versao(versao):
+    if versao is None or not versao.nom_logradouro:
+        return "—"
+    endereco = versao.nom_logradouro
+    if versao.num_endereco:
+        endereco = f"{endereco}, {versao.num_endereco}"
+    return endereco
+
+
 def _endereco_imovel(imovel):
-    if imovel.nom_logradouro:
-        endereco = imovel.nom_logradouro
-        if imovel.num_endereco:
-            endereco = f"{endereco}, {imovel.num_endereco}"
-        return endereco
-    return "—"
+    return _endereco_versao(_ultima_versao_imovel(imovel))
 
 
 def _endereco_os_imovel(vinculo):
-    if vinculo.snap_nom_logradouro:
-        endereco = vinculo.snap_nom_logradouro
-        if vinculo.snap_num_endereco:
-            endereco = f"{endereco}, {vinculo.snap_num_endereco}"
-        return endereco
-    return "—"
+    return _endereco_versao(_versao_vinculo(vinculo))
 
 
 def _identificacao_imovel(imovel):
@@ -865,38 +883,40 @@ def _identificacao_imovel(imovel):
 
 
 def _identificacao_os_imovel(vinculo):
-    if vinculo.snap_inscricao_cadastral:
-        return str(vinculo.snap_inscricao_cadastral)
-    if vinculo.snap_codigo_isic:
-        return vinculo.snap_codigo_isic
+    versao = _versao_vinculo(vinculo)
+    if versao and vinculo.imovel.inscricao_cadastral:
+        return str(vinculo.imovel.inscricao_cadastral)
+    if vinculo.imovel.codigo_isic:
+        return vinculo.imovel.codigo_isic
     return "—"
 
 
-def _coords_os_imovel(vinculo):
-    lat = vinculo.snap_latitude
-    lng = vinculo.snap_longitude
-    if (lat is None or lng is None) and vinculo.imovel_id:
-        lat = lat or vinculo.imovel.latitude
-        lng = lng or vinculo.imovel.longitude
-    if lat is None or lng is None:
+def _coords_versao(versao):
+    if versao is None or versao.latitude is None or versao.longitude is None:
         return None, None
-    return float(lat), float(lng)
+    return float(versao.latitude), float(versao.longitude)
+
+
+def _coords_os_imovel(vinculo):
+    return _coords_versao(_versao_vinculo(vinculo))
 
 
 def _montar_imoveis_coords_os(vinculos):
     com_coords = []
     sem_coords = 0
     for vinculo in vinculos:
+        versao = _versao_vinculo(vinculo)
         lat, lng = _coords_os_imovel(vinculo)
         if lat is None or lng is None:
             sem_coords += 1
             continue
+        area = versao.area_territorial if versao else None
         com_coords.append(
             {
                 "id": vinculo.imovel_id,
                 "identificacao": _identificacao_os_imovel(vinculo),
                 "endereco": _endereco_os_imovel(vinculo),
-                "area": _format_area_mapa(vinculo.snap_area_territorial),
+                "area": _format_area_mapa(area),
                 "lat": lat,
                 "lng": lng,
             },
@@ -904,16 +924,68 @@ def _montar_imoveis_coords_os(vinculos):
     return com_coords, sem_coords
 
 
-def _imovel_para_mapa(imovel):
+def _imovel_para_mapa(imovel, versao=None):
+    versao = versao or _ultima_versao_imovel(imovel)
+    lat, lng = _coords_versao(versao)
     return {
         "id": imovel.pk,
         "identificacao": _identificacao_imovel(imovel),
-        "endereco": _endereco_imovel(imovel),
-        "bairro": imovel.bairro or "—",
-        "area": _format_area_mapa(imovel.area_territorial),
+        "endereco": _endereco_versao(versao),
+        "bairro": (versao.bairro if versao else None) or "—",
+        "area": _format_area_mapa(versao.area_territorial if versao else None),
         "tipo_identificacao": imovel.tipo_identificacao,
-        "lat": float(imovel.latitude),
-        "lng": float(imovel.longitude),
+        "lat": lat,
+        "lng": lng,
+    }
+
+
+def _versao_para_dict(versao):
+    if versao is None:
+        return {}
+    return {
+        "num_bloco": versao.num_bloco,
+        "cod_logradouro": versao.cod_logradouro,
+        "nom_logradouro": versao.nom_logradouro,
+        "num_endereco": versao.num_endereco,
+        "num_unidade": versao.num_unidade,
+        "bairro": versao.bairro,
+        "des_finalidade": versao.des_finalidade,
+        "area_territorial": versao.area_territorial,
+        "area_construida": versao.area_construida,
+        "exercicio_referencia": versao.exercicio,
+        "num_versao": versao.num_versao,
+        "rh_nome": versao.rh_nome,
+        "rh_valor": versao.rh_valor,
+        "idf_regiao_homogenea": versao.idf_regiao_homogenea,
+        "latitude": versao.latitude,
+        "longitude": versao.longitude,
+        "coord_x": versao.coord_x,
+        "coord_y": versao.coord_y,
+        "origem_dados": versao.origem_dados,
+    }
+
+
+def _montar_resultado_busca(dados, fonte):
+    endereco_partes = []
+    if dados.get("nom_logradouro"):
+        endereco_partes.append(dados["nom_logradouro"])
+    if dados.get("num_endereco"):
+        endereco_partes.append(str(dados["num_endereco"]))
+
+    identificacao = dados.get("inscricao_cadastral") or dados.get("codigo_isic") or ""
+    exercicio = dados.get("exercicio_referencia") or dados.get("exercicio")
+
+    return {
+        "inscricao_cadastral": dados.get("inscricao_cadastral"),
+        "identificacao": str(identificacao),
+        "endereco": ", ".join(endereco_partes),
+        "bairro": dados.get("bairro") or "",
+        "area_territorial": _format_area_mapa(dados.get("area_territorial")),
+        "exercicio": exercicio,
+        "num_versao": dados.get("num_versao", 0),
+        "fonte": fonte,
+        "num_bloco": dados.get("num_bloco") or "",
+        "dados_completos": dados,
     }
 
 
@@ -1423,6 +1495,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
         )
         imoveis_vinculados = OsImovel.objects.filter(os=os_obj).select_related(
             "imovel",
+            "imovel_versao",
             "vinculado_por",
         )
         context["imoveis"] = imoveis_vinculados
@@ -1695,16 +1768,31 @@ class ImovelMapaView(RequerLoginMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         total_imoveis = Imovel.objects.count()
-        imoveis_plotaveis = Imovel.objects.filter(
-            latitude__isnull=False,
-            longitude__isnull=False,
-        )
-        total_com_coords = imoveis_plotaveis.count()
-        total_sem_coords = total_imoveis - total_com_coords
-        imoveis_com_coords = [
-            _imovel_para_mapa(imovel) for imovel in imoveis_plotaveis.order_by("id")
-        ]
+        imoveis_com_coords = []
+        imoveis_sem_coords_lista = []
 
+        for imovel in Imovel.objects.order_by("id"):
+            versao = _ultima_versao_imovel(imovel)
+            lat, lng = _coords_versao(versao)
+            if lat is not None and lng is not None:
+                item = _imovel_para_mapa(imovel, versao)
+                if item["lat"] is not None and item["lng"] is not None:
+                    imoveis_com_coords.append(item)
+                    continue
+            if len(imoveis_sem_coords_lista) < 50:
+                imoveis_sem_coords_lista.append(
+                    {
+                        "id": imovel.pk,
+                        "inscricao_cadastral": imovel.inscricao_cadastral,
+                        "codigo_isic": imovel.codigo_isic,
+                        "nom_logradouro": versao.nom_logradouro if versao else None,
+                        "num_endereco": versao.num_endereco if versao else None,
+                        "bairro": versao.bairro if versao else None,
+                    },
+                )
+
+        total_com_coords = len(imoveis_com_coords)
+        total_sem_coords = total_imoveis - total_com_coords
         context["imoveis_com_coords"] = imoveis_com_coords
         context["total_imoveis"] = total_imoveis
         context["total_com_coords"] = total_com_coords
@@ -1718,16 +1806,7 @@ class ImovelMapaView(RequerLoginMixin, TemplateView):
             imoveis_com_coords,
             ensure_ascii=False,
         )
-        context["imoveis_sem_coords_lista"] = list(
-            Imovel.objects.filter(latitude__isnull=True).values(
-                "id",
-                "inscricao_cadastral",
-                "codigo_isic",
-                "nom_logradouro",
-                "num_endereco",
-                "bairro",
-            )[:50],
-        )
+        context["imoveis_sem_coords_lista"] = imoveis_sem_coords_lista
         return context
 
 
@@ -1741,18 +1820,26 @@ class ImovelListView(RequerLoginMixin, ListView):
         queryset = Imovel.objects.all()
         busca = self.request.GET.get("q", "").strip()
         if busca:
-            filtros = (
-                Q(codigo_isic__icontains=busca)
-                | Q(nom_logradouro__icontains=busca)
-                | Q(bairro__icontains=busca)
-                | Q(num_endereco__icontains=busca)
-            )
+            filtros = Q(codigo_isic__icontains=busca)
+            filtros |= Q(versoes__nom_logradouro__icontains=busca)
+            filtros |= Q(versoes__bairro__icontains=busca)
+            filtros |= Q(versoes__num_endereco__icontains=busca)
             try:
                 filtros |= Q(inscricao_cadastral=int(busca))
             except ValueError:
                 pass
-            queryset = queryset.filter(filtros)
-        return queryset.order_by("-id")
+            queryset = queryset.filter(filtros).distinct()
+        return queryset.prefetch_related(
+            Prefetch(
+                "versoes",
+                queryset=ImovelVersao.objects.order_by(
+                    "-exercicio",
+                    "-num_versao",
+                    "-data_registro",
+                    "-pk",
+                ),
+            ),
+        ).order_by("-id")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1783,14 +1870,20 @@ class ImovelDetailView(RequerLoginMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         imovel = self.object
+        context["versao_atual"] = _ultima_versao_imovel(imovel)
+        context["versoes"] = imovel.versoes.order_by(
+            "-exercicio",
+            "-num_versao",
+            "-data_registro",
+        )
         context["vinculos_os"] = (
             OsImovel.objects.filter(imovel=imovel)
-            .select_related("os")
+            .select_related("os", "imovel_versao")
             .order_by("-os__data_criacao_sgbd")
         )
         context["vinculos_producao"] = (
             ProducaoImovel.objects.filter(imovel=imovel)
-            .select_related("producao", "producao__tipo_producao", "producao__os")
+            .select_related("producao", "producao__tipo_producao", "producao__os", "imovel_versao")
             .order_by("-producao__data_criacao")
         )
         return context
@@ -1981,11 +2074,12 @@ def _formatar_identificacao_imovel(imovel):
 
 
 def _formatar_endereco_imovel(imovel):
+    versao = _ultima_versao_imovel(imovel)
     partes = []
-    if imovel.nom_logradouro:
-        partes.append(imovel.nom_logradouro)
-    if imovel.num_endereco:
-        partes.append(imovel.num_endereco)
+    if versao and versao.nom_logradouro:
+        partes.append(versao.nom_logradouro)
+    if versao and versao.num_endereco:
+        partes.append(versao.num_endereco)
     return ", ".join(partes)
 
 
@@ -2014,35 +2108,27 @@ def _pode_agrupar_producao(request):
     return perfil is not None and perfil.pode_homologar
 
 
-def _formatar_identificacao_snap(registro):
-    if registro.snap_inscricao_cadastral:
-        return str(registro.snap_inscricao_cadastral)
-    if registro.snap_codigo_isic:
-        return registro.snap_codigo_isic
-    return f"Imóvel #{registro.imovel_id}"
+def _formatar_identificacao_vinculo(vinculo):
+    return _identificacao_os_imovel(vinculo)
 
 
-def _formatar_endereco_snap(registro):
-    partes = []
-    if registro.snap_nom_logradouro:
-        partes.append(registro.snap_nom_logradouro)
-    if registro.snap_num_endereco:
-        partes.append(registro.snap_num_endereco)
-    return ", ".join(partes) or "—"
+def _formatar_endereco_vinculo(vinculo):
+    return _endereco_os_imovel(vinculo)
 
 
-def _formatar_area_snap(registro):
-    if registro.snap_area_territorial is not None:
-        return str(registro.snap_area_territorial)
+def _formatar_area_vinculo(vinculo):
+    versao = _versao_vinculo(vinculo)
+    if versao and versao.area_territorial is not None:
+        return str(versao.area_territorial)
     return None
 
 
 def _serializar_os_imovel(vinculo):
     return {
         "imovel_id": vinculo.imovel_id,
-        "identificacao": _formatar_identificacao_snap(vinculo),
-        "endereco": _formatar_endereco_snap(vinculo),
-        "area_territorial": _formatar_area_snap(vinculo),
+        "identificacao": _formatar_identificacao_vinculo(vinculo),
+        "endereco": _formatar_endereco_vinculo(vinculo),
+        "area_territorial": _formatar_area_vinculo(vinculo),
     }
 
 
@@ -2050,9 +2136,9 @@ def _serializar_producao_imovel(item):
     return {
         "id": item.pk,
         "imovel_id": item.imovel_id,
-        "identificacao": _formatar_identificacao_snap(item),
-        "endereco": _formatar_endereco_snap(item),
-        "area_territorial": _formatar_area_snap(item),
+        "identificacao": _formatar_identificacao_vinculo(item),
+        "endereco": _formatar_endereco_vinculo(item),
+        "area_territorial": _formatar_area_vinculo(item),
         "grupo_ref": item.grupo_ref or "",
     }
 
@@ -2066,13 +2152,13 @@ def _contexto_imoveis_producao(producao):
         _serializar_os_imovel(vinculo)
         for vinculo in OsImovel.objects.filter(os=producao.os)
         .exclude(imovel_id__in=vinculados_ids)
-        .select_related("imovel")
-        .order_by("snap_inscricao_cadastral", "snap_codigo_isic", "imovel_id")
+        .select_related("imovel", "imovel_versao")
+        .order_by("imovel__inscricao_cadastral", "imovel__codigo_isic", "imovel_id")
     ]
     imoveis_producao = [
         _serializar_producao_imovel(item)
         for item in ProducaoImovel.objects.filter(producao=producao)
-        .select_related("imovel")
+        .select_related("imovel", "imovel_versao")
         .order_by("grupo_ref", "pk")
     ]
     return imoveis_disponiveis, imoveis_producao
@@ -2126,20 +2212,12 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
         producao = self.object
         imoveis = (
             ProducaoImovel.objects.filter(producao=producao)
-            .select_related("imovel")
+            .select_related("imovel", "imovel_versao")
             .order_by("grupo_ref", "pk")
         )
-        dados_por_exercicio = defaultdict(list)
-        for dado in (
-            ProducaoImovelDados.objects.filter(producao_imovel__producao=producao)
-            .select_related("producao_imovel", "producao_imovel__imovel")
-            .order_by("producao_imovel_id", "exercicio")
-        ):
-            dados_por_exercicio[dado.producao_imovel_id].append(dado)
 
         context["os"] = producao.os
         context["imoveis"] = imoveis
-        context["dados_por_exercicio"] = dict(dados_por_exercicio)
         context["status_logs"] = (
             ProducaoStatusLog.objects.filter(producao=producao)
             .select_related(
@@ -2540,8 +2618,8 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
             producao_imovel = ProducaoImovel.objects.create(
                 producao=self.producao_obj,
                 imovel_id=imovel_id,
+                imovel_versao=os_imovel.imovel_versao,
             )
-            producao_imovel.capturar_snapshot_de_osimovel(os_imovel)
             self._auditar_se_homologada(
                 servidor,
                 producao_imovel,
@@ -2765,18 +2843,32 @@ class OSVincularImovelView(RequerLoginMixin, View):
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
-        imovel_id = request.POST.get("imovel_id")
-        if not imovel_id:
-            messages.error(request, "Selecione um imóvel para vincular.")
+        dados_json = request.POST.get("dados_completos", "").strip()
+        if not dados_json:
+            messages.error(request, "Dados do imóvel não informados.")
             return redirect(reverse("os_vincular_imovel", kwargs={"pk": self.os_obj.pk}))
 
-        imovel = get_object_or_404(Imovel, pk=imovel_id)
+        try:
+            dados_completos = json.loads(dados_json)
+        except json.JSONDecodeError:
+            messages.error(request, "Dados do imóvel inválidos.")
+            return redirect(reverse("os_vincular_imovel", kwargs={"pk": self.os_obj.pk}))
+
+        if dados_completos.get("codigo_isic"):
+            imovel, versao = obter_ou_criar_versao_isic(dados_completos)
+        else:
+            imovel, versao, _ = obter_ou_criar_versao(dados_completos)
+
         if OsImovel.objects.filter(os=self.os_obj, imovel=imovel).exists():
             messages.error(request, "Este imóvel já está vinculado à OS.")
             return redirect(reverse("os_vincular_imovel", kwargs={"pk": self.os_obj.pk}))
 
-        vinculo = OsImovel.objects.create(os=self.os_obj, imovel=imovel)
-        vinculo.capturar_snapshot(servidor=servidor)
+        OsImovel.objects.create(
+            os=self.os_obj,
+            imovel=imovel,
+            imovel_versao=versao,
+            vinculado_por=servidor,
+        )
         messages.success(request, "Imóvel vinculado à OS com sucesso.")
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
@@ -2787,35 +2879,44 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
         if not busca:
             return JsonResponse([], safe=False)
 
-        filtros = Q(codigo_isic__icontains=busca) | Q(nom_logradouro__icontains=busca)
-        filtros |= Q(num_bloco=busca)
-        try:
-            filtros |= Q(inscricao_cadastral=int(busca))
-        except ValueError:
-            pass
-
         resultados = []
-        for imovel in Imovel.objects.filter(filtros).order_by(
-            "inscricao_cadastral",
-            "codigo_isic",
-        )[:20]:
-            resultados.append(
-                {
-                    "id": imovel.pk,
-                    "identificacao": _formatar_identificacao_imovel(imovel),
-                    "num_bloco": imovel.num_bloco or "",
-                    "endereco": _formatar_endereco_imovel(imovel),
-                    "bairro": imovel.bairro or "",
-                    "area_territorial": (
-                        str(imovel.area_territorial)
-                        if imovel.area_territorial is not None
-                        else None
-                    ),
-                    "origem_dados": imovel.origem_dados,
-                },
-            )
+        vistos = set()
 
-        return JsonResponse(resultados, safe=False)
+        try:
+            inscricao = int(busca)
+        except ValueError:
+            inscricao = None
+
+        if inscricao is not None:
+            if SIAT_ARQUIVO_PATH.exists():
+                dados = buscar_inscricao_no_arquivo(inscricao, SIAT_ARQUIVO_PATH)
+                if dados:
+                    resultados.append(_montar_resultado_busca(dados, "siat"))
+            return JsonResponse(resultados, safe=False)
+
+        for imovel in Imovel.objects.filter(
+            tipo_identificacao="ISIC",
+            codigo_isic__icontains=busca,
+        ).order_by("codigo_isic")[:20]:
+            versao = _ultima_versao_imovel(imovel)
+            dados = _versao_para_dict(versao)
+            dados["codigo_isic"] = imovel.codigo_isic
+            chave = f"isic:{imovel.pk}"
+            if chave not in vistos:
+                vistos.add(chave)
+                resultados.append(_montar_resultado_busca(dados, "isic"))
+
+        if SIAT_ARQUIVO_PATH.exists():
+            for dados in buscar_por_logradouro_no_arquivo(busca, SIAT_ARQUIVO_PATH, limite=20):
+                chave = f"siat:{dados.get('inscricao_cadastral')}"
+                if chave in vistos:
+                    continue
+                vistos.add(chave)
+                resultados.append(_montar_resultado_busca(dados, "siat"))
+                if len(resultados) >= 20:
+                    break
+
+        return JsonResponse(resultados[:20], safe=False)
 
 
 class SiatCoordenadasBlocoView(RequerLoginJSONMixin, View):
