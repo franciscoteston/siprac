@@ -473,3 +473,17 @@ se o vínculo possui Função Gratificada (FG) e qual é a função:
   Auxiliar Técnico)
 - Exibir na interface: nome do usuário + cargo + FG quando aplicável
 - Útil para rastreio de responsabilidades em homologações e revisões
+
+### 15.10 Exibição de cargo e perfil na navbar
+Atualmente a navbar exibe o cargo e unidade do vínculo ativo de maior
+hierarquia do servidor logado. Refinamento previsto:
+- Para servidores com múltiplos vínculos ativos, avaliar se é mais
+  informativo exibir o cargo operacional ou o perfil de maior hierarquia
+- Exemplo: franciscoteston aparece como "Engenheiro — DAI" mas seu
+  perfil de maior hierarquia é "Administrador"
+- Opções a avaliar:
+  * Exibir perfil do sistema: "Administrador — DAI"
+  * Exibir cargo + perfil: "Engenheiro — DAI (Administrador)"
+  * Permitir que o usuário escolha qual vínculo exibir quando tiver múltiplos
+- Considerar também exibir indicação de Função Gratificada (FG)
+  quando o vínculo ativo tiver fg_ativa=True (ver seção 15.9)
