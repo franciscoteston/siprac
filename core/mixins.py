@@ -62,10 +62,11 @@ class RequerHomologarMixin(RequerLoginMixin):
 
 
 class RequerAdminMixin(RequerLoginMixin):
-    """Exige permissão admin_sistema no perfil ativo."""
+    """Exige permissão admin_sistema em algum vínculo ativo do servidor."""
 
     def dispatch(self, request, *args, **kwargs):
-        perfil = getattr(request, "perfil_acesso", None)
-        if perfil is None or not perfil.admin_sistema:
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not getattr(request, "admin_sistema", False):
             raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
+        return super(RequerLoginMixin, self).dispatch(request, *args, **kwargs)

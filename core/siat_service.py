@@ -1,11 +1,11 @@
-from django.core.cache import cache
+import datetime
+import os
+
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
-from core.models import Imovel
+from core.models import Imovel, OsImovel, ProducaoImovel
 from core.siat_parser import parse_siat_file
-
-SIAT_IMPORT_STATUS_KEY = "siat_import_status"
-SIAT_CACHE_TIMEOUT = 3600
 
 CAMPOS_SIAT = (
     "num_bloco",
@@ -29,63 +29,51 @@ CAMPOS_SIAT = (
     "coord_y",
 )
 
+CAMPOS_CABECALHO_ESPERADOS = ("NUM_BLOCO", "NUM_INSCRICAO", "NME_ENDLOC_LOGRADOURO")
 
-def _status_inicial_importacao():
+
+def carregar_arquivo_siat(filepath):
+    """
+    Valida o arquivo SIAT e o disponibiliza para consultas.
+    NÃO importa registros para o banco.
+    Retorna dict com informações do arquivo.
+    """
+    if not os.path.exists(filepath):
+        return {"valido": False, "erro": "Arquivo não encontrado."}
+
+    with open(filepath, "r", encoding="utf-8", errors="replace") as arquivo:
+        cabecalho = arquivo.readline()
+        total_linhas = sum(1 for _ in arquivo)
+
+    campos_presentes = [campo in cabecalho for campo in CAMPOS_CABECALHO_ESPERADOS]
+    if not all(campos_presentes):
+        return {"valido": False, "erro": "Formato de arquivo inválido."}
+
     return {
-        "rodando": True,
-        "criados": 0,
-        "atualizados": 0,
-        "ignorados": 0,
-        "erros": 0,
-        "total_processado": 0,
-        "concluido": False,
-        "total_registros": 0,
+        "valido": True,
+        "total_registros": total_linhas,
+        "data_arquivo": datetime.date.today(),
     }
 
 
-def _atualizar_cache_importacao(
-    resultado,
-    total_processado,
-    total_registros,
-    *,
-    concluido=False,
-    rodando=True,
-):
-    cache.set(
-        SIAT_IMPORT_STATUS_KEY,
-        {
-            "rodando": rodando and not concluido,
-            "criados": resultado["criados"],
-            "atualizados": resultado["atualizados"],
-            "ignorados": resultado["ignorados"],
-            "erros": resultado["erros"],
-            "total_processado": total_processado,
-            "concluido": concluido,
-            "total_registros": total_registros,
-        },
-        SIAT_CACHE_TIMEOUT,
-    )
+def obter_status_arquivo_siat(filepath):
+    """Retorna informações do arquivo SIAT disponível para consulta."""
+    if not os.path.exists(filepath):
+        return {"disponivel": False}
 
-
-def obter_status_importacao_siat():
-    return cache.get(SIAT_IMPORT_STATUS_KEY) or {
-        "rodando": False,
-        "criados": 0,
-        "atualizados": 0,
-        "ignorados": 0,
-        "erros": 0,
-        "total_processado": 0,
-        "concluido": False,
-        "total_registros": 0,
+    stat = os.stat(filepath)
+    validacao = carregar_arquivo_siat(filepath)
+    return {
+        "disponivel": validacao.get("valido", False),
+        "total_registros": validacao.get("total_registros", 0),
+        "data_arquivo": validacao.get("data_arquivo"),
+        "tamanho_bytes": stat.st_size,
+        "modificado_em": datetime.datetime.fromtimestamp(
+            stat.st_mtime,
+            tz=datetime.timezone.utc,
+        ).isoformat(),
+        "erro": validacao.get("erro"),
     }
-
-
-def iniciar_status_importacao_siat():
-    cache.set(
-        SIAT_IMPORT_STATUS_KEY,
-        _status_inicial_importacao(),
-        SIAT_CACHE_TIMEOUT,
-    )
 
 
 def _aplicar_dados_siat(imovel, dados):
@@ -94,89 +82,6 @@ def _aplicar_dados_siat(imovel, dados):
             setattr(imovel, campo, dados[campo])
     imovel.origem_dados = "SIAT"
     imovel.data_ultima_importacao = timezone.localdate()
-
-
-def carregar_arquivo_siat(filepath, use_cache=False):
-    resultado = {
-        "criados": 0,
-        "atualizados": 0,
-        "ignorados": 0,
-        "erros": 0,
-        "detalhes_erros": [],
-    }
-
-    if use_cache:
-        iniciar_status_importacao_siat()
-
-    try:
-        registros = parse_siat_file(filepath)
-    except OSError as exc:
-        resultado["erros"] = 1
-        resultado["detalhes_erros"].append(str(exc))
-        if use_cache:
-            _atualizar_cache_importacao(
-                resultado,
-                0,
-                0,
-                concluido=True,
-                rodando=False,
-            )
-        return resultado
-
-    total_registros = len(registros)
-    if use_cache:
-        _atualizar_cache_importacao(resultado, 0, total_registros)
-
-    for indice, dados in enumerate(registros, start=1):
-        inscricao = dados.get("inscricao_cadastral")
-        if not inscricao:
-            resultado["erros"] += 1
-            resultado["detalhes_erros"].append("Registro sem inscrição cadastral.")
-            if use_cache and indice % 1000 == 0:
-                _atualizar_cache_importacao(
-                    resultado,
-                    indice,
-                    total_registros,
-                )
-            continue
-
-        try:
-            imovel = Imovel.objects.filter(inscricao_cadastral=inscricao).first()
-            if imovel:
-                if imovel.editado_manualmente:
-                    resultado["ignorados"] += 1
-                else:
-                    _aplicar_dados_siat(imovel, dados)
-                    imovel.save()
-                    resultado["atualizados"] += 1
-            else:
-                imovel = Imovel(tipo_identificacao="CADASTRAL")
-                _aplicar_dados_siat(imovel, dados)
-                imovel.save()
-                resultado["criados"] += 1
-        except Exception as exc:
-            resultado["erros"] += 1
-            resultado["detalhes_erros"].append(
-                f"Inscrição {inscricao}: {exc}",
-            )
-
-        if use_cache and indice % 1000 == 0:
-            _atualizar_cache_importacao(
-                resultado,
-                indice,
-                total_registros,
-            )
-
-    if use_cache:
-        _atualizar_cache_importacao(
-            resultado,
-            total_registros,
-            total_registros,
-            concluido=True,
-            rodando=False,
-        )
-
-    return resultado
 
 
 def buscar_inscricao_no_arquivo(inscricao_cadastral, filepath):
@@ -228,3 +133,23 @@ def obter_coordenadas_bloco(num_bloco, filepath):
         "coord_x": primeiro.get("coord_x"),
         "coord_y": primeiro.get("coord_y"),
     }
+
+
+def queryset_imoveis_siat_orfaos():
+    """Imóveis SIAT sem vínculo em OS ou produção."""
+    return Imovel.objects.filter(origem_dados="SIAT").exclude(
+        Exists(OsImovel.objects.filter(imovel_id=OuterRef("pk"))),
+    ).exclude(
+        Exists(ProducaoImovel.objects.filter(imovel_id=OuterRef("pk"))),
+    )
+
+
+def contar_imoveis_siat_orfaos():
+    return queryset_imoveis_siat_orfaos().count()
+
+
+def limpar_imoveis_siat_orfaos():
+    queryset = queryset_imoveis_siat_orfaos()
+    total = queryset.count()
+    queryset.delete()
+    return total

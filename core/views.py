@@ -1,6 +1,5 @@
 import json
 import logging
-import threading
 from collections import defaultdict
 
 from django.contrib import messages
@@ -48,8 +47,10 @@ from core.siat_config import SIAT_ARQUIVO_PATH
 from core.siat_service import (
     atualizar_inscricao_do_arquivo,
     carregar_arquivo_siat,
+    contar_imoveis_siat_orfaos,
+    limpar_imoveis_siat_orfaos,
     obter_coordenadas_bloco,
-    obter_status_importacao_siat,
+    obter_status_arquivo_siat,
 )
 from core.models import (
     Encaminhamento,
@@ -1825,42 +1826,42 @@ class ProximoIsicAPIView(RequerLoginJSONMixin, View):
         return JsonResponse({"codigo": _gerar_codigo_isic()})
 
 
-def _contexto_arquivo_siat():
-    if not SIAT_ARQUIVO_PATH.exists():
-        return {"arquivo_existe": False}
-
-    stat = SIAT_ARQUIVO_PATH.stat()
-    modificado = timezone.localtime(
-        datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.timezone.utc),
-    )
-    tamanho = stat.st_size
+def _formatar_tamanho_arquivo(tamanho):
     if tamanho >= 1024 * 1024:
-        tamanho_formatado = f"{tamanho / (1024 * 1024):.1f} MB"
-    elif tamanho >= 1024:
-        tamanho_formatado = f"{tamanho / 1024:.1f} KB"
-    else:
-        tamanho_formatado = f"{tamanho} bytes"
+        return f"{tamanho / (1024 * 1024):.1f} MB"
+    if tamanho >= 1024:
+        return f"{tamanho / 1024:.1f} KB"
+    return f"{tamanho} bytes"
 
-    return {
-        "arquivo_existe": True,
-        "arquivo_nome": SIAT_ARQUIVO_PATH.name,
-        "arquivo_modificado": modificado,
-        "arquivo_tamanho": tamanho_formatado,
+
+def _contexto_arquivo_siat():
+    status = obter_status_arquivo_siat(SIAT_ARQUIVO_PATH)
+    contexto = {
+        "arquivo_existe": status.get("disponivel", False),
+        "contagem_siat_orfaos": contar_imoveis_siat_orfaos(),
     }
+    if not status.get("disponivel"):
+        return contexto
 
-
-def _executar_importacao_siat_em_background(filepath):
-    from django.db import connections
-
-    try:
-        carregar_arquivo_siat(filepath, use_cache=True)
-    finally:
-        connections.close_all()
+    modificado = timezone.localtime(
+        datetime.datetime.fromisoformat(status["modificado_em"]),
+    )
+    contexto.update(
+        {
+            "arquivo_nome": SIAT_ARQUIVO_PATH.name,
+            "arquivo_modificado": modificado,
+            "arquivo_tamanho": _formatar_tamanho_arquivo(status["tamanho_bytes"]),
+            "arquivo_total_registros": status.get("total_registros", 0),
+            "arquivo_data": status.get("data_arquivo"),
+        },
+    )
+    return contexto
 
 
 class SiatCarregarArquivoView(RequerAdminMixin, FormView):
     template_name = "siat_carregar.html"
     form_class = SiatUploadForm
+    success_url = reverse_lazy("siat_carregar")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1874,47 +1875,58 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
             for chunk in uploaded.chunks():
                 destino.write(chunk)
 
-        thread = threading.Thread(
-            target=_executar_importacao_siat_em_background,
-            args=(SIAT_ARQUIVO_PATH,),
-            daemon=True,
-        )
-        thread.start()
-        return JsonResponse({"iniciado": True})
+        resultado = carregar_arquivo_siat(SIAT_ARQUIVO_PATH)
+        if not resultado.get("valido"):
+            if SIAT_ARQUIVO_PATH.exists():
+                SIAT_ARQUIVO_PATH.unlink()
+            messages.error(
+                self.request,
+                resultado.get("erro", "Formato de arquivo inválido."),
+            )
+            return self.form_invalid(form)
 
-    def form_invalid(self, form):
-        return JsonResponse(
-            {"iniciado": False, "errors": form.errors},
-            status=400,
+        total = resultado.get("total_registros", 0)
+        messages.success(
+            self.request,
+            f"Arquivo disponibilizado com sucesso. "
+            f"{total:,} registros disponíveis para consulta.".replace(",", "."),
         )
+        return super().form_valid(form)
 
 
 class SiatStatusView(RequerLoginJSONMixin, View):
     def get(self, request):
-        perfil = getattr(request, "perfil_acesso", None)
-        if perfil is None or not perfil.admin_sistema:
+        if not getattr(request, "admin_sistema", False):
             return JsonResponse({"error": "Sem permissão."}, status=403)
-        return JsonResponse(obter_status_importacao_siat())
+        return JsonResponse(obter_status_arquivo_siat(SIAT_ARQUIVO_PATH))
 
 
-class SiatProcessarArquivoView(RequerAdminMixin, View):
+class SiatLimparImoveisView(RequerAdminMixin, View):
+    def dispatch(self, request, *args, **kwargs):
+        logger.warning("perfil_acesso: %s", getattr(request, "perfil_acesso", None))
+        logger.warning(
+            "admin_sistema: %s",
+            getattr(getattr(request, "perfil_acesso", None), "admin_sistema", None),
+        )
+        logger.warning("admin_sistema flag: %s", getattr(request, "admin_sistema", None))
+        return super().dispatch(request, *args, **kwargs)
+
     def get(self, request):
-        if not SIAT_ARQUIVO_PATH.exists():
-            messages.error(
-                request,
-                "Arquivo SIAT não encontrado em data/siat_view.txt.",
-            )
+        return redirect("siat_carregar")
+
+    def post(self, request):
+        total = contar_imoveis_siat_orfaos()
+        if total == 0:
+            messages.info(request, "Nenhum imóvel SIAT órfão para remover.")
             return redirect("siat_carregar")
 
-        thread = threading.Thread(
-            target=_executar_importacao_siat_em_background,
-            args=(SIAT_ARQUIVO_PATH,),
-            daemon=True,
-        )
-        thread.start()
+        removidos = limpar_imoveis_siat_orfaos()
         messages.success(
             request,
-            "Processamento SIAT iniciado. Acompanhe o progresso na tela de carregamento.",
+            f"{removidos:,} imóvel(is) SIAT não vinculado(s) removido(s).".replace(
+                ",",
+                ".",
+            ),
         )
         return redirect("siat_carregar")
 

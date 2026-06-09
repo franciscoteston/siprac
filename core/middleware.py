@@ -23,12 +23,27 @@ def _nivel_hierarquico(nome_perfil: str) -> int:
         return len(HIERARQUIA_PERFIS)
 
 
-def obter_vinculo_unidade_ativo(servidor: Servidor):
-    """Retorna o ServidorUnidade ativo de maior hierarquia."""
+def _vinculos_unidade_ativos(servidor: Servidor):
     hoje = timezone.localdate()
-    vinculos_ativos = servidor.vinculos_unidade.filter(
+    return servidor.vinculos_unidade.filter(
+        data_inicio__lte=hoje,
+    ).filter(
         Q(data_fim__isnull=True) | Q(data_fim__gte=hoje),
     ).select_related("unidade", "perfil")
+
+
+def servidor_tem_admin_sistema(servidor: Servidor) -> bool:
+    """True se o servidor tem vínculo vigente com perfil admin_sistema."""
+    hoje = timezone.localdate()
+    return servidor.vinculos_unidade.filter(
+        Q(data_fim__isnull=True) | Q(data_fim__gte=hoje),
+        perfil__admin_sistema=True,
+    ).exists()
+
+
+def obter_vinculo_unidade_ativo(servidor: Servidor):
+    """Retorna o ServidorUnidade ativo de maior hierarquia."""
+    vinculos_ativos = _vinculos_unidade_ativos(servidor)
 
     vinculo_escolhido = None
     melhor_nivel = len(HIERARQUIA_PERFIS)
@@ -58,6 +73,7 @@ class PerfilAcessoMiddleware:
 
     def __call__(self, request):
         request.perfil_acesso = None
+        request.admin_sistema = False
 
         if request.user.is_authenticated:
             try:
@@ -67,5 +83,6 @@ class PerfilAcessoMiddleware:
 
             if servidor is not None:
                 request.perfil_acesso = obter_perfil_acesso_ativo(servidor)
+                request.admin_sistema = servidor_tem_admin_sistema(servidor)
 
         return self.get_response(request)

@@ -143,6 +143,37 @@ Os dados do imóvel existem em dois contextos com propósitos distintos:
 
 Imóveis podem ser agrupados dentro de uma produção para atendimento conjunto, evitando registro repetitivo do mesmo procedimento. O agrupamento é flexível — cada imóvel tem seu registro individualizado em `PRODUCAO_IMOVEL`, com um campo `grupo_ref` que identifica o agrupamento dentro daquela produção. Mover um imóvel de grupo não afeta os demais.
 
+### 6.4 Distinção fundamental: View SIAT vs. tabela Imovel
+
+**View SIAT** (`data/siat_view.txt`) — fonte de consulta externa:
+- Arquivo exportado mensalmente do SIAT, armazenado no servidor
+- Contém dados cadastrais atuais de todas as inscrições do município
+- É uma fonte de referência, NÃO um espelho do banco SIPRAC
+- NUNCA deve ser importada em massa para a tabela Imovel
+- Acesso: somente leitura, sob demanda explícita do usuário
+
+**Tabela Imovel** (banco SIPRAC) — registros de trabalho:
+- Contém apenas imóveis que foram explicitamente consultados
+  e vinculados a Ordens de Serviço pela equipe da DAI
+- Cada registro foi trazido da View SIAT por ação do usuário,
+  ou cadastrado manualmente como ISIC
+- Representa o universo de imóveis que já passaram pela DAI,
+  não o cadastro completo do município
+
+**Fluxo correto de uso da View SIAT:**
+1. Usuário vincula imóvel a uma OS → sistema busca inscrição
+   no arquivo siat_view.txt → dados são trazidos para Imovel
+2. Usuário clica "Atualizar da View" em imóvel existente →
+   sistema relê o arquivo para aquela inscrição específica
+3. Arquivo siat_view.txt é atualizado mensalmente via upload
+   na tela Carregar View SIAT → apenas substitui o arquivo,
+   sem processar ou importar registros
+
+**O que NÃO fazer:**
+- Não importar todos os registros do arquivo para o banco
+- Não sincronizar automaticamente a tabela Imovel com o SIAT
+- Não tratar a tabela Imovel como cópia do cadastro municipal
+
 ---
 
 ## 7. Produção
