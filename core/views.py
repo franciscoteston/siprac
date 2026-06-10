@@ -1288,7 +1288,7 @@ class OSCreateView(RequerLoginMixin, FormView):
         with transaction.atomic():
             os_obj = OS.objects.create(
                 numero_os=_gerar_numero_os(),
-                data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada"],
+                data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada_divisao"],
                 natureza=form.cleaned_data["natureza"],
                 tipo_demanda=form.cleaned_data["tipo_demanda"],
                 finalidade=form.cleaned_data["finalidade"],
@@ -1302,12 +1302,14 @@ class OSCreateView(RequerLoginMixin, FormView):
             processo_sei, _ = ProcessoSei.objects.get_or_create(
                 numero_processo=form.cleaned_data["processo_sei_numero"],
             )
+            processo_sei.data_abertura_sei = form.cleaned_data["processo_sei_data_criacao_sei"]
+            processo_sei.save(update_fields=["data_abertura_sei"])
 
             OsProcesso.objects.create(
                 os=os_obj,
                 processo_sei=processo_sei,
                 tipo_vinculo="PRINCIPAL",
-                data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada"],
+                data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada_divisao"],
             )
 
             MacroetapaLog.objects.create(
@@ -1455,6 +1457,24 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context["processos"] = OsProcesso.objects.filter(os=os_obj).select_related(
             "processo_sei",
         )
+        context["processo_principal"] = (
+            OsProcesso.objects.filter(os=os_obj, tipo_vinculo="PRINCIPAL")
+            .select_related("processo_sei")
+            .first()
+        )
+        os_imoveis = OsImovel.objects.filter(os=os_obj)
+        imoveis_em_producao = set(
+            ProducaoImovel.objects.filter(
+                os_imovel__os=os_obj,
+            )
+            .exclude(
+                producao__status=Producao.STATUS_CANCELADO,
+            )
+            .values_list("os_imovel_id", flat=True),
+        )
+        context["imoveis_sem_producao"] = {
+            oi.pk for oi in os_imoveis if oi.pk not in imoveis_em_producao
+        }
         context["macroetapas"] = MacroetapaLog.objects.filter(os=os_obj).order_by(
             "data_hora",
         )

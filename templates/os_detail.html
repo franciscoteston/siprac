@@ -55,9 +55,23 @@
           <dd class="col-sm-8">{{ os.tipo_demanda.descricao }}</dd>
           <dt class="col-sm-4">Finalidade</dt>
           <dd class="col-sm-8">{{ os.finalidade.descricao }}</dd>
-          <dt class="col-sm-4">Data entrada Divisão</dt>
+          <dt class="col-sm-4">Data de criação no SEI</dt>
           <dd class="col-sm-8">
-            {% if os.data_entrada_divisao %}{{ os.data_entrada_divisao|date:"d/m/Y" }}{% else %}—{% endif %}
+            {% if processo_principal and processo_principal.processo_sei.data_abertura_sei %}
+              {{ processo_principal.processo_sei.data_abertura_sei|date:"d/m/Y" }}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-sm-4">Data de entrada na Divisão</dt>
+          <dd class="col-sm-8">
+            {% if processo_principal and processo_principal.data_entrada_divisao %}
+              {{ processo_principal.data_entrada_divisao|date:"d/m/Y" }}
+            {% elif os.data_entrada_divisao %}
+              {{ os.data_entrada_divisao|date:"d/m/Y" }}
+            {% else %}—{% endif %}
+          </dd>
+          <dt class="col-sm-4">Data de criação no SIPRAC</dt>
+          <dd class="col-sm-8">
+            {% if os.data_criacao_sgbd %}{{ os.data_criacao_sgbd|date:"d/m/Y H:i" }}{% else %}—{% endif %}
           </dd>
           <dt class="col-sm-4">Prioridade</dt>
           <dd class="col-sm-8">{{ os.prioridade|prioridade_display }}</dd>
@@ -134,15 +148,22 @@
               {% for vinculo in imoveis %}
               <tr>
                 <td>
-                  <a href="{% url 'imovel_detalhe' vinculo.imovel.pk %}" class="text-decoration-none fw-semibold">
-                    {% if vinculo.imovel.inscricao_cadastral %}
-                      {{ vinculo.imovel.inscricao_cadastral }}
-                    {% elif vinculo.imovel.codigo_isic %}
-                      {{ vinculo.imovel.codigo_isic }}
+                  <div class="d-flex flex-wrap align-items-center gap-1">
+                    <a href="{% url 'imovel_detalhe' vinculo.imovel.pk %}" class="text-decoration-none fw-semibold">
+                      {% if vinculo.imovel.inscricao_cadastral %}
+                        {{ vinculo.imovel.inscricao_cadastral }}
+                      {% elif vinculo.imovel.codigo_isic %}
+                        {{ vinculo.imovel.codigo_isic }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </a>
+                    {% if vinculo.pk in imoveis_sem_producao %}
+                    <span class="badge text-bg-warning">Sem produção</span>
                     {% else %}
-                      —
+                    <span class="badge text-bg-success">Na produção</span>
                     {% endif %}
-                  </a>
+                  </div>
                 </td>
                 <td>
                   {% if vinculo.nom_logradouro %}

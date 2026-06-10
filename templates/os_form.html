@@ -13,8 +13,17 @@
     <div class="col-md-6">
       {{ form.processo_sei_numero|as_crispy_field }}
     </div>
-    <div class="col-md-6">
-      {{ form.processo_sei_data_entrada|as_crispy_field }}
+    <div class="col-md-4">
+      {{ form.processo_sei_data_criacao_sei|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.processo_sei_data_entrada_divisao|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Data de criação no SIPRAC</label>
+      <p class="form-control-plaintext text-muted small mb-0 pt-1">
+        (será registrada automaticamente)
+      </p>
     </div>
     <div class="col-md-4">
       {{ form.natureza|as_crispy_field }}

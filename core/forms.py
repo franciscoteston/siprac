@@ -1,3 +1,5 @@
+import re
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -16,14 +18,29 @@ from core.models import (
 )
 
 
+PADROES_SEI = [
+    r"^\d{2}\.\d\.\d{9}-\d$",
+    r"^\d{2}\.\d{2}\.\d{9}-\d$",
+    r"^\d{3}\.\d{6}\.\d{2}\.\d\.\d{5}$",
+]
+
+
 class OSForm(forms.Form):
     processo_sei_numero = forms.CharField(
         label="Número do processo SEI",
         max_length=255,
     )
-    processo_sei_data_entrada = forms.DateField(
-        label="Data de entrada na Divisão",
+    processo_sei_data_criacao_sei = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de criação no SEI",
+        required=True,
+        help_text="Data em que o processo foi criado no SEI",
+    )
+    processo_sei_data_entrada_divisao = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de entrada na Divisão",
+        required=True,
+        help_text="Data em que o processo chegou à DAI",
     )
     natureza = forms.ModelChoiceField(
         label="Natureza",
@@ -102,6 +119,19 @@ class OSForm(forms.Form):
                 raise ValidationError("Combinação inválida para esta natureza.")
 
         return cleaned_data
+
+    def clean_processo_sei_numero(self):
+        numero = self.cleaned_data.get("processo_sei_numero", "").strip()
+        if numero:
+            valido = any(re.match(padrao, numero) for padrao in PADROES_SEI)
+            if not valido:
+                raise ValidationError(
+                    "Número de processo inválido. "
+                    "Formatos aceitos: 20.0.000011172-5 (16 dígitos), "
+                    "22.15.000005831-1 (17 dígitos) ou "
+                    "002.078002.16.8.00000 (21 dígitos).",
+                )
+        return numero
 
 
 class EncaminhamentoForm(forms.Form):

@@ -311,7 +311,11 @@ class ProcessoSei(models.Model):
     """Processo registrado no SEI, referenciado por uma ou mais OS."""
 
     numero_processo = models.CharField(max_length=255)
-    data_abertura_sei = models.DateField(null=True, blank=True)
+    data_abertura_sei = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de criação no SEI",
+    )
     situacao = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
@@ -344,7 +348,10 @@ class OS(models.Model):
     ]
 
     numero_os = models.CharField(max_length=255, unique=True)
-    data_criacao_sgbd = models.DateField(auto_now_add=True)
+    data_criacao_sgbd = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Data de criação no SIPRAC",
+    )
     data_entrada_divisao = models.DateField(null=True, blank=True)
     os_interna = models.BooleanField(default=False)
     pendente_confirmacao = models.BooleanField(default=False)
