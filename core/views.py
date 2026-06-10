@@ -8,7 +8,16 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied
 import datetime
 from django.db import transaction
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import (
+    Case,
+    Count,
+    IntegerField,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+    When,
+)
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -28,12 +37,16 @@ from core.forms import (
     OSVincularProcessoForm,
     ProducaoForm,
     RelatorioProducaoForm,
+    RelatorioTempoRegistroForm,
     SiatUploadForm,
 )
 from core.relatorios import (
     exportar_producao_excel,
+    exportar_tempo_registro_excel,
     linhas_relatorio_producao,
+    linhas_relatorio_tempo_registro,
     relatorio_producao_por_servidor,
+    relatorio_tempo_registro_processo,
 )
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
@@ -218,9 +231,8 @@ def _montar_fila_os(unidades_ids):
         .distinct()
     )
 
-    ordens = OS.objects.filter(id__in=os_ids).select_related("natureza").order_by(
-        "-prioridade",
-        "numero_os",
+    ordens = _ordenar_queryset_os_fila(
+        OS.objects.filter(id__in=os_ids).select_related("natureza"),
     )
 
     processos_principais = {
@@ -542,10 +554,11 @@ def _obter_minha_fila(servidor, unidades_ids, perfil):
 def _ordenar_producoes_fila(queryset):
     producoes = list(queryset)
     producoes.sort(
-        key=lambda producao: (
-            PRIORIDADE_ORDEM.get(producao.os.prioridade, 9),
-            producao.data_criacao,
-        ),
+        key=lambda producao: producao.os.data_criacao_sgbd or datetime.datetime.min,
+        reverse=True,
+    )
+    producoes.sort(
+        key=lambda producao: PRIORIDADE_ORDEM.get(producao.os.prioridade, 9),
     )
     return producoes
 
@@ -957,6 +970,25 @@ def _montar_resultado_busca(dados, fonte):
     }
 
 
+def _anotar_prioridade_os(queryset):
+    return queryset.annotate(
+        prioridade_ordem=Case(
+            When(prioridade="URGENTE", then=3),
+            When(prioridade="PRIORITARIO", then=2),
+            When(prioridade="NORMAL", then=1),
+            default=0,
+            output_field=IntegerField(),
+        ),
+    )
+
+
+def _ordenar_queryset_os_fila(queryset):
+    return _anotar_prioridade_os(queryset).order_by(
+        "-prioridade_ordem",
+        "-data_criacao_sgbd",
+    )
+
+
 def _queryset_os_anotado():
     ultima_macroetapa = MacroetapaLog.objects.filter(
         os_id=OuterRef("pk"),
@@ -1209,7 +1241,27 @@ RELATORIOS_DISPONIVEIS = [
         ),
         "url_name": "relatorio_producao",
     },
+    {
+        "titulo": "Tempo de Registro de Processos",
+        "descricao": (
+            "Desempenho do auxiliar administrativo: intervalo entre a entrada "
+            "do processo na Divisão e o registro no SIPRAC."
+        ),
+        "url_name": "relatorio_tempo_registro",
+    },
 ]
+
+
+def _filtros_relatorio_tempo_registro(form):
+    dados = form.cleaned_data
+    filtros = {}
+    if dados.get("servidor"):
+        filtros["servidor_id"] = dados["servidor"].pk
+    if dados.get("data_inicio"):
+        filtros["data_inicio"] = dados["data_inicio"]
+    if dados.get("data_fim"):
+        filtros["data_fim"] = dados["data_fim"]
+    return filtros
 
 
 def _filtros_relatorio_producao(form):
@@ -1267,6 +1319,41 @@ class RelatorioProducaoView(RequerLoginMixin, View):
             return exportar_producao_excel(queryset)
 
         linhas = linhas_relatorio_producao(queryset)
+        return self._render(request, form, linhas=linhas, total=len(linhas))
+
+
+class RelatorioTempoRegistroView(RequerLoginMixin, View):
+    template_name = "relatorio_tempo_registro.html"
+
+    def _render(self, request, form, linhas=None, total=None):
+        return render(
+            request,
+            self.template_name,
+            {
+                "form": form,
+                "linhas": linhas,
+                "total": total,
+                "exibir_resultados": linhas is not None,
+            },
+        )
+
+    def get(self, request):
+        return self._render(request, RelatorioTempoRegistroForm())
+
+    def post(self, request):
+        form = RelatorioTempoRegistroForm(request.POST)
+        if not form.is_valid():
+            return self._render(request, form)
+
+        queryset = relatorio_tempo_registro_processo(
+            _filtros_relatorio_tempo_registro(form),
+        )
+        acao = request.POST.get("action", "visualizar")
+
+        if acao == "exportar":
+            return exportar_tempo_registro_excel(queryset)
+
+        linhas = linhas_relatorio_tempo_registro(queryset)
         return self._render(request, form, linhas=linhas, total=len(linhas))
 
 
@@ -1338,7 +1425,7 @@ class OSListView(RequerLoginMixin, ListView):
             self.request,
         )
         queryset = _aplicar_filtros_os(queryset, self.request)
-        return queryset.order_by("-data_criacao_sgbd", "numero_os")
+        return _ordenar_queryset_os_fila(queryset)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1458,7 +1545,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context["processos"] = (
             OsProcesso.objects.filter(os=os_obj)
             .select_related("processo_sei")
-            .order_by("pk")
+            .order_by("-data_vinculo")
         )
         context["processo_principal"] = (
             OsProcesso.objects.filter(os=os_obj, tipo_vinculo="PRINCIPAL")
@@ -1479,7 +1566,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
             oi.pk for oi in os_imoveis if oi.pk not in imoveis_em_producao
         }
         context["macroetapas"] = MacroetapaLog.objects.filter(os=os_obj).order_by(
-            "data_hora",
+            "-data_hora",
         )
         context["encaminhamentos"] = (
             Encaminhamento.objects.filter(os=os_obj)
@@ -1490,7 +1577,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
                 "servidor_destino",
                 "unidade_externa_destino",
             )
-            .order_by("data_hora")
+            .order_by("-data_hora")
         )
         imoveis_vinculados = OsImovel.objects.filter(os=os_obj).select_related(
             "imovel",
@@ -1506,8 +1593,10 @@ class OSDetailView(RequerLoginMixin, DetailView):
             imoveis_com_coords,
             ensure_ascii=False,
         )
-        context["producoes"] = Producao.objects.filter(os=os_obj).select_related(
-            "tipo_producao",
+        context["producoes"] = (
+            Producao.objects.filter(os=os_obj)
+            .select_related("tipo_producao")
+            .order_by("-data_criacao")
         )
         context["macroetapa_atual"] = (
             MacroetapaLog.objects.filter(os=os_obj)
@@ -2317,7 +2406,7 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
                 "servidor_destino",
                 "unidade_destino",
             )
-            .order_by("data_hora")
+            .order_by("-data_hora")
         )
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
         context["transicoes"] = _transicoes_status_disponiveis(
@@ -2605,7 +2694,7 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         logs = (
             ProducaoStatusLog.objects.filter(producao=self.producao_obj)
             .select_related("servidor_origem", "servidor_destino")
-            .order_by("data_hora")
+            .order_by("-data_hora")
         )
         return JsonResponse(
             {

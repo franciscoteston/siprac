@@ -10,6 +10,147 @@ from openpyxl.utils import get_column_letter
 from core.models import OsProcesso, Producao
 
 
+def _dias_tempo_registro(data_vinculo, data_entrada_divisao):
+    if not data_vinculo or not data_entrada_divisao:
+        return None
+    if timezone.is_aware(data_vinculo):
+        data_registro = timezone.localtime(data_vinculo).date()
+    else:
+        data_registro = data_vinculo.date()
+    return (data_registro - data_entrada_divisao).days
+
+
+def relatorio_tempo_registro_processo(filtros):
+    qs = (
+        OsProcesso.objects.filter(
+            data_entrada_divisao__isnull=False,
+            data_vinculo__isnull=False,
+        )
+        .select_related("os", "processo_sei", "os__criado_por")
+        .order_by("data_vinculo")
+    )
+
+    if filtros.get("data_inicio"):
+        qs = qs.filter(data_vinculo__date__gte=filtros["data_inicio"])
+    if filtros.get("data_fim"):
+        qs = qs.filter(data_vinculo__date__lte=filtros["data_fim"])
+    if filtros.get("servidor_id"):
+        qs = qs.filter(os__criado_por__id=filtros["servidor_id"])
+
+    return qs
+
+
+def linhas_relatorio_tempo_registro(queryset):
+    linhas = []
+    for vinculo in queryset:
+        dias = _dias_tempo_registro(vinculo.data_vinculo, vinculo.data_entrada_divisao)
+        linhas.append(
+            {
+                "numero_os": vinculo.os.numero_os,
+                "processo_sei": vinculo.processo_sei.numero_processo,
+                "criado_por": (
+                    vinculo.os.criado_por.nome if vinculo.os.criado_por else "—"
+                ),
+                "data_entrada_divisao": vinculo.data_entrada_divisao,
+                "data_vinculo": vinculo.data_vinculo,
+                "dias": dias,
+            },
+        )
+    return linhas
+
+
+def exportar_tempo_registro_excel(queryset):
+    vinculos = list(queryset)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Tempo de Registro"
+
+    cabecalho_fill = PatternFill(
+        start_color="1A3A5C",
+        end_color="1A3A5C",
+        fill_type="solid",
+    )
+    cabecalho_font = Font(color="FFFFFF", bold=True, size=11)
+
+    colunas = [
+        ("OS", 18),
+        ("Processo SEI", 25),
+        ("Criado por", 25),
+        ("Entrada na Divisão", 18),
+        ("Registro SIPRAC", 20),
+        ("Dias de diferença", 16),
+    ]
+
+    for col, (titulo, largura) in enumerate(colunas, 1):
+        cell = ws.cell(row=1, column=col, value=titulo)
+        cell.font = cabecalho_font
+        cell.fill = cabecalho_fill
+        cell.alignment = Alignment(horizontal="center")
+        ws.column_dimensions[get_column_letter(col)].width = largura
+
+    for row, vinculo in enumerate(vinculos, 2):
+        dias = _dias_tempo_registro(vinculo.data_vinculo, vinculo.data_entrada_divisao)
+        ws.cell(row=row, column=1, value=vinculo.os.numero_os)
+        ws.cell(row=row, column=2, value=vinculo.processo_sei.numero_processo)
+        ws.cell(
+            row=row,
+            column=3,
+            value=vinculo.os.criado_por.nome if vinculo.os.criado_por else "—",
+        )
+        ws.cell(
+            row=row,
+            column=4,
+            value=(
+                vinculo.data_entrada_divisao.strftime("%d/%m/%Y")
+                if vinculo.data_entrada_divisao
+                else "—"
+            ),
+        )
+        ws.cell(
+            row=row,
+            column=5,
+            value=(
+                timezone.localtime(vinculo.data_vinculo).strftime("%d/%m/%Y %H:%M")
+                if vinculo.data_vinculo
+                else "—"
+            ),
+        )
+        dias_cell = ws.cell(
+            row=row,
+            column=6,
+            value=dias if dias is not None else "—",
+        )
+        if dias is not None and dias > 5:
+            dias_cell.font = Font(color="C00000", bold=True)
+        elif dias is not None and dias > 2:
+            dias_cell.font = Font(color="ED7D31", bold=True)
+
+        if row % 2 == 0:
+            fill = PatternFill(
+                start_color="EEF2F7",
+                end_color="EEF2F7",
+                fill_type="solid",
+            )
+            for col in range(1, len(colunas) + 1):
+                ws.cell(row=row, column=col).fill = fill
+
+    total_row = len(vinculos) + 2
+    ws.cell(row=total_row, column=1, value=f"Total: {len(vinculos)} registros")
+    ws.cell(row=total_row, column=1).font = Font(bold=True)
+
+    response = HttpResponse(
+        content_type=(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ),
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="tempo_registro_processo_{date.today():%Y%m%d}.xlsx"'
+    )
+    wb.save(response)
+    return response
+
+
 def relatorio_producao_por_servidor(filtros):
     """
     Gera dados do relatório de produção por servidor.

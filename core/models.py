@@ -391,6 +391,7 @@ class OS(models.Model):
         db_table = "OS"
         verbose_name = "ordem de serviço"
         verbose_name_plural = "ordens de serviço"
+        ordering = ["-data_criacao_sgbd"]
 
     def __str__(self):
         return self.numero_os
@@ -449,6 +450,10 @@ class OsProcesso(models.Model):
         related_name="vinculos_os",
     )
     tipo_vinculo = models.CharField(max_length=255)
+    data_vinculo = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Data de registro no SIPRAC",
+    )
     data_entrada_divisao = models.DateField(null=True, blank=True)
     data_encerramento = models.DateField(null=True, blank=True)
     motivo_encerramento = models.TextField(null=True, blank=True)

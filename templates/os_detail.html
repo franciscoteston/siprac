@@ -98,6 +98,8 @@
                 <th>Vínculo</th>
                 <th>Criação no SEI</th>
                 <th>Entrada na Divisão</th>
+                <th>Registro SIPRAC</th>
+                <th>Tempo de registro</th>
                 <th>Encerramento</th>
               </tr>
             </thead>
@@ -122,11 +124,19 @@
                   {% else %}—{% endif %}
                 </td>
                 <td>{% if vinculo.data_entrada_divisao %}{{ vinculo.data_entrada_divisao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                <td>{% if vinculo.data_vinculo %}{{ vinculo.data_vinculo|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
+                <td>
+                  {% with dias=vinculo|dias_tempo_registro %}
+                    {% if dias is not None %}
+                      <span class="{{ dias|cor_tempo_registro }}">{{ dias }} dia{{ dias|pluralize }}</span>
+                    {% else %}—{% endif %}
+                  {% endwith %}
+                </td>
                 <td>{% if vinculo.data_encerramento %}{{ vinculo.data_encerramento|date:"d/m/Y" }}{% else %}—{% endif %}</td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="5" class="text-muted text-center py-3">Nenhum processo vinculado.</td>
+                <td colspan="7" class="text-muted text-center py-3">Nenhum processo vinculado.</td>
               </tr>
               {% endfor %}
             </tbody>

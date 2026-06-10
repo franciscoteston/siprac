@@ -79,7 +79,7 @@
         </div>
         <a class="nav-link{% if request.resolver_match.url_name == 'producao_list' or request.resolver_match.url_name == 'producao_detail' %} active{% endif %}"
            href="{% url 'producao_list' %}">Produções</a>
-        <a class="nav-link{% if request.resolver_match.url_name == 'relatorio_list' or request.resolver_match.url_name == 'relatorio_producao' %} active{% endif %}"
+        <a class="nav-link{% if request.resolver_match.url_name == 'relatorio_list' or request.resolver_match.url_name == 'relatorio_producao' or request.resolver_match.url_name == 'relatorio_tempo_registro' %} active{% endif %}"
            href="{% url 'relatorio_list' %}">Relatórios</a>
         {% if request.admin_sistema %}
         <a class="nav-link" href="{% url 'admin:index' %}">Administração</a>

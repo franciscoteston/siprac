@@ -1,4 +1,5 @@
 from django import template
+from django.utils import timezone
 
 register = template.Library()
 
@@ -150,6 +151,29 @@ def decimal_br(value):
         return f"{inteiro},{decimal}"
     except Exception:
         return value
+
+
+@register.filter
+def dias_tempo_registro(vinculo):
+    if not vinculo or not vinculo.data_entrada_divisao or not vinculo.data_vinculo:
+        return None
+    data_vinculo = vinculo.data_vinculo
+    if timezone.is_aware(data_vinculo):
+        data_registro = timezone.localtime(data_vinculo).date()
+    else:
+        data_registro = data_vinculo.date()
+    return (data_registro - vinculo.data_entrada_divisao).days
+
+
+@register.filter
+def cor_tempo_registro(dias):
+    if dias is None:
+        return ""
+    if dias > 5:
+        return "text-danger fw-semibold"
+    if dias > 2:
+        return "text-warning fw-semibold"
+    return ""
 
 
 @register.filter

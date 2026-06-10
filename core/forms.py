@@ -638,3 +638,22 @@ class RelatorioProducaoForm(forms.Form):
         required=False,
         empty_label="Todas",
     )
+
+
+class RelatorioTempoRegistroForm(forms.Form):
+    servidor = forms.ModelChoiceField(
+        label="Criado por",
+        queryset=Servidor.objects.all().order_by("nome"),
+        required=False,
+        empty_label="Todos",
+    )
+    data_inicio = forms.DateField(
+        label="Data inicial (registro SIPRAC)",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    data_fim = forms.DateField(
+        label="Data final (registro SIPRAC)",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
