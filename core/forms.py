@@ -134,6 +134,36 @@ class OSForm(forms.Form):
         return numero
 
 
+class OSVincularProcessoForm(forms.Form):
+    numero_processo = forms.CharField(
+        label="Número do processo SEI",
+        max_length=255,
+    )
+    data_criacao_sei = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de criação no SEI",
+        required=True,
+    )
+    data_entrada_divisao = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de entrada na Divisão",
+        required=True,
+    )
+
+    def clean_numero_processo(self):
+        numero = self.cleaned_data.get("numero_processo", "").strip()
+        if numero:
+            valido = any(re.match(padrao, numero) for padrao in PADROES_SEI)
+            if not valido:
+                raise ValidationError(
+                    "Número de processo inválido. "
+                    "Formatos aceitos: 20.0.000011172-5 (16 dígitos), "
+                    "22.15.000005831-1 (17 dígitos) ou "
+                    "002.078002.16.8.00000 (21 dígitos).",
+                )
+        return numero
+
+
 class EncaminhamentoForm(forms.Form):
     tipo_destino = forms.ChoiceField(
         label="Tipo de destino",

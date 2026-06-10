@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Incluir processo — {{ os.numero_os }} — SIPRAC{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1 text-dark">Incluir processo relacionado</h1>
+<p class="text-muted mb-4">OS: {{ os.numero_os }}</p>
+
+<form method="post" id="form-vincular-processo" novalidate>
+  {% csrf_token %}
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      {{ form.numero_processo|as_crispy_field }}
+      <div id="feedback-numero-sei" class="form-text"></div>
+    </div>
+    <div class="col-md-3">
+      {{ form.data_criacao_sei|as_crispy_field }}
+    </div>
+    <div class="col-md-3">
+      {{ form.data_entrada_divisao|as_crispy_field }}
+    </div>
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger mt-3">
+    {{ form.non_field_errors }}
+  </div>
+  {% endif %}
+
+  <div class="d-flex gap-2 mt-4">
+    <button type="submit" class="btn btn-primary siprac-btn-primary" id="btn-salvar">Salvar</button>
+    <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const padroesSei = [
+    /^\d{2}\.\d\.\d{9}-\d$/,
+    /^\d{2}\.\d{2}\.\d{9}-\d$/,
+    /^\d{3}\.\d{6}\.\d{2}\.\d\.\d{5}$/,
+  ];
+  const inputNumero = document.getElementById('id_numero_processo');
+  const feedback = document.getElementById('feedback-numero-sei');
+  const btnSalvar = document.getElementById('btn-salvar');
+
+  function validarNumeroSei(valor) {
+    const numero = (valor || '').trim();
+    if (!numero) {
+      return { valido: false, mensagem: '' };
+    }
+    const valido = padroesSei.some(function (padrao) {
+      return padrao.test(numero);
+    });
+    if (valido) {
+      return { valido: true, mensagem: 'Formato válido.' };
+    }
+    return {
+      valido: false,
+      mensagem: 'Formato inválido. Use 20.0.000011172-5, 22.15.000005831-1 ou 002.078002.16.8.00000.',
+    };
+  }
+
+  function atualizarFeedback() {
+    if (!inputNumero || !feedback) {
+      return;
+    }
+    const resultado = validarNumeroSei(inputNumero.value);
+    feedback.textContent = resultado.mensagem;
+    feedback.className = 'form-text';
+    inputNumero.classList.remove('is-valid', 'is-invalid');
+
+    if (!inputNumero.value.trim()) {
+      feedback.textContent = '';
+      return;
+    }
+
+    if (resultado.valido) {
+      feedback.classList.add('text-success');
+      inputNumero.classList.add('is-valid');
+    } else {
+      feedback.classList.add('text-danger');
+      inputNumero.classList.add('is-invalid');
+    }
+  }
+
+  if (inputNumero) {
+    inputNumero.addEventListener('input', atualizarFeedback);
+    inputNumero.addEventListener('blur', atualizarFeedback);
+    atualizarFeedback();
+  }
+
+  const form = document.getElementById('form-vincular-processo');
+  if (form) {
+    form.addEventListener('submit', function (event) {
+      const resultado = validarNumeroSei(inputNumero ? inputNumero.value : '');
+      if (!resultado.valido) {
+        event.preventDefault();
+        atualizarFeedback();
+        if (inputNumero) {
+          inputNumero.focus();
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

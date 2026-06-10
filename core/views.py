@@ -25,6 +25,7 @@ from core.forms import (
     ISICForm,
     OSEncerramentoForm,
     OSForm,
+    OSVincularProcessoForm,
     ProducaoForm,
     RelatorioProducaoForm,
     SiatUploadForm,
@@ -1454,8 +1455,10 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context = super().get_context_data(**kwargs)
         os_obj = self.object
 
-        context["processos"] = OsProcesso.objects.filter(os=os_obj).select_related(
-            "processo_sei",
+        context["processos"] = (
+            OsProcesso.objects.filter(os=os_obj)
+            .select_related("processo_sei")
+            .order_by("pk")
         )
         context["processo_principal"] = (
             OsProcesso.objects.filter(os=os_obj, tipo_vinculo="PRINCIPAL")
@@ -1511,6 +1514,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
             .order_by("-data_hora", "-id")
             .first()
         )
+        context["os_encerrada"] = _os_esta_encerrada(os_obj)
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
         context["producoes_pendentes"] = _producoes_pendentes_os(os_obj)
         context["comentarios"] = (
@@ -1651,6 +1655,42 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
         return redirect(reverse("producao_detail", kwargs={"pk": producao.pk}))
 
 
+def _os_esta_encerrada(os_obj):
+    ultimo_log = (
+        MacroetapaLog.objects.filter(os=os_obj)
+        .order_by("-data_hora", "-id")
+        .first()
+    )
+    return ultimo_log is not None and ultimo_log.macroetapa == "ENCERRADO"
+
+
+def _verificar_encerramento_automatico_os(os_obj, servidor):
+    processos_abertos = OsProcesso.objects.filter(
+        os=os_obj,
+        data_encerramento__isnull=True,
+    )
+    if processos_abertos.exists():
+        return False
+
+    ultimo_log = (
+        MacroetapaLog.objects.filter(os=os_obj)
+        .order_by("-data_hora", "-id")
+        .first()
+    )
+    if ultimo_log and ultimo_log.macroetapa != "ENCERRADO":
+        MacroetapaLog.objects.create(
+            os=os_obj,
+            macroetapa="ENCERRADO",
+            servidor=servidor,
+            automatico=True,
+            observacao=(
+                "Encerrado automaticamente: todos os processos encerrados na Divisão."
+            ),
+        )
+        return True
+    return False
+
+
 class OSEncerramentoView(RequerLoginMixin, FormView):
     template_name = "os_encerramento.html"
     form_class = OSEncerramentoForm
@@ -1707,8 +1747,81 @@ class OSEncerramentoView(RequerLoginMixin, FormView):
                 motivo_encerramento=motivo,
                 encerrado_por=servidor,
             )
+            _verificar_encerramento_automatico_os(self.os_obj, servidor)
 
         messages.success(self.request, "OS encerrada com sucesso.")
+        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class OSVincularProcessoView(RequerLoginMixin, FormView):
+    template_name = "os_vincular_processo.html"
+    form_class = OSVincularProcessoForm
+
+    def dispatch(self, request, *args, **kwargs):
+        self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        if _obter_servidor(request.user) is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if _os_esta_encerrada(self.os_obj):
+            messages.error(request, "Não é possível incluir processos em OS encerrada.")
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["os"] = self.os_obj
+        return context
+
+    def form_valid(self, form):
+        servidor = _obter_servidor(self.request.user)
+        numero = form.cleaned_data["numero_processo"]
+        data_criacao_sei = form.cleaned_data["data_criacao_sei"]
+        data_entrada_divisao = form.cleaned_data["data_entrada_divisao"]
+
+        processo_sei, created = ProcessoSei.objects.get_or_create(
+            numero_processo=numero,
+            defaults={"data_abertura_sei": data_criacao_sei},
+        )
+        if not created:
+            if (
+                processo_sei.data_abertura_sei
+                and processo_sei.data_abertura_sei != data_criacao_sei
+            ):
+                messages.warning(
+                    self.request,
+                    "O processo já existe no sistema com data de criação no SEI "
+                    f"diferente ({processo_sei.data_abertura_sei:%d/%m/%Y}). "
+                    "O vínculo foi criado com os dados cadastrados anteriormente.",
+                )
+            elif not processo_sei.data_abertura_sei:
+                processo_sei.data_abertura_sei = data_criacao_sei
+                processo_sei.save(update_fields=["data_abertura_sei"])
+
+        if OsProcesso.objects.filter(os=self.os_obj, processo_sei=processo_sei).exists():
+            messages.error(
+                self.request,
+                "Este processo já está vinculado a esta OS.",
+            )
+            return self.form_invalid(form)
+
+        with transaction.atomic():
+            OsProcesso.objects.create(
+                os=self.os_obj,
+                processo_sei=processo_sei,
+                tipo_vinculo="RELACIONADO",
+                data_entrada_divisao=data_entrada_divisao,
+            )
+            MacroetapaLog.objects.create(
+                os=self.os_obj,
+                macroetapa="INCLUSAO_PROCESSO_RELACIONADO",
+                servidor=servidor,
+                observacao=f"Processo {numero} incluído como relacionado.",
+            )
+
+        messages.success(
+            self.request,
+            f"Processo {numero} vinculado à OS com sucesso.",
+        )
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
 

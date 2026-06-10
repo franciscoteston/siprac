@@ -308,15 +308,14 @@ class TipoProducaoUnidade(models.Model):
 
 
 class ProcessoSei(models.Model):
-    """Processo registrado no SEI, referenciado por uma ou mais OS."""
+    """Processo registrado no SEI — apenas dados imutáveis de identificação."""
 
-    numero_processo = models.CharField(max_length=255)
+    numero_processo = models.CharField(max_length=255, unique=True)
     data_abertura_sei = models.DateField(
         null=True,
         blank=True,
         verbose_name="Data de criação no SEI",
     )
-    situacao = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         db_table = "PROCESSO_SEI"

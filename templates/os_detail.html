@@ -96,7 +96,8 @@
               <tr>
                 <th>Processo</th>
                 <th>Vínculo</th>
-                <th>Entrada</th>
+                <th>Criação no SEI</th>
+                <th>Entrada na Divisão</th>
                 <th>Encerramento</th>
               </tr>
             </thead>
@@ -108,18 +109,36 @@
                     {{ vinculo.processo_sei.numero_processo }}
                   </a>
                 </td>
-                <td>{{ vinculo.tipo_vinculo }}</td>
+                <td>
+                  {% if vinculo.tipo_vinculo == 'PRINCIPAL' %}
+                  <span class="badge text-bg-success">PRINCIPAL</span>
+                  {% else %}
+                  <span class="badge text-bg-primary">RELACIONADO</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if vinculo.processo_sei.data_abertura_sei %}
+                    {{ vinculo.processo_sei.data_abertura_sei|date:"d/m/Y" }}
+                  {% else %}—{% endif %}
+                </td>
                 <td>{% if vinculo.data_entrada_divisao %}{{ vinculo.data_entrada_divisao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                 <td>{% if vinculo.data_encerramento %}{{ vinculo.data_encerramento|date:"d/m/Y" }}{% else %}—{% endif %}</td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="4" class="text-muted text-center py-3">Nenhum processo vinculado.</td>
+                <td colspan="5" class="text-muted text-center py-3">Nenhum processo vinculado.</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        {% if tem_servidor and not os_encerrada %}
+        <div class="card-footer bg-white">
+          <a href="{% url 'os_vincular_processo' os.pk %}" class="btn btn-outline-primary btn-sm">
+            Incluir processo relacionado
+          </a>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

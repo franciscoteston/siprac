@@ -344,8 +344,7 @@ class OSAdmin(admin.ModelAdmin):
 class ProcessoSeiAdmin(admin.ModelAdmin):
     """Processos SEI."""
 
-    list_display = ("numero_processo", "data_abertura_sei", "situacao")
-    list_filter = ("situacao",)
+    list_display = ("numero_processo", "data_abertura_sei")
     search_fields = ("numero_processo",)
     ordering = ("numero_processo",)
     date_hierarchy = "data_abertura_sei"

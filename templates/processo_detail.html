@@ -8,8 +8,7 @@
   <div>
     <h1 class="h3 mb-2 text-dark">{{ processo.numero_processo }}</h1>
     <div class="d-flex flex-wrap gap-3 text-muted small">
-      <span>Situação: {% if processo.situacao %}{{ processo.situacao }}{% else %}—{% endif %}</span>
-      <span>Abertura SEI: {% if processo.data_abertura_sei %}{{ processo.data_abertura_sei|date:"d/m/Y" }}{% else %}—{% endif %}</span>
+      <span>Criação no SEI: {% if processo.data_abertura_sei %}{{ processo.data_abertura_sei|date:"d/m/Y" }}{% else %}—{% endif %}</span>
     </div>
   </div>
   <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">Voltar</a>
