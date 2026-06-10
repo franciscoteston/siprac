@@ -208,7 +208,6 @@
       <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Grupo</th>
             <th>Identificação</th>
             <th>Endereço</th>
             <th>Área</th>
@@ -217,14 +216,7 @@
         </thead>
         <tbody>
           {% for item in imoveis %}
-          <tr{% if item.grupo_ref %} style="background-color: {{ item.grupo_ref|grupo_cor_fundo }};"{% endif %}>
-            <td>
-              {% if item.grupo_ref %}
-                <span class="badge {{ item.grupo_ref|grupo_badge_class }}">{{ item.grupo_ref }}</span>
-              {% else %}
-                <span class="badge text-bg-secondary">Individual</span>
-              {% endif %}
-            </td>
+          <tr>
             <td>
               {% if item.os_imovel.imovel.inscricao_cadastral %}
                 {{ item.os_imovel.imovel.inscricao_cadastral }}
@@ -252,7 +244,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="text-muted text-center py-3">
+            <td colspan="4" class="text-muted text-center py-3">
               Nenhum imóvel vinculado.
               {% if tem_servidor %}
               <a href="{% url 'producao_vincular_imovel' producao.pk %}">Gerenciar imóveis</a>

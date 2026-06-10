@@ -2066,31 +2066,6 @@ def _formatar_endereco_imovel(imovel):
     return ", ".join(partes)
 
 
-def _proximo_grupo_ref(producao):
-    grupos = (
-        ProducaoImovel.objects.filter(
-            producao=producao,
-            grupo_ref__isnull=False,
-        )
-        .exclude(grupo_ref="")
-        .values_list("grupo_ref", flat=True)
-        .distinct()
-    )
-    numeros = []
-    for grupo in grupos:
-        try:
-            numeros.append(int(str(grupo).replace("G", "")))
-        except ValueError:
-            pass
-    proximo = max(numeros) + 1 if numeros else 1
-    return f"G{proximo:02d}"
-
-
-def _pode_agrupar_producao(request):
-    perfil = getattr(request, "perfil_acesso", None)
-    return perfil is not None and perfil.pode_homologar
-
-
 def _formatar_identificacao_vinculo(vinculo):
     return _identificacao_os_imovel(_obter_os_imovel_vinculo(vinculo))
 
@@ -2124,7 +2099,6 @@ def _serializar_producao_imovel(item):
         "identificacao": _formatar_identificacao_vinculo(item),
         "endereco": _formatar_endereco_vinculo(item),
         "area_territorial": _formatar_area_vinculo(item),
-        "grupo_ref": item.grupo_ref or "",
     }
 
 
@@ -2144,7 +2118,7 @@ def _contexto_imoveis_producao(producao):
         _serializar_producao_imovel(item)
         for item in ProducaoImovel.objects.filter(producao=producao)
         .select_related("os_imovel", "os_imovel__imovel")
-        .order_by("grupo_ref", "pk")
+        .order_by("pk")
     ]
     return imoveis_disponiveis, imoveis_producao
 
@@ -2198,7 +2172,7 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
         imoveis = (
             ProducaoImovel.objects.filter(producao=producao)
             .select_related("os_imovel", "os_imovel__imovel")
-            .order_by("grupo_ref", "pk")
+            .order_by("pk")
         )
 
         context["os"] = producao.os
@@ -2817,9 +2791,7 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
                 "os": self.producao_obj.os,
                 "imoveis_disponiveis": imoveis_disponiveis,
                 "imoveis_producao": imoveis_producao,
-                "pode_agrupar": _pode_agrupar_producao(request),
                 "producao_homologada": self.producao_obj.status == Producao.STATUS_HOMOLOGADO,
-                "proximo_grupo_ref": _proximo_grupo_ref(self.producao_obj),
             },
         )
 
@@ -2829,8 +2801,6 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
             "sucesso": sucesso,
             "imoveis_disponiveis": imoveis_disponiveis,
             "imoveis_producao": imoveis_producao,
-            "proximo_grupo_ref": _proximo_grupo_ref(self.producao_obj),
-            "pode_agrupar": _pode_agrupar_producao(request),
         }
         payload.update(dados)
         return JsonResponse(payload, status=status)
@@ -2858,7 +2828,6 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
 
     def _processar_acao(self, request, acao, servidor, justificativa):
         tipo = acao.get("tipo")
-        pode_agrupar = _pode_agrupar_producao(request)
 
         if tipo == "vincular":
             os_imovel_id = acao.get("os_imovel_id")
@@ -2899,125 +2868,6 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
                 operacao="EDICAO_POS_HOMOLOGACAO",
                 campo_alterado="vinculo",
                 valor_novo=str(os_imovel.pk),
-            )
-            return {
-                "sucesso": True,
-                "tipo": tipo,
-                "item": _serializar_producao_imovel(producao_imovel),
-            }
-
-        if tipo in {"agrupar", "novo_grupo", "remover_grupo"}:
-            if not pode_agrupar:
-                return {
-                    "sucesso": False,
-                    "erro": "Você não tem permissão para gerenciar agrupamentos.",
-                    "status": 403,
-                }
-
-        if tipo == "agrupar":
-            producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
-            if producao_imovel is None:
-                return {"sucesso": False, "erro": "Imóvel da produção não encontrado."}
-            grupo_ref = (acao.get("grupo_ref") or "").strip()
-            if not grupo_ref:
-                return {"sucesso": False, "erro": "grupo_ref é obrigatório."}
-
-            valor_anterior = producao_imovel.grupo_ref
-            producao_imovel.grupo_ref = grupo_ref
-            producao_imovel.save(update_fields=["grupo_ref"])
-            self._auditar_se_homologada(
-                servidor,
-                producao_imovel,
-                justificativa,
-                campo_alterado="grupo_ref",
-                valor_anterior=valor_anterior,
-                valor_novo=grupo_ref,
-            )
-            return {
-                "sucesso": True,
-                "tipo": tipo,
-                "item": _serializar_producao_imovel(producao_imovel),
-            }
-
-        if tipo == "novo_grupo":
-            ids = acao.get("ids") or []
-            if len(ids) < 2:
-                return {
-                    "sucesso": False,
-                    "erro": "Selecione ao menos dois imóveis para agrupar.",
-                }
-
-            ids_int = []
-            for raw_id in ids:
-                try:
-                    ids_int.append(int(raw_id))
-                except (TypeError, ValueError):
-                    return {"sucesso": False, "erro": f"ID inválido: {raw_id}"}
-
-            registros = list(
-                ProducaoImovel.objects.filter(
-                    producao=self.producao_obj,
-                    pk__in=ids_int,
-                ),
-            )
-            if len(registros) != len(set(ids_int)):
-                return {
-                    "sucesso": False,
-                    "erro": "Um ou mais imóveis não pertencem a esta produção.",
-                }
-
-            grupo_ref = _proximo_grupo_ref(self.producao_obj)
-            for producao_imovel in registros:
-                valor_anterior = producao_imovel.grupo_ref
-                self._auditar_se_homologada(
-                    servidor,
-                    producao_imovel,
-                    justificativa,
-                    campo_alterado="grupo_ref",
-                    valor_anterior=valor_anterior,
-                    valor_novo=grupo_ref,
-                )
-
-            atualizados = ProducaoImovel.objects.filter(
-                producao=self.producao_obj,
-                pk__in=ids_int,
-            ).update(grupo_ref=grupo_ref)
-            logger.info(
-                "novo_grupo producao=%s grupo_ref=%s ids=%s atualizados=%s",
-                self.producao_obj.pk,
-                grupo_ref,
-                ids_int,
-                atualizados,
-            )
-            itens = [
-                _serializar_producao_imovel(item)
-                for item in ProducaoImovel.objects.filter(
-                    producao=self.producao_obj,
-                    pk__in=ids_int,
-                ).order_by("pk")
-            ]
-            return {
-                "sucesso": True,
-                "tipo": tipo,
-                "grupo_ref": grupo_ref,
-                "ids_atualizados": ids_int,
-                "itens": itens,
-            }
-
-        if tipo == "remover_grupo":
-            producao_imovel = self._obter_producao_imovel(acao.get("producao_imovel_id"))
-            if producao_imovel is None:
-                return {"sucesso": False, "erro": "Imóvel da produção não encontrado."}
-            valor_anterior = producao_imovel.grupo_ref
-            producao_imovel.grupo_ref = None
-            producao_imovel.save(update_fields=["grupo_ref"])
-            self._auditar_se_homologada(
-                servidor,
-                producao_imovel,
-                justificativa,
-                campo_alterado="grupo_ref",
-                valor_anterior=valor_anterior,
-                valor_novo=None,
             )
             return {
                 "sucesso": True,
