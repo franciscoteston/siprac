@@ -7,7 +7,8 @@
         <th>Processo SEI principal</th>
         <th>Natureza</th>
         <th>Etapa atual</th>
-        <th>Prazo</th>
+        <th>Prazo OS</th>
+        <th>Prazo interno</th>
         <th>Prioridade</th>
         <th>Tipo produção</th>
         <th>Status produção</th>
@@ -32,7 +33,8 @@
             {{ item.status|status_producao_display }}
           {% endif %}
         </td>
-        <td class="small">{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td class="small">{% if item.prazo_os %}{{ item.prazo_os|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td class="small">{% if item.prazo_interno %}{{ item.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td>
           {% if item.prioridade == 'URGENTE' %}
           <span class="badge badge-prioridade-urgente">{{ item.prioridade|prioridade_display }}</span>
@@ -49,7 +51,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="8" class="text-muted text-center py-4">Nenhuma produção na sua fila.</td>
+        <td colspan="9" class="text-muted text-center py-4">Nenhuma produção na sua fila.</td>
       </tr>
       {% endfor %}
     </tbody>

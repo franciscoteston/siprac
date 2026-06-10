@@ -7,6 +7,7 @@ from core.models import (
     Finalidade,
     Imovel,
     Natureza,
+    OS,
     Servidor,
     TipoDemanda,
     TipoProducao,
@@ -49,6 +50,16 @@ class OSForm(forms.Form):
         label="Observação",
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    prazo_tipo = forms.ChoiceField(
+        label="Tipo de prazo",
+        choices=OS.PRAZO_TIPO_CHOICES,
+        initial="SEM_PRIORIDADE",
+    )
+    prazo_data = forms.DateField(
+        label="Data do prazo",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
     )
 
     def __init__(self, *args, **kwargs):

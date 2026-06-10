@@ -213,6 +213,7 @@
         <th>Status</th>
         <th>Responsável</th>
         <th>Prazo OS</th>
+        <th>Prazo interno</th>
       </tr>
     </thead>
     <tbody>
@@ -222,10 +223,11 @@
         <td>{{ item.tipo }}</td>
         <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
         <td class="small">{{ item.servidor_responsavel }}</td>
-        <td class="small">{% if item.prazo %}{{ item.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td class="small">{% if item.prazo_os %}{{ item.prazo_os|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td class="small">{% if item.prazo_interno %}{{ item.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="5" class="text-muted text-center py-4">Nenhuma produção ativa na unidade.</td></tr>
+      <tr><td colspan="6" class="text-muted text-center py-4">Nenhuma produção ativa na unidade.</td></tr>
       {% endfor %}
     </tbody>
   </table>

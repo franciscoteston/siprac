@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from collections import defaultdict
 
 from django.contrib import messages
@@ -43,6 +44,7 @@ from core.os_service import (
     os_da_unidade_atual,
     _queryset_os_nao_encerradas,
 )
+from core import siat_index
 from core.siat_config import SIAT_ARQUIVO_PATH
 from core.siat_service import (
     atualizar_inscricao_do_arquivo,
@@ -58,6 +60,7 @@ from core.siat_service import (
     obter_status_arquivo_siat,
 )
 from core.models import (
+    Comentario,
     Encaminhamento,
     Finalidade,
     Imovel,
@@ -452,7 +455,8 @@ def _serializar_fila_producoes(queryset):
                     if producao.servidor_responsavel
                     else "—"
                 ),
-                "prazo": prazos.get(producao.os_id),
+                "prazo_os": producao.os.prazo_data,
+                "prazo_interno": producao.prazo_interno,
                 "prioridade": producao.os.prioridade,
             },
         )
@@ -495,7 +499,6 @@ def _serializar_minha_fila_padronizada(queryset):
         ),
     )
     os_ids = [producao.os_id for producao in producoes]
-    prazos = _mapa_prazos_os(os_ids)
     processos = _mapa_processos_principais_os(os_ids)
     etapas = _mapa_etapas_internas_os(os_ids)
     fila = []
@@ -511,7 +514,8 @@ def _serializar_minha_fila_padronizada(queryset):
                 "etapa_interna": etapas.get(producao.os_id),
                 "tipo": producao.tipo_producao.prefixo,
                 "status": producao.status,
-                "prazo": prazos.get(producao.os_id),
+                "prazo_os": producao.os.prazo_data,
+                "prazo_interno": producao.prazo_interno,
                 "prioridade": producao.os.prioridade,
             },
         )
@@ -961,12 +965,19 @@ def _queryset_os_anotado():
         tipo_vinculo="PRINCIPAL",
     )
 
+    producao_ativa = Producao.objects.filter(
+        os_id=OuterRef("pk"),
+    ).exclude(
+        status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
+    ).order_by("-data_criacao")
+
     return OS.objects.select_related("natureza").annotate(
         macroetapa_atual=Subquery(ultima_macroetapa.values("macroetapa")[:1]),
         processo_sei_numero=Subquery(
             processo_principal.values("processo_sei__numero_processo")[:1],
         ),
         prazo=Subquery(processo_principal.values("data_entrada_divisao")[:1]),
+        prazo_interno=Subquery(producao_ativa.values("prazo_interno")[:1]),
     )
 
 
@@ -1283,6 +1294,8 @@ class OSCreateView(RequerLoginMixin, FormView):
                 finalidade=form.cleaned_data["finalidade"],
                 prioridade=form.cleaned_data["prioridade"],
                 observacao=form.cleaned_data.get("observacao") or None,
+                prazo_tipo=form.cleaned_data.get("prazo_tipo") or "SEM_PRIORIDADE",
+                prazo_data=form.cleaned_data.get("prazo_data"),
                 criado_por=servidor,
             )
 
@@ -1480,6 +1493,11 @@ class OSDetailView(RequerLoginMixin, DetailView):
         )
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
         context["producoes_pendentes"] = _producoes_pendentes_os(os_obj)
+        context["comentarios"] = (
+            Comentario.objects.filter(os=os_obj)
+            .select_related("servidor", "producao", "producao__tipo_producao")
+            .order_by("-data_hora")
+        )
         return context
 
 
@@ -1936,6 +1954,11 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
             return self.form_invalid(form)
 
         total = resultado.get("total_registros", 0)
+        threading.Thread(
+            target=siat_index.carregar_indice,
+            args=(SIAT_ARQUIVO_PATH,),
+            daemon=True,
+        ).start()
         messages.success(
             self.request,
             f"Arquivo disponibilizado com sucesso. "
@@ -2190,6 +2213,16 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
             .order_by("data_hora")
         )
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
+        context["transicoes"] = _transicoes_status_disponiveis(
+            producao,
+            self.request,
+        )
+        context["servidores"] = Servidor.objects.order_by("nome")
+        context["comentarios"] = (
+            Comentario.objects.filter(producao=producao)
+            .select_related("servidor")
+            .order_by("-data_hora")
+        )
         return context
 
 
@@ -2272,6 +2305,88 @@ def _transicao_status_permitida(producao, request, status_novo):
         if transicao["destino"] == status_novo:
             return transicao
     return None
+
+
+def _verificar_conflito_producao(os_imovel, producao):
+    return ProducaoImovel.objects.filter(
+        os_imovel__imovel=os_imovel.imovel,
+        producao__tipo_producao=producao.tipo_producao,
+    ).exclude(
+        producao__status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
+    ).exclude(
+        producao=producao,
+    ).exists()
+
+
+def _request_wants_json(request):
+    accept = request.headers.get("Accept", "")
+    if "application/json" in accept:
+        return True
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _serializar_status_log(log):
+    return {
+        "data_hora": timezone.localtime(log.data_hora).strftime("%d/%m/%Y %H:%M"),
+        "status_anterior": log.status_anterior,
+        "status_anterior_label": (
+            dict(Producao.STATUS_CHOICES).get(log.status_anterior, log.status_anterior)
+            if log.status_anterior
+            else None
+        ),
+        "status_novo": log.status_novo,
+        "status_novo_label": dict(Producao.STATUS_CHOICES).get(
+            log.status_novo,
+            log.status_novo,
+        ),
+        "servidor_origem": log.servidor_origem.nome if log.servidor_origem else None,
+        "servidor_destino": log.servidor_destino.nome if log.servidor_destino else None,
+        "justificativa": log.justificativa or "",
+    }
+
+
+def _serializar_comentario(comentario):
+    badge = "OS"
+    if comentario.origem == "PRODUCAO" and comentario.producao:
+        badge = comentario.producao.tipo_producao.prefixo
+    return {
+        "id": comentario.pk,
+        "texto": comentario.texto,
+        "servidor": comentario.servidor.nome,
+        "data_hora": timezone.localtime(comentario.data_hora).strftime(
+            "%d/%m/%Y %H:%M",
+        ),
+        "origem": comentario.origem,
+        "badge": badge,
+    }
+
+
+def _buscar_registros_siat(busca):
+    """Busca registros SIAT por bloco, inscrição ou logradouro."""
+    if not SIAT_ARQUIVO_PATH.exists():
+        return None, []
+
+    if siat_index.indice_pronto():
+        if busca.isdigit() and len(busca) == 12:
+            return "bloco", siat_index.buscar_por_bloco(busca)
+        if busca.isdigit():
+            dados = siat_index.buscar_por_inscricao(int(busca))
+            return "inscricao", [dados] if dados else []
+        return "logradouro", siat_index.buscar_por_logradouro(busca)
+
+    if busca.isdigit() and len(busca) == 12:
+        registros = buscar_bloco_no_arquivo(busca, SIAT_ARQUIVO_PATH, limite=20)
+        return "bloco", registros or []
+
+    if busca.isdigit():
+        dados = buscar_inscricao_no_arquivo(int(busca), SIAT_ARQUIVO_PATH)
+        return "inscricao", [dados] if dados else []
+
+    return "logradouro", buscar_por_logradouro_no_arquivo(
+        busca,
+        SIAT_ARQUIVO_PATH,
+        limite=20,
+    )
 
 
 def _pode_redistribuir_producao(producao, request):
@@ -2358,16 +2473,123 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
     def post(self, request, *args, **kwargs):
         servidor = _obter_servidor(request.user)
         if servidor is None:
+            if _request_wants_json(request):
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
         acao = (request.POST.get("acao") or "").strip()
         justificativa = (request.POST.get("justificativa") or "").strip()
 
+        if acao == "atualizar_prazos":
+            return self._processar_atualizar_prazos(request, servidor)
+
         if acao == "redistribuir":
             return self._processar_redistribuicao(request, servidor, justificativa)
 
         return self._processar_transicao_status(request, servidor, justificativa)
+
+    def _resposta_status_json(self, request, *, sucesso=True, erro=None, status=200):
+        if erro:
+            return JsonResponse({"sucesso": False, "erro": erro}, status=status)
+        logs = (
+            ProducaoStatusLog.objects.filter(producao=self.producao_obj)
+            .select_related("servidor_origem", "servidor_destino")
+            .order_by("data_hora")
+        )
+        return JsonResponse(
+            {
+                "sucesso": sucesso,
+                "status": self.producao_obj.status,
+                "status_label": dict(Producao.STATUS_CHOICES).get(
+                    self.producao_obj.status,
+                    self.producao_obj.status,
+                ),
+                "status_logs": [_serializar_status_log(log) for log in logs],
+                "transicoes": _transicoes_status_disponiveis(self.producao_obj, request),
+            },
+            status=status,
+        )
+
+    def _processar_atualizar_prazos(self, request, servidor):
+        prazo_interno_raw = (request.POST.get("prazo_interno") or "").strip()
+        mes_cronograma_raw = (request.POST.get("mes_cronograma") or "").strip()
+        campos_atualizar = []
+
+        if prazo_interno_raw:
+            try:
+                self.producao_obj.prazo_interno = datetime.date.fromisoformat(
+                    prazo_interno_raw,
+                )
+            except ValueError:
+                erro = "Data de prazo interno inválida."
+                if _request_wants_json(request):
+                    return self._resposta_status_json(request, sucesso=False, erro=erro, status=400)
+                messages.error(request, erro)
+                return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+            campos_atualizar.append("prazo_interno")
+        else:
+            self.producao_obj.prazo_interno = None
+            campos_atualizar.append("prazo_interno")
+
+        if mes_cronograma_raw:
+            try:
+                if len(mes_cronograma_raw) == 7 and mes_cronograma_raw[4] == "-":
+                    ano, mes = mes_cronograma_raw.split("-")
+                    self.producao_obj.mes_cronograma = datetime.date(
+                        int(ano),
+                        int(mes),
+                        1,
+                    )
+                else:
+                    self.producao_obj.mes_cronograma = datetime.date.fromisoformat(
+                        mes_cronograma_raw,
+                    )
+            except ValueError:
+                erro = "Mês do cronograma inválido."
+                if _request_wants_json(request):
+                    return self._resposta_status_json(request, sucesso=False, erro=erro, status=400)
+                messages.error(request, erro)
+                return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+            campos_atualizar.append("mes_cronograma")
+        else:
+            self.producao_obj.mes_cronograma = None
+            campos_atualizar.append("mes_cronograma")
+
+        self.producao_obj.save(update_fields=campos_atualizar)
+
+        if _request_wants_json(request):
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "prazo_interno": (
+                        self.producao_obj.prazo_interno.isoformat()
+                        if self.producao_obj.prazo_interno
+                        else None
+                    ),
+                    "prazo_interno_display": (
+                        self.producao_obj.prazo_interno.strftime("%d/%m/%Y")
+                        if self.producao_obj.prazo_interno
+                        else "—"
+                    ),
+                    "mes_cronograma": (
+                        self.producao_obj.mes_cronograma.isoformat()
+                        if self.producao_obj.mes_cronograma
+                        else None
+                    ),
+                    "mes_cronograma_display": (
+                        self.producao_obj.mes_cronograma.strftime("%m/%Y")
+                        if self.producao_obj.mes_cronograma
+                        else "—"
+                    ),
+                },
+            )
+
+        messages.success(request, "Prazos da produção atualizados.")
+        return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
     def _processar_redistribuicao(self, request, servidor, justificativa):
         if not _pode_redistribuir_producao(self.producao_obj, request):
@@ -2413,12 +2635,26 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         transicao = _transicao_status_permitida(self.producao_obj, request, status_novo)
 
         if transicao is None:
+            if _request_wants_json(request):
+                return self._resposta_status_json(
+                    request,
+                    sucesso=False,
+                    erro="Transição de status não permitida.",
+                    status=400,
+                )
             messages.error(request, "Transição de status não permitida.")
             return redirect(
                 reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
             )
 
         if transicao["justificativa_obrigatoria"] and not justificativa:
+            if _request_wants_json(request):
+                return self._resposta_status_json(
+                    request,
+                    sucesso=False,
+                    erro="Justificativa obrigatória para esta transição.",
+                    status=400,
+                )
             messages.error(request, "Justificativa obrigatória para esta transição.")
             return redirect(
                 reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
@@ -2431,6 +2667,13 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         if status_novo == Producao.STATUS_DISTRIBUIDO:
             novo_responsavel, erro = _obter_servidor_responsavel_post(request)
             if erro:
+                if _request_wants_json(request):
+                    return self._resposta_status_json(
+                        request,
+                        sucesso=False,
+                        erro=erro,
+                        status=400,
+                    )
                 messages.error(request, erro)
                 return redirect(
                     reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
@@ -2442,6 +2685,13 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         if status_novo == Producao.STATUS_HOMOLOGADO:
             autor_trabalho, erro = _obter_autor_trabalho_post(request)
             if erro:
+                if _request_wants_json(request):
+                    return self._resposta_status_json(
+                        request,
+                        sucesso=False,
+                        erro=erro,
+                        status=400,
+                    )
                 messages.error(request, erro)
                 return redirect(
                     reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
@@ -2479,12 +2729,63 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             justificativa=justificativa or None,
         )
 
+        derivar_macroetapa_os(self.producao_obj.os, servidor=servidor)
+        if _request_wants_json(request):
+            return self._resposta_status_json(request)
+
         messages.success(
             request,
             f"Status alterado para {dict(Producao.STATUS_CHOICES).get(status_novo, status_novo)}.",
         )
-        derivar_macroetapa_os(self.producao_obj.os, servidor=servidor)
         return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+
+
+class ComentarioCreateView(RequerLoginJSONMixin, View):
+    def post(self, request, os_pk=None, prod_pk=None):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        texto = (request.POST.get("texto") or "").strip()
+        if not texto:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Texto do comentário é obrigatório."},
+                status=400,
+            )
+
+        if prod_pk is not None:
+            producao = get_object_or_404(Producao.objects.select_related("tipo_producao"), pk=prod_pk)
+            comentario = Comentario.objects.create(
+                os=producao.os,
+                producao=producao,
+                origem="PRODUCAO",
+                texto=texto,
+                servidor=servidor,
+            )
+            comentario = Comentario.objects.select_related(
+                "servidor",
+                "producao",
+                "producao__tipo_producao",
+            ).get(pk=comentario.pk)
+        else:
+            os_obj = get_object_or_404(OS, pk=os_pk)
+            comentario = Comentario.objects.create(
+                os=os_obj,
+                origem="OS",
+                texto=texto,
+                servidor=servidor,
+            )
+            comentario = Comentario.objects.select_related("servidor").get(pk=comentario.pk)
+
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "comentario": _serializar_comentario(comentario),
+            },
+        )
 
 
 class ProducaoVincularImovelView(RequerLoginMixin, View):
@@ -2576,6 +2877,16 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
                 os_imovel=os_imovel,
             ).exists():
                 return {"sucesso": False, "erro": "Imóvel já vinculado à produção."}
+
+            if _verificar_conflito_producao(os_imovel, self.producao_obj):
+                prefixo = self.producao_obj.tipo_producao.prefixo
+                return {
+                    "sucesso": False,
+                    "erro": (
+                        f"Esta inscrição já está em outra produção ativa do tipo {prefixo}. "
+                        "Homologue ou cancele a produção anterior antes de incluir aqui."
+                    ),
+                }
 
             producao_imovel = ProducaoImovel.objects.create(
                 producao=self.producao_obj,
@@ -2868,25 +3179,17 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
         vistos = set()
 
         if SIAT_ARQUIVO_PATH.exists():
-            # num_bloco: 12 dígitos numéricos (preserva zeros à esquerda)
             if busca.isdigit() and len(busca) == 12:
-                registros = buscar_bloco_no_arquivo(busca, SIAT_ARQUIVO_PATH, limite=20)
-                if registros:
-                    for dados in registros:
-                        _adicionar_resultado_siat(resultados, vistos, dados)
+                _, registros = _buscar_registros_siat(busca)
+                for dados in registros:
+                    _adicionar_resultado_siat(resultados, vistos, dados)
                 return JsonResponse(resultados[:20], safe=False)
 
-            # inscrição cadastral: termo convertível para inteiro
-            try:
-                inscricao = int(busca)
-            except ValueError:
-                inscricao = None
-
-            if inscricao is not None:
-                dados = buscar_inscricao_no_arquivo(inscricao, SIAT_ARQUIVO_PATH)
-                if dados:
+            if busca.isdigit():
+                _, registros = _buscar_registros_siat(busca)
+                for dados in registros:
                     _adicionar_resultado_siat(resultados, vistos, dados)
-                return JsonResponse(resultados, safe=False)
+                return JsonResponse(resultados[:20], safe=False)
 
         for imovel in Imovel.objects.filter(
             tipo_identificacao="ISIC",
@@ -2900,11 +3203,8 @@ class BuscarImoveisAPIView(RequerLoginJSONMixin, View):
                 resultados.append(_montar_resultado_busca(dados, "isic"))
 
         if SIAT_ARQUIVO_PATH.exists():
-            for dados in buscar_por_logradouro_no_arquivo(
-                busca,
-                SIAT_ARQUIVO_PATH,
-                limite=20,
-            ):
+            _, registros = _buscar_registros_siat(busca)
+            for dados in registros:
                 if _adicionar_resultado_siat(resultados, vistos, dados):
                     if len(resultados) >= 20:
                         break

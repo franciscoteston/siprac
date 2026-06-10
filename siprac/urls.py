@@ -6,6 +6,7 @@ from django.urls import path
 
 from core.views import (
     BuscarImoveisAPIView,
+    ComentarioCreateView,
     DashboardView,
     EncaminhamentoCreateView,
     FinalidadesAPIView,
@@ -59,9 +60,15 @@ urlpatterns = [
         ProducaoVincularImovelView.as_view(),
         name='producao_vincular_imovel',
     ),
+    path(
+        'producoes/<int:prod_pk>/comentarios/',
+        ComentarioCreateView.as_view(),
+        name='producao_comentarios',
+    ),
     path('os/<int:pk>/encerrar/', OSEncerramentoView.as_view(), name='os_encerrar'),
     path('os/<int:pk>/imoveis/vincular/', OSVincularImovelView.as_view(), name='os_vincular_imovel'),
     path('os/<int:pk>/', OSDetailView.as_view(), name='os_detalhe'),
+    path('os/<int:os_pk>/comentarios/', ComentarioCreateView.as_view(), name='os_comentarios'),
     path('os/', OSListView.as_view(), name='os_list'),
     path('imoveis/novo/', ImovelCreateView.as_view(), name='imovel_novo'),
     path('imoveis/mapa/', ImovelMapaView.as_view(), name='imovel_mapa'),

@@ -61,6 +61,10 @@
           </dd>
           <dt class="col-sm-4">Prioridade</dt>
           <dd class="col-sm-8">{{ os.prioridade|prioridade_display }}</dd>
+          <dt class="col-sm-4">Tipo de prazo</dt>
+          <dd class="col-sm-8">{{ os.prazo_tipo|prazo_tipo_display }}</dd>
+          <dt class="col-sm-4">Data do prazo</dt>
+          <dd class="col-sm-8">{% if os.prazo_data %}{{ os.prazo_data|date:"d/m/Y" }}{% else %}—{% endif %}</dd>
           <dt class="col-sm-4">Observação</dt>
           <dd class="col-sm-8">{% if os.observacao %}{{ os.observacao }}{% else %}—{% endif %}</dd>
         </dl>
@@ -298,6 +302,39 @@
   </div>
 </div>
 
+<div class="card siprac-card mb-4" id="secao-comentarios">
+  <div class="card-header bg-white fw-semibold">Comentários</div>
+  <div class="card-body">
+    <ul class="list-unstyled mb-3" id="lista-comentarios">
+      {% for comentario in comentarios %}
+      <li class="mb-3 pb-3 border-bottom" data-comentario-id="{{ comentario.pk }}">
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+          {% if comentario.origem == 'OS' %}
+          <span class="badge text-bg-primary">OS</span>
+          {% else %}
+          <span class="badge text-bg-warning text-dark">Produção {{ comentario.producao.tipo_producao.prefixo }}</span>
+          {% endif %}
+          <span class="small fw-semibold">{{ comentario.servidor.nome }}</span>
+          <span class="small text-muted">{{ comentario.data_hora|date:"d/m/Y H:i" }}</span>
+        </div>
+        <p class="mb-0 small">{{ comentario.texto|linebreaksbr }}</p>
+      </li>
+      {% empty %}
+      <li class="text-muted small" id="comentarios-vazio">Nenhum comentário registrado.</li>
+      {% endfor %}
+    </ul>
+    {% if tem_servidor %}
+    <form id="form-comentario-os" class="mt-2">
+      {% csrf_token %}
+      <div class="mb-2">
+        <textarea name="texto" id="texto-comentario-os" class="form-control form-control-sm" rows="2" placeholder="Escreva um comentário…" required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm siprac-btn-primary">Comentar</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
 <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Voltar ao dashboard</a>
 {% endblock %}
 
@@ -351,6 +388,68 @@
   if (collapseEl) {
     collapseEl.addEventListener('shown.bs.collapse', inicializarMapaOs);
   }
+})();
+
+(function () {
+  var form = document.getElementById('form-comentario-os');
+  if (!form) {
+    return;
+  }
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    var textarea = document.getElementById('texto-comentario-os');
+    var lista = document.getElementById('lista-comentarios');
+    var vazio = document.getElementById('comentarios-vazio');
+    var texto = (textarea.value || '').trim();
+    if (!texto) {
+      return;
+    }
+
+    var formData = new FormData(form);
+    formData.set('texto', texto);
+
+    fetch('{% url "os_comentarios" os.pk %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      },
+      body: formData,
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok) {
+            throw new Error(data.erro || 'Erro ao salvar comentário.');
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        if (vazio) {
+          vazio.remove();
+        }
+        var item = document.createElement('li');
+        item.className = 'mb-3 pb-3 border-bottom';
+        item.dataset.comentarioId = String(data.comentario.id);
+        var badgeClass = data.comentario.origem === 'OS' ? 'text-bg-primary' : 'text-bg-warning text-dark';
+        var badgeText = data.comentario.origem === 'OS' ? 'OS' : 'Produção ' + data.comentario.badge;
+        item.innerHTML =
+          '<div class="d-flex flex-wrap gap-2 align-items-center mb-1">' +
+          '<span class="badge ' + badgeClass + '">' + badgeText + '</span>' +
+          '<span class="small fw-semibold">' + data.comentario.servidor + '</span>' +
+          '<span class="small text-muted">' + data.comentario.data_hora + '</span>' +
+          '</div>' +
+          '<p class="mb-0 small"></p>';
+        item.querySelector('p').textContent = data.comentario.texto;
+        lista.prepend(item);
+        textarea.value = '';
+      })
+      .catch(function (error) {
+        alert(error.message);
+      });
+  });
 })();
 </script>
 {% endblock %}

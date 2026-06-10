@@ -73,7 +73,8 @@
         <th scope="col">Processo SEI</th>
         <th scope="col">Natureza</th>
         <th scope="col">Etapa</th>
-        <th scope="col">Prazo</th>
+        <th scope="col">Prazo OS</th>
+        <th scope="col">Prazo interno</th>
         <th scope="col">Prioridade</th>
       </tr>
     </thead>
@@ -87,7 +88,8 @@
         <td>{% if os.processo_sei_numero %}{{ os.processo_sei_numero }}{% else %}—{% endif %}</td>
         <td>{{ os.natureza.descricao }}</td>
         <td>{% if os.macroetapa_atual %}{{ os.macroetapa_atual|macroetapa_display }}{% else %}—{% endif %}</td>
-        <td>{% if os.prazo %}{{ os.prazo|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td>{% if os.prazo_data %}{{ os.prazo_data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td>{% if os.prazo_interno %}{{ os.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td>
           {% if os.prioridade == 'URGENTE' %}
           <span class="badge badge-prioridade-urgente">{{ os.prioridade|prioridade_display }}</span>
@@ -100,7 +102,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="6" class="text-muted text-center py-4">Nenhuma ordem de serviço encontrada.</td>
+        <td colspan="7" class="text-muted text-center py-4">Nenhuma ordem de serviço encontrada.</td>
       </tr>
       {% endfor %}
     </tbody>

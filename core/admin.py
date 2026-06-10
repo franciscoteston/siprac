@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from core.models import (
     CombinacaoValida,
+    Comentario,
     Encaminhamento,
     Finalidade,
     Imovel,
@@ -439,6 +440,20 @@ class TarefaInternaAdmin(admin.ModelAdmin):
     autocomplete_fields = ("os", "encaminhamento", "unidade", "servidor")
     ordering = ("-data_inicio",)
     date_hierarchy = "data_inicio"
+
+
+# ---------------------------------------------------------------------------
+# Comentários
+# ---------------------------------------------------------------------------
+
+
+@admin.register(Comentario)
+class ComentarioAdmin(admin.ModelAdmin):
+    list_display = ("os", "producao", "origem", "servidor", "data_hora")
+    list_filter = ("origem",)
+    search_fields = ("texto", "os__numero_os", "servidor__nome")
+    autocomplete_fields = ("os", "producao", "servidor")
+    ordering = ("-data_hora",)
 
 
 # ---------------------------------------------------------------------------

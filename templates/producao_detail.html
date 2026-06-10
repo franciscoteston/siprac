@@ -14,7 +14,7 @@
       {% endif %}
     </h1>
     <div class="d-flex flex-wrap gap-2 align-items-center">
-      <span class="badge bg-{{ producao.status|status_producao_cor }}">
+      <span class="badge bg-{{ producao.status|status_producao_cor }}" id="badge-status-producao">
         {{ producao.status|status_producao_display }}
       </span>
       <span class="text-muted small">{{ producao.data_criacao|date:"d/m/Y H:i" }}</span>
@@ -30,9 +30,6 @@
     {% if tem_servidor %}
     <a href="{% url 'producao_vincular_imovel' producao.pk %}" class="btn btn-outline-primary btn-sm">
       Gerenciar imóveis
-    </a>
-    <a href="{% url 'producao_alterar_status' producao.pk %}" class="btn btn-outline-secondary btn-sm">
-      Alterar status
     </a>
     {% endif %}
     <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary btn-sm">Voltar à OS</a>
@@ -78,11 +75,36 @@
           {% if producao.data_homologacao %} · {{ producao.data_homologacao|date:"d/m/Y" }}{% endif %}
         {% else %}—{% endif %}
       </dd>
+      <dt class="col-sm-3">Prazo interno</dt>
+      <dd class="col-sm-9" id="display-prazo-interno">
+        {% if producao.prazo_interno %}{{ producao.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}
+      </dd>
+      <dt class="col-sm-3">Mês do cronograma</dt>
+      <dd class="col-sm-9" id="display-mes-cronograma">{{ producao.mes_cronograma|mes_ano }}</dd>
       {% if producao.observacao %}
       <dt class="col-sm-3">Observação</dt>
       <dd class="col-sm-9">{{ producao.observacao }}</dd>
       {% endif %}
     </dl>
+    {% if tem_servidor %}
+    <form id="form-prazos-producao" class="row g-2 align-items-end mt-3 pt-3 border-top small">
+      {% csrf_token %}
+      <input type="hidden" name="acao" value="atualizar_prazos">
+      <div class="col-md-4">
+        <label for="prazo_interno" class="form-label mb-1">Prazo interno</label>
+        <input type="date" name="prazo_interno" id="prazo_interno" class="form-control form-control-sm"
+               value="{% if producao.prazo_interno %}{{ producao.prazo_interno|date:'Y-m-d' }}{% endif %}">
+      </div>
+      <div class="col-md-4">
+        <label for="mes_cronograma" class="form-label mb-1">Mês do cronograma</label>
+        <input type="month" name="mes_cronograma" id="mes_cronograma" class="form-control form-control-sm"
+               value="{% if producao.mes_cronograma %}{{ producao.mes_cronograma|date:'Y-m' }}{% endif %}">
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-outline-primary btn-sm">Salvar prazos</button>
+      </div>
+    </form>
+    {% endif %}
   </div>
 </div>
 
@@ -101,7 +123,7 @@
             <th>Justificativa</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="tbody-status-logs">
           {% for log in status_logs %}
           <tr>
             <td>{{ log.data_hora|date:"d/m/Y H:i" }}</td>
@@ -116,10 +138,63 @@
             <td>{% if log.justificativa %}{{ log.justificativa }}{% else %}—{% endif %}</td>
           </tr>
           {% empty %}
-          <tr>
+          <tr id="status-logs-vazio">
             <td colspan="6" class="text-muted text-center py-3">Nenhum registro de status.</td>
           </tr>
           {% endfor %}
+          {% if tem_servidor and transicoes %}
+          <tr id="linha-alterar-status">
+            <td colspan="6" class="p-3 bg-light">
+              <form id="form-alterar-status-inline" class="small">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="transicao">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-3">
+                    <label for="novo_status" class="form-label mb-1">Novo status</label>
+                    <select name="novo_status" id="novo_status" class="form-select form-select-sm" required>
+                      {% for transicao in transicoes %}
+                      <option value="{{ transicao.destino }}"
+                              data-justificativa-obrigatoria="{{ transicao.justificativa_obrigatoria|yesno:'true,false' }}">
+                        {{ transicao.label }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-3 d-none" id="campo-servidor-inline">
+                    <label for="servidor_responsavel" class="form-label mb-1">Servidor responsável</label>
+                    <select name="servidor_responsavel" id="servidor_responsavel" class="form-select form-select-sm">
+                      <option value="">Selecione…</option>
+                      {% for srv in servidores %}
+                      <option value="{{ srv.pk }}"{% if srv.pk == producao.servidor_responsavel_id %} selected{% endif %}>
+                        {{ srv.nome }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-3 d-none" id="campo-autor-inline">
+                    <label for="autor_trabalho" class="form-label mb-1">Autor do trabalho</label>
+                    <select name="autor_trabalho" id="autor_trabalho" class="form-select form-select-sm">
+                      <option value="">Selecione…</option>
+                      {% for srv in servidores %}
+                      <option value="{{ srv.pk }}"{% if srv.pk == producao.servidor_responsavel_id %} selected{% endif %}>
+                        {{ srv.nome }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label for="justificativa" class="form-label mb-1">Justificativa</label>
+                    <textarea name="justificativa" id="justificativa" class="form-control form-control-sm" rows="2"></textarea>
+                  </div>
+                  <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-sm siprac-btn-primary w-100">Registrar</button>
+                  </div>
+                </div>
+                <div class="text-danger small mt-2 d-none" id="erro-status-inline"></div>
+              </form>
+            </td>
+          </tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
@@ -190,4 +265,249 @@
     </div>
   </div>
 </div>
+
+<div class="card siprac-card mb-4" id="secao-comentarios">
+  <div class="card-header bg-white fw-semibold">Comentários</div>
+  <div class="card-body">
+    <ul class="list-unstyled mb-3" id="lista-comentarios">
+      {% for comentario in comentarios %}
+      <li class="mb-3 pb-3 border-bottom" data-comentario-id="{{ comentario.pk }}">
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+          <span class="badge text-bg-warning text-dark">Produção {{ producao.tipo_producao.prefixo }}</span>
+          <span class="small fw-semibold">{{ comentario.servidor.nome }}</span>
+          <span class="small text-muted">{{ comentario.data_hora|date:"d/m/Y H:i" }}</span>
+        </div>
+        <p class="mb-0 small">{{ comentario.texto|linebreaksbr }}</p>
+      </li>
+      {% empty %}
+      <li class="text-muted small" id="comentarios-vazio">Nenhum comentário registrado.</li>
+      {% endfor %}
+    </ul>
+    {% if tem_servidor %}
+    <form id="form-comentario-producao" class="mt-2">
+      {% csrf_token %}
+      <div class="mb-2">
+        <textarea name="texto" id="texto-comentario-producao" class="form-control form-control-sm" rows="2" placeholder="Escreva um comentário…" required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm siprac-btn-primary">Comentar</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var STATUS_DISTRIBUIDO = 'DISTRIBUIDO';
+  var STATUS_HOMOLOGADO = 'HOMOLOGADO';
+  var statusUrl = '{% url "producao_alterar_status" producao.pk %}';
+
+  function atualizarTabelaStatus(logs) {
+    var tbody = document.getElementById('tbody-status-logs');
+    var linhaForm = document.getElementById('linha-alterar-status');
+    var vazio = document.getElementById('status-logs-vazio');
+    if (vazio) {
+      vazio.remove();
+    }
+
+    tbody.querySelectorAll('tr:not(#linha-alterar-status)').forEach(function (row) {
+      row.remove();
+    });
+
+    logs.forEach(function (log) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + log.data_hora + '</td>' +
+        '<td>' + (log.status_anterior_label || '—') + '</td>' +
+        '<td>' + log.status_novo_label + '</td>' +
+        '<td>' + (log.servidor_origem || '—') + '</td>' +
+        '<td>' + (log.servidor_destino || '—') + '</td>' +
+        '<td>' + (log.justificativa || '—') + '</td>';
+      if (linhaForm) {
+        tbody.insertBefore(tr, linhaForm);
+      } else {
+        tbody.appendChild(tr);
+      }
+    });
+  }
+
+  function atualizarCamposStatusInline() {
+    var select = document.getElementById('novo_status');
+    var campoServidor = document.getElementById('campo-servidor-inline');
+    var campoAutor = document.getElementById('campo-autor-inline');
+    var textarea = document.getElementById('justificativa');
+    if (!select) {
+      return;
+    }
+
+    var option = select.options[select.selectedIndex];
+    var destino = select.value;
+    var justificativaObrigatoria = option && option.dataset.justificativaObrigatoria === 'true';
+
+    campoServidor.classList.add('d-none');
+    campoAutor.classList.add('d-none');
+    if (destino === STATUS_DISTRIBUIDO) {
+      campoServidor.classList.remove('d-none');
+    } else if (destino === STATUS_HOMOLOGADO) {
+      campoAutor.classList.remove('d-none');
+    }
+
+    textarea.required = justificativaObrigatoria;
+  }
+
+  var selectStatus = document.getElementById('novo_status');
+  if (selectStatus) {
+    selectStatus.addEventListener('change', atualizarCamposStatusInline);
+    atualizarCamposStatusInline();
+  }
+
+  var formStatus = document.getElementById('form-alterar-status-inline');
+  if (formStatus) {
+    formStatus.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var erroEl = document.getElementById('erro-status-inline');
+      erroEl.classList.add('d-none');
+      erroEl.textContent = '';
+
+      var formData = new FormData(formStatus);
+      fetch(statusUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+        },
+        body: formData,
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok || !data.sucesso) {
+              throw new Error(data.erro || 'Erro ao alterar status.');
+            }
+            return data;
+          });
+        })
+        .then(function (data) {
+          atualizarTabelaStatus(data.status_logs);
+          var badge = document.getElementById('badge-status-producao');
+          if (badge) {
+            badge.textContent = data.status_label;
+          }
+          formStatus.querySelector('#justificativa').value = '';
+
+          var select = document.getElementById('novo_status');
+          if (select && data.transicoes && data.transicoes.length) {
+            select.innerHTML = '';
+            data.transicoes.forEach(function (transicao, index) {
+              var option = document.createElement('option');
+              option.value = transicao.destino;
+              option.textContent = transicao.label;
+              option.dataset.justificativaObrigatoria = transicao.justificativa_obrigatoria ? 'true' : 'false';
+              if (index === 0) {
+                option.selected = true;
+              }
+              select.appendChild(option);
+            });
+            atualizarCamposStatusInline();
+          } else if (document.getElementById('linha-alterar-status')) {
+            document.getElementById('linha-alterar-status').remove();
+          }
+        })
+        .catch(function (error) {
+          erroEl.textContent = error.message;
+          erroEl.classList.remove('d-none');
+        });
+    });
+  }
+
+  var formPrazos = document.getElementById('form-prazos-producao');
+  if (formPrazos) {
+    formPrazos.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var formData = new FormData(formPrazos);
+      fetch(statusUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+        },
+        body: formData,
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok || !data.sucesso) {
+              throw new Error(data.erro || 'Erro ao salvar prazos.');
+            }
+            return data;
+          });
+        })
+        .then(function (data) {
+          document.getElementById('display-prazo-interno').textContent = data.prazo_interno_display;
+          document.getElementById('display-mes-cronograma').textContent = data.mes_cronograma_display;
+        })
+        .catch(function (error) {
+          alert(error.message);
+        });
+    });
+  }
+
+  var formComentario = document.getElementById('form-comentario-producao');
+  if (formComentario) {
+    formComentario.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var textarea = document.getElementById('texto-comentario-producao');
+      var lista = document.getElementById('lista-comentarios');
+      var vazio = document.getElementById('comentarios-vazio');
+      var texto = (textarea.value || '').trim();
+      if (!texto) {
+        return;
+      }
+
+      var formData = new FormData(formComentario);
+      formData.set('texto', texto);
+
+      fetch('{% url "producao_comentarios" producao.pk %}', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+        },
+        body: formData,
+      })
+        .then(function (response) {
+          return response.json().then(function (data) {
+            if (!response.ok) {
+              throw new Error(data.erro || 'Erro ao salvar comentário.');
+            }
+            return data;
+          });
+        })
+        .then(function (data) {
+          if (vazio) {
+            vazio.remove();
+          }
+          var item = document.createElement('li');
+          item.className = 'mb-3 pb-3 border-bottom';
+          item.dataset.comentarioId = String(data.comentario.id);
+          item.innerHTML =
+            '<div class="d-flex flex-wrap gap-2 align-items-center mb-1">' +
+            '<span class="badge text-bg-warning text-dark">Produção ' + data.comentario.badge + '</span>' +
+            '<span class="small fw-semibold">' + data.comentario.servidor + '</span>' +
+            '<span class="small text-muted">' + data.comentario.data_hora + '</span>' +
+            '</div>' +
+            '<p class="mb-0 small"></p>';
+          item.querySelector('p').textContent = data.comentario.texto;
+          lista.prepend(item);
+          textarea.value = '';
+        })
+        .catch(function (error) {
+          alert(error.message);
+        });
+    });
+  }
+});
+</script>
 {% endblock %}

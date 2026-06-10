@@ -331,6 +331,18 @@ class ProcessoSei(models.Model):
 class OS(models.Model):
     """Ordem de Serviço — entidade central do ciclo de vida da demanda na DAI."""
 
+    PRAZO_TIPO_CHOICES = [
+        ("SEM_PRIORIDADE", "Sem prioridade"),
+        ("PRIORIDADE_GS", "Prioridade - GS"),
+        ("PRIORIDADE_GP", "Prioridade - GP"),
+        ("PRIORIDADE_IDOSO", "Prioridade - Idoso"),
+        ("OUVIDORIA", "Ouvidoria"),
+        ("PRIORIDADE_PGM", "Prioridade - PGM"),
+        ("JUDICIAL_COM_PRAZO", "Judicial com prazo"),
+        ("PRAZO_LEGAL", "Prazo legal"),
+        ("PRAZO_CONTRATUAL", "Prazo contratual"),
+    ]
+
     numero_os = models.CharField(max_length=255, unique=True)
     data_criacao_sgbd = models.DateField(auto_now_add=True)
     data_entrada_divisao = models.DateField(null=True, blank=True)
@@ -358,6 +370,16 @@ class OS(models.Model):
         related_name="ordens_servico_criadas",
     )
     observacao = models.TextField(null=True, blank=True)
+    prazo_tipo = models.CharField(
+        max_length=30,
+        choices=PRAZO_TIPO_CHOICES,
+        default="SEM_PRIORIDADE",
+    )
+    prazo_data = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data do prazo",
+    )
 
     class Meta:
         db_table = "OS"
@@ -366,6 +388,45 @@ class OS(models.Model):
 
     def __str__(self):
         return self.numero_os
+
+
+class Comentario(models.Model):
+    """Comentário vinculado à OS ou a uma produção."""
+
+    ORIGEM = [
+        ("OS", "OS"),
+        ("PRODUCAO", "Produção"),
+    ]
+
+    os = models.ForeignKey(
+        OS,
+        on_delete=models.PROTECT,
+        related_name="comentarios",
+    )
+    producao = models.ForeignKey(
+        "Producao",
+        on_delete=models.PROTECT,
+        related_name="comentarios",
+        null=True,
+        blank=True,
+    )
+    origem = models.CharField(max_length=10, choices=ORIGEM)
+    texto = models.TextField()
+    servidor = models.ForeignKey(
+        Servidor,
+        on_delete=models.PROTECT,
+        related_name="comentarios",
+    )
+    data_hora = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "comentario"
+        verbose_name = "Comentário"
+        verbose_name_plural = "Comentários"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"{self.servidor} — {self.data_hora:%d/%m/%Y %H:%M}"
 
 
 class OsProcesso(models.Model):
@@ -688,6 +749,16 @@ class Producao(models.Model):
     )
     data_homologacao = models.DateField(null=True, blank=True)
     observacao = models.TextField(null=True, blank=True)
+    prazo_interno = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Prazo interno",
+    )
+    mes_cronograma = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Mês do cronograma",
+    )
 
     class Meta:
         db_table = "PRODUCAO"

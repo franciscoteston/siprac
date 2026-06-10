@@ -153,6 +153,22 @@ def decimal_br(value):
 
 
 @register.filter
+def mes_ano(value):
+    if not value:
+        return "—"
+    return value.strftime("%m/%Y")
+
+
+@register.filter
+def prazo_tipo_display(value):
+    from core.models import OS
+
+    if not value:
+        return "—"
+    return dict(OS.PRAZO_TIPO_CHOICES).get(value, value)
+
+
+@register.filter
 def decimal_br_simples(value):
     """Formata decimal sem casas decimais: 492000.00 → 492.000"""
     if value is None:
