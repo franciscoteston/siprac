@@ -630,7 +630,11 @@ class OsImovel(models.Model):
         related_name="imoveis_vinculados_os",
     )
     num_bloco = models.CharField(max_length=12, null=True, blank=True)
-    cod_logradouro = models.IntegerField(null=True, blank=True)
+    cod_logradouro = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="CTM",
+    )
     nom_logradouro = models.CharField(max_length=255, null=True, blank=True)
     num_endereco = models.CharField(max_length=20, null=True, blank=True)
     num_unidade = models.CharField(max_length=20, null=True, blank=True)

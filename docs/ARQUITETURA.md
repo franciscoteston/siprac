@@ -137,7 +137,7 @@ Os dados do imóvel existem em dois contextos com propósitos distintos:
 
 **Identidade** (entidade `IMOVEL`) — inscrição cadastral ou código ISIC, mais observação interna. Não armazena dados cadastrais.
 
-**Dados cadastrais no vínculo** (entidade `OS_IMOVEL`) — endereço, áreas, região homogênea e coordenadas registrados no momento em que o imóvel é vinculado à OS, a partir do SIAT ou de cadastro manual (ISIC). Cada vínculo preserva o snapshot dos dados daquele momento.
+**Dados cadastrais no vínculo** (entidade `OS_IMOVEL`) — CTM, endereço, áreas, região homogênea e coordenadas registrados no momento em que o imóvel é vinculado à OS, a partir do SIAT ou de cadastro manual (ISIC). Cada vínculo preserva o snapshot dos dados daquele momento.
 
 **Produção** (entidade `PRODUCAO_IMOVEL`) — referencia o `OS_IMOVEL` correspondente, reutilizando os dados cadastrais já capturados na OS.
 

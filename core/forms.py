@@ -347,7 +347,7 @@ class ImovelForm(forms.Form):
         required=False,
     )
     cod_logradouro = forms.IntegerField(
-        label="Código do logradouro",
+        label="CTM",
         required=False,
     )
     nom_logradouro = forms.CharField(
