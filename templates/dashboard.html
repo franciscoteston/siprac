@@ -219,7 +219,7 @@
     <tbody>
       {% for item in fila_unidade %}
       <tr>
-        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}</a></td>
+        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}{% if item.apelido %} ({{ item.apelido }}){% endif %}</a></td>
         <td>{{ item.tipo }}</td>
         <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
         <td class="small">{{ item.servidor_responsavel }}</td>

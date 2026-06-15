@@ -47,10 +47,10 @@ Uma OS pode ser criada sem vínculo com processo SEI para atender demandas inter
 Cada OS é classificada em três dimensões independentes, em cascata:
 
 - **Natureza:** ex: Tributário – IPTU, Tributário – ITBI, Não tributário
-- **Tipo de demanda:** ex: Requerimento IPTU, Requerimento Desapropriação, Ofício
+- **Requerimento:** ex: Requerimento IPTU, Requerimento Desapropriação, Ofício
 - **Finalidade:** ex: Desapropriação Parcial, Desapropriação Total, Revisão do Valor Venal
 
-Há combinações inválidas entre as três dimensões (ex: Não tributário + IPTU é inválido). O controle é feito por uma tabela `COMBINACAO_VALIDA`, administrada pelo administrador do sistema. A interface apresenta as opções em cascata — ao selecionar a Natureza, os Tipos de Demanda válidos são filtrados automaticamente, e assim por diante.
+Há combinações inválidas entre as três dimensões (ex: Não tributário + IPTU é inválido). O controle é feito por uma tabela `COMBINACAO_VALIDA`, administrada pelo administrador do sistema. A interface apresenta as opções em cascata — ao selecionar a Natureza, os Requerimentos válidos são filtrados automaticamente, e assim por diante.
 
 ### 3.4 Prioridade
 
@@ -489,3 +489,12 @@ hierarquia do servidor logado. Refinamento previsto:
   * Permitir que o usuário escolha qual vínculo exibir quando tiver múltiplos
 - Considerar também exibir indicação de Função Gratificada (FG)
   quando o vínculo ativo tiver fg_ativa=True (ver seção 15.9)
+
+### 15.11 Campo Origem — unidade externa solicitante
+O campo Origem identifica a unidade externa que originou a demanda
+(ex: ATENDIMENTO-SMF, PPDP-PGM, RM-SMF, CEFH-SMAMUS).
+Atualmente não implementado no SIPRAC. Avaliar futuramente se deve
+ser um campo texto livre, uma lista de Unidades Externas já cadastradas,
+ou uma lista separada de "unidades solicitantes" distinta das unidades
+externas de encaminhamento.
+Referência: campo Origem da planilha gerencial EAV (SIGA).

@@ -204,7 +204,7 @@ class NaturezaAdmin(admin.ModelAdmin):
 
 @admin.register(TipoDemanda)
 class TipoDemandaAdmin(admin.ModelAdmin):
-    """Tipos de demanda da OS."""
+    """Requerimentos da OS."""
 
     list_display = ("descricao", "ativa")
     list_filter = ("ativa",)

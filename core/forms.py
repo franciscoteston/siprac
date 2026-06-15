@@ -47,7 +47,7 @@ class OSForm(forms.Form):
         queryset=Natureza.objects.filter(ativa=True),
     )
     tipo_demanda = forms.ModelChoiceField(
-        label="Tipo de demanda",
+        label="Requerimento",
         queryset=TipoDemanda.objects.none(),
     )
     finalidade = forms.ModelChoiceField(
@@ -67,6 +67,14 @@ class OSForm(forms.Form):
         label="Observação",
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    apelido = forms.CharField(
+        label="Apelido (identificação rápida)",
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(
+            attrs={"placeholder": "Ex: Golden Lake, Escola Vila Nova..."},
+        ),
     )
     prazo_tipo = forms.ChoiceField(
         label="Tipo de prazo",

@@ -173,8 +173,8 @@ class TipoDemanda(models.Model):
 
     class Meta:
         db_table = "TIPO_DEMANDA"
-        verbose_name = "tipo de demanda"
-        verbose_name_plural = "tipos de demanda"
+        verbose_name = "Requerimento"
+        verbose_name_plural = "Requerimentos"
 
     def __str__(self):
         return self.descricao
@@ -364,6 +364,7 @@ class OS(models.Model):
         TipoDemanda,
         on_delete=models.PROTECT,
         related_name="ordens_servico",
+        verbose_name="Requerimento",
     )
     finalidade = models.ForeignKey(
         Finalidade,
@@ -376,6 +377,12 @@ class OS(models.Model):
         related_name="ordens_servico_criadas",
     )
     observacao = models.TextField(null=True, blank=True)
+    apelido = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Apelido",
+    )
     prazo_tipo = models.CharField(
         max_length=30,
         choices=PRAZO_TIPO_CHOICES,

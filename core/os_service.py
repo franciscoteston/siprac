@@ -248,3 +248,28 @@ def contar_producoes_por_os_ids(os_ids):
     ).count()
 
     return resultado
+
+
+def data_entrada_unidade(os, unidade):
+    """
+    Retorna a data do último encaminhamento recebido pela unidade
+    para esta OS. Representa a entrada mais recente da OS na unidade.
+    Retorna None se a OS nunca foi encaminhada para esta unidade.
+    """
+    enc = Encaminhamento.objects.filter(
+        os=os,
+        unidade_interna_destino=unidade,
+    ).order_by("-data_hora").first()
+    return enc.data_hora if enc else None
+
+
+def historico_entradas_unidade(os, unidade):
+    """
+    Retorna todos os encaminhamentos recebidos pela unidade para
+    esta OS, ordenados do mais recente para o mais antigo.
+    Útil para relatório histórico de entradas e saídas.
+    """
+    return Encaminhamento.objects.filter(
+        os=os,
+        unidade_interna_destino=unidade,
+    ).order_by("-data_hora")

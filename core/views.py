@@ -53,6 +53,7 @@ from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
 from core.os_service import (
     contar_producoes_por_os_ids,
     contar_producoes_por_status_unidades,
+    data_entrada_unidade,
     derivar_macroetapa_os,
     os_ativas_por_unidade,
     os_da_unidade_atual,
@@ -448,7 +449,7 @@ def _mapa_prazos_os(os_ids):
     }
 
 
-def _serializar_fila_producoes(queryset):
+def _serializar_fila_producoes(queryset, unidade=None):
     producoes = _ordenar_producoes_fila(
         queryset.select_related("os", "tipo_producao", "servidor_responsavel"),
     )
@@ -456,23 +457,25 @@ def _serializar_fila_producoes(queryset):
     prazos = _mapa_prazos_os(os_ids)
     fila = []
     for producao in producoes:
-        fila.append(
-            {
-                "pk": producao.pk,
-                "os_pk": producao.os_id,
-                "numero_os": producao.os.numero_os,
-                "tipo": producao.tipo_producao.prefixo,
-                "status": producao.status,
-                "servidor_responsavel": (
-                    producao.servidor_responsavel.nome
-                    if producao.servidor_responsavel
-                    else "—"
-                ),
-                "prazo_os": producao.os.prazo_data,
-                "prazo_interno": producao.prazo_interno,
-                "prioridade": producao.os.prioridade,
-            },
-        )
+        item = {
+            "pk": producao.pk,
+            "os_pk": producao.os_id,
+            "numero_os": producao.os.numero_os,
+            "apelido": producao.os.apelido,
+            "tipo": producao.tipo_producao.prefixo,
+            "status": producao.status,
+            "servidor_responsavel": (
+                producao.servidor_responsavel.nome
+                if producao.servidor_responsavel
+                else "—"
+            ),
+            "prazo_os": producao.os.prazo_data,
+            "prazo_interno": producao.prazo_interno,
+            "prioridade": producao.os.prioridade,
+        }
+        if unidade is not None:
+            item["data_entrada"] = data_entrada_unidade(producao.os, unidade)
+        fila.append(item)
     return fila
 
 
@@ -594,6 +597,7 @@ def _obter_fila_unidade(unidade):
         Producao.objects.filter(os_id__in=os_ids).exclude(
             status__in=STATUS_PRODUCAO_FINAL,
         ),
+        unidade=unidade,
     )
 
 
@@ -1382,6 +1386,7 @@ class OSCreateView(RequerLoginMixin, FormView):
                 finalidade=form.cleaned_data["finalidade"],
                 prioridade=form.cleaned_data["prioridade"],
                 observacao=form.cleaned_data.get("observacao") or None,
+                apelido=form.cleaned_data.get("apelido") or None,
                 prazo_tipo=form.cleaned_data.get("prazo_tipo") or "SEM_PRIORIDADE",
                 prazo_data=form.cleaned_data.get("prazo_data"),
                 criado_por=servidor,
@@ -1610,6 +1615,11 @@ class OSDetailView(RequerLoginMixin, DetailView):
             Comentario.objects.filter(os=os_obj)
             .select_related("servidor", "producao", "producao__tipo_producao")
             .order_by("-data_hora")
+        )
+        servidor = _obter_servidor(self.request.user)
+        unidade = _obter_unidade_principal_servidor(servidor) if servidor else None
+        context["data_entrada_unidade_atual"] = (
+            data_entrada_unidade(os_obj, unidade) if unidade else None
         )
         return context
 
