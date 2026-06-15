@@ -498,3 +498,14 @@ ser um campo texto livre, uma lista de Unidades Externas já cadastradas,
 ou uma lista separada de "unidades solicitantes" distinta das unidades
 externas de encaminhamento.
 Referência: campo Origem da planilha gerencial EAV (SIGA).
+
+### 15.12 Revisão dos status de produção
+O sistema EAV possui dois status intermediários não implementados no SIPRAC:
+- **REVISADO**: estado entre PARA_REVISAO e PARA_AJUSTES — servidor entregou
+  para revisão, chefia ainda não avaliou
+- **HOMOLOGAR**: estado entre PARA_AJUSTES e HOMOLOGADO — ajustes aprovados
+  pela chefia, aguardando homologação formal
+
+Avaliar futuramente se esses estados intermediários são relevantes
+operacionalmente para a DAI, considerando o volume de trabalho e
+a necessidade de granularidade no rastreio do fluxo de revisão.

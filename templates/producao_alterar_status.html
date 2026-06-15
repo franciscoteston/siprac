@@ -113,6 +113,23 @@
         </select>
       </div>
 
+      {% if pode_homologar %}
+      <div id="campo-revisor" class="mb-3 d-none">
+        <label for="revisor" class="form-label">
+          Revisor responsável <span class="text-muted">(opcional)</span>
+        </label>
+        <select name="revisor" id="revisor" class="form-select">
+          <option value="">Selecione…</option>
+          {% for srv in servidores_revisores %}
+          <option value="{{ srv.pk }}"
+                  {% if srv.pk == revisor_atual_id %}selected{% endif %}>
+            {{ srv.nome }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
       <div class="mb-3">
         <label for="justificativa" class="form-label" id="label-justificativa">
           Justificativa <span class="text-muted">(opcional)</span>
@@ -165,14 +182,20 @@ document.addEventListener('DOMContentLoaded', function () {
   const selectServidor = document.getElementById('servidor_responsavel');
   const selectAutor = document.getElementById('autor_trabalho');
   const inputAcao = document.getElementById('input-acao');
+  const campoRevisor = document.getElementById('campo-revisor');
+  const podeHomologar = {{ pode_homologar|yesno:"true,false" }};
   const STATUS_DISTRIBUIDO = 'DISTRIBUIDO';
   const STATUS_HOMOLOGADO = 'HOMOLOGADO';
+  const STATUS_PARA_REVISAO = 'PARA_REVISAO';
 
   function ocultarCamposAtribuicao() {
     campoServidor.classList.add('d-none');
     campoAutor.classList.add('d-none');
     selectServidor.required = false;
     selectAutor.required = false;
+    if (campoRevisor) {
+      campoRevisor.classList.add('d-none');
+    }
   }
 
   function mostrarServidorResponsavel() {
@@ -185,6 +208,13 @@ document.addEventListener('DOMContentLoaded', function () {
     ocultarCamposAtribuicao();
     campoAutor.classList.remove('d-none');
     selectAutor.required = true;
+  }
+
+  function mostrarRevisor() {
+    ocultarCamposAtribuicao();
+    if (campoRevisor && podeHomologar) {
+      campoRevisor.classList.remove('d-none');
+    }
   }
 
   function atualizarJustificativa(botao) {
@@ -212,6 +242,8 @@ document.addEventListener('DOMContentLoaded', function () {
         mostrarServidorResponsavel();
       } else if (destino === STATUS_HOMOLOGADO) {
         mostrarAutorTrabalho();
+      } else if (destino === STATUS_PARA_REVISAO) {
+        mostrarRevisor();
       } else {
         ocultarCamposAtribuicao();
       }
@@ -236,6 +268,8 @@ document.addEventListener('DOMContentLoaded', function () {
       mostrarServidorResponsavel();
     } else if (primeiroDestino === STATUS_HOMOLOGADO) {
       mostrarAutorTrabalho();
+    } else if (primeiroDestino === STATUS_PARA_REVISAO) {
+      mostrarRevisor();
     }
   }
 });

@@ -25,6 +25,7 @@ from core.views import (
     ProducaoAlterarStatusView,
     ProducaoCreateView,
     ProducaoDetailView,
+    ProducaoEditarCampoView,
     ProducaoListView,
     ProducaoVincularImovelView,
     ProximoIsicAPIView,
@@ -56,6 +57,11 @@ urlpatterns = [
         'producoes/<int:pk>/status/',
         ProducaoAlterarStatusView.as_view(),
         name='producao_alterar_status',
+    ),
+    path(
+        'producoes/<int:pk>/editar-campo/',
+        ProducaoEditarCampoView.as_view(),
+        name='producao_editar_campo',
     ),
     path(
         'producoes/<int:pk>/imoveis/',

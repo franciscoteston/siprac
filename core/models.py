@@ -748,6 +748,20 @@ class Producao(models.Model):
         related_name="producoes_responsavel",
         verbose_name="Servidor responsável",
     )
+    revisor = models.ForeignKey(
+        Servidor,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="producoes_revisor",
+        verbose_name="Revisor",
+    )
+    modelo_sugerido = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name="Modelo sugerido",
+    )
     autor_trabalho = models.ForeignKey(
         Servidor,
         null=True,

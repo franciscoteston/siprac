@@ -4,6 +4,9 @@
 {% block title %}{% if producao.numero_producao %}{{ producao.numero_producao }}{% else %}{{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}{% endif %} — SIPRAC{% endblock %}
 
 {% block content %}
+{% if pode_homologar %}
+<form class="d-none">{% csrf_token %}</form>
+{% endif %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
   <div>
     <h1 class="h3 mb-2 text-dark">
@@ -62,6 +65,33 @@
           {{ producao.servidor_responsavel.nome }}
         {% else %}—{% endif %}
       </dd>
+      {% if producao.revisor %}
+      <dt class="col-sm-3">Revisor</dt>
+      <dd class="col-sm-9">{{ producao.revisor.nome }}</dd>
+      {% endif %}
+      {% if pode_homologar %}
+      <dt class="col-sm-3">Modelo sugerido</dt>
+      <dd class="col-sm-9">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="text"
+                 id="modelo-sugerido-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 280px"
+                 maxlength="50"
+                 value="{{ producao.modelo_sugerido|default:'' }}"
+                 placeholder="Ex: MOD_Z1_Z2_003">
+          <button type="button"
+                  id="btn-salvar-modelo-sugerido"
+                  class="btn btn-outline-primary btn-sm">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-modelo-sugerido"></div>
+      </dd>
+      {% elif producao.modelo_sugerido %}
+      <dt class="col-sm-3">Modelo sugerido</dt>
+      <dd class="col-sm-9">{{ producao.modelo_sugerido }}</dd>
+      {% endif %}
       <dt class="col-sm-3">Autor do trabalho</dt>
       <dd class="col-sm-9">
         {% if producao.status == 'HOMOLOGADO' and producao.autor_trabalho %}
@@ -414,6 +444,63 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var formPrazos = document.getElementById('form-prazos-producao');
+  var editarCampoUrl = '{% url "producao_editar_campo" producao.pk %}';
+  var btnSalvarModelo = document.getElementById('btn-salvar-modelo-sugerido');
+  var inputModelo = document.getElementById('modelo-sugerido-input');
+  var erroModelo = document.getElementById('erro-modelo-sugerido');
+
+  function salvarModeloSugerido() {
+    if (!inputModelo) {
+      return;
+    }
+    var formData = new FormData();
+    formData.append('campo', 'modelo_sugerido');
+    formData.append('valor', inputModelo.value.trim());
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch(editarCampoUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      },
+      body: formData,
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok || !data.sucesso) {
+            throw new Error(data.erro || 'Erro ao salvar modelo sugerido.');
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        inputModelo.value = data.valor || '';
+        if (erroModelo) {
+          erroModelo.classList.add('d-none');
+        }
+      })
+      .catch(function (error) {
+        if (erroModelo) {
+          erroModelo.textContent = error.message;
+          erroModelo.classList.remove('d-none');
+        }
+      });
+  }
+
+  if (btnSalvarModelo) {
+    btnSalvarModelo.addEventListener('click', salvarModeloSugerido);
+  }
+  if (inputModelo) {
+    inputModelo.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        salvarModeloSugerido();
+      }
+    });
+  }
+
   if (formPrazos) {
     formPrazos.addEventListener('submit', function (event) {
       event.preventDefault();

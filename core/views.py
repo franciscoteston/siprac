@@ -49,7 +49,12 @@ from core.relatorios import (
     relatorio_tempo_registro_processo,
 )
 from core.middleware import obter_vinculo_unidade_ativo
-from core.mixins import RequerAdminMixin, RequerLoginJSONMixin, RequerLoginMixin
+from core.mixins import (
+    RequerAdminMixin,
+    RequerHomologarMixin,
+    RequerLoginJSONMixin,
+    RequerLoginMixin,
+)
 from core.os_service import (
     contar_producoes_por_os_ids,
     contar_producoes_por_status_unidades,
@@ -198,6 +203,28 @@ def _obter_unidades_ativas(servidor):
     return servidor.vinculos_unidade.filter(
         Q(data_fim__isnull=True) | Q(data_fim__gte=hoje),
     ).values_list("unidade_id", flat=True)
+
+
+def _servidores_revisores_da_unidade(servidor):
+    """Servidores com pode_homologar nas unidades ativas do servidor informado."""
+    if servidor is None:
+        return Servidor.objects.none()
+    hoje = timezone.localdate()
+    unidades_ids = list(_obter_unidades_ativas(servidor))
+    if not unidades_ids:
+        return Servidor.objects.none()
+    return (
+        Servidor.objects.filter(
+            vinculos_unidade__unidade_id__in=unidades_ids,
+            vinculos_unidade__perfil__pode_homologar=True,
+        )
+        .filter(
+            Q(vinculos_unidade__data_fim__isnull=True)
+            | Q(vinculos_unidade__data_fim__gte=hoje),
+        )
+        .distinct()
+        .order_by("nome")
+    )
 
 
 def _contar_os_abertas():
@@ -2395,6 +2422,7 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
             "criado_por",
             "homologado_por",
             "servidor_responsavel",
+            "revisor",
             "autor_trabalho",
         )
 
@@ -2429,6 +2457,8 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
             .select_related("servidor")
             .order_by("-data_hora")
         )
+        perfil = getattr(self.request, "perfil_acesso", None)
+        context["pode_homologar"] = perfil is not None and perfil.pode_homologar
         return context
 
 
@@ -2625,6 +2655,16 @@ def _obter_autor_trabalho_post(request):
         return None, "Autor do trabalho inválido."
 
 
+def _obter_revisor_post(request, queryset_permitido):
+    revisor_id = (request.POST.get("revisor") or "").strip()
+    if not revisor_id:
+        return None, None
+    try:
+        return queryset_permitido.get(pk=int(revisor_id)), None
+    except (Servidor.DoesNotExist, ValueError, TypeError):
+        return None, "Revisor inválido."
+
+
 def _criar_producao_status_log(
     producao,
     status_anterior,
@@ -2655,6 +2695,7 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
                 "os",
                 "tipo_producao",
                 "servidor_responsavel",
+                "revisor",
             ),
             pk=kwargs["pk"],
         )
@@ -2664,13 +2705,23 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         return super().dispatch(request, *args, **kwargs)
 
     def _contexto_formulario(self, request):
+        perfil = getattr(request, "perfil_acesso", None)
+        pode_homologar = perfil is not None and perfil.pode_homologar
+        servidor = _obter_servidor(request.user)
         return {
             "producao": self.producao_obj,
             "os": self.producao_obj.os,
             "transicoes": _transicoes_status_disponiveis(self.producao_obj, request),
             "pode_redistribuir": _pode_redistribuir_producao(self.producao_obj, request),
+            "pode_homologar": pode_homologar,
             "servidores": Servidor.objects.order_by("nome"),
+            "servidores_revisores": (
+                _servidores_revisores_da_unidade(servidor)
+                if pode_homologar
+                else Servidor.objects.none()
+            ),
             "servidor_responsavel_atual_id": self.producao_obj.servidor_responsavel_id,
+            "revisor_atual_id": self.producao_obj.revisor_id,
         }
 
     def get(self, request, *args, **kwargs):
@@ -2912,6 +2963,29 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             self.producao_obj.data_homologacao = timezone.localdate()
             campos_atualizar.extend(["autor_trabalho", "homologado_por", "data_homologacao"])
 
+        perfil = getattr(request, "perfil_acesso", None)
+        if (
+            status_novo == Producao.STATUS_PARA_REVISAO
+            and perfil is not None
+            and perfil.pode_homologar
+        ):
+            revisores = _servidores_revisores_da_unidade(servidor)
+            revisor, erro = _obter_revisor_post(request, revisores)
+            if erro:
+                if _request_wants_json(request):
+                    return self._resposta_status_json(
+                        request,
+                        sucesso=False,
+                        erro=erro,
+                        status=400,
+                    )
+                messages.error(request, erro)
+                return redirect(
+                    reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
+                )
+            self.producao_obj.revisor = revisor
+            campos_atualizar.append("revisor")
+
         self.producao_obj.status = status_novo
         self.producao_obj.save(update_fields=campos_atualizar)
 
@@ -2944,6 +3018,60 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             f"Status alterado para {dict(Producao.STATUS_CHOICES).get(status_novo, status_novo)}.",
         )
         return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
+
+
+CAMPOS_EDITAVEIS_PRODUCAO = frozenset({"modelo_sugerido", "revisor"})
+
+
+class ProducaoEditarCampoView(RequerHomologarMixin, View):
+    def post(self, request, pk):
+        producao = get_object_or_404(Producao.objects.select_related("revisor"), pk=pk)
+        servidor = _obter_servidor(request.user)
+        campo = (request.POST.get("campo") or "").strip()
+        valor = (request.POST.get("valor") or "").strip()
+
+        if campo not in CAMPOS_EDITAVEIS_PRODUCAO:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Campo não permitido."},
+                status=400,
+            )
+
+        if campo == "modelo_sugerido":
+            if valor and len(valor) > 50:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Modelo sugerido deve ter no máximo 50 caracteres."},
+                    status=400,
+                )
+            producao.modelo_sugerido = valor or None
+            producao.save(update_fields=["modelo_sugerido"])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": producao.modelo_sugerido or "",
+                },
+            )
+
+        revisores = _servidores_revisores_da_unidade(servidor)
+        if not valor:
+            producao.revisor = None
+        else:
+            try:
+                producao.revisor = revisores.get(pk=int(valor))
+            except (Servidor.DoesNotExist, ValueError, TypeError):
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Revisor inválido."},
+                    status=400,
+                )
+        producao.save(update_fields=["revisor"])
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "campo": campo,
+                "valor": producao.revisor.nome if producao.revisor else "",
+                "revisor_id": producao.revisor_id,
+            },
+        )
 
 
 class ComentarioCreateView(RequerLoginJSONMixin, View):
