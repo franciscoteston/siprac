@@ -1611,6 +1611,9 @@ COLUNAS_GERENCIAL_PADRAO = [
     "prazo_eav",
     "dias_sei",
     "status_producao",
+    "la_pt_ptf",
+    "doc_sei",
+    "destino",
 ]
 
 STATUS_GERENCIAL_CARDS = [
@@ -1824,17 +1827,9 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         if os_imovel
         else "—"
     )
-    numero_producao = "—"
-    la_pt_ptf = "—"
-    if producao and producao.tipo_producao:
-        la_pt_ptf = producao.tipo_producao.prefixo
-    if (
-        producao
-        and producao.status == Producao.STATUS_HOMOLOGADO
-        and producao.numero_producao
-    ):
-        numero_producao = producao.numero_producao
-        la_pt_ptf = producao.numero_producao
+    la_pt_ptf = (
+        producao.numero_producao if producao and producao.numero_producao else "—"
+    )
 
     prazo_interno_iso = (
         producao.prazo_interno.isoformat()
@@ -1928,12 +1923,12 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "status_producao": status_producao_label,
         "la_pt_ptf": la_pt_ptf,
         "tipo_trabalho": (
-            producao.tipo_producao.descricao
+            producao.tipo_producao.prefixo
             if producao and producao.tipo_producao
             else "—"
         ),
-        "doc_sei": (producao.numero_sei if producao and producao.numero_sei else "—"),
-        "destino": _destino_pos_homologacao(os_obj, producao),
+        "doc_sei": (producao.numero_sei or "—") if producao else "—",
+        "destino": _destino_pos_homologacao(os_obj, producao) or "—",
     }
 
     panel_data = {
