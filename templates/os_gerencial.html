@@ -47,9 +47,9 @@
   {% endfor %}
 </div>
 
-<div class="gerencial-layout" id="gerencial-layout">
+<div class="gerencial-wrap painel-colapsado" id="gerencialWrap">
   <div class="gerencial-tabela-wrap" id="gerencialTabelaWrap">
-      <table class="table table-sm table-hover siprac-table gerencial-table align-middle mb-0" id="tabela-gerencial">
+      <table class="table table-sm table-hover siprac-table align-middle mb-0" id="tabela-gerencial">
         <thead>
           <tr>
             <th class="gerencial-col-fixa">Processo SEI</th>
@@ -82,7 +82,7 @@
         </thead>
         <tbody>
           {% for linha in linhas_gerencial %}
-          <tr class="gerencial-row" data-os-pk="{{ linha.os_pk }}">
+          <tr data-os-pk="{{ linha.os_pk }}">
             <td class="gerencial-col-fixa">
               {% if linha.processo_pk %}
               <a href="{% url 'processo_detail' linha.processo_pk %}" class="text-decoration-none"
@@ -137,10 +137,10 @@
     {% endif %}
   </div>
 
-  <div class="gerencial-painel-toggle" id="gerencialToggle" title="Abrir/fechar painel" role="button" tabindex="0" aria-label="Abrir/fechar painel">›</div>
+  <div class="gerencial-painel-toggle" id="gerencialToggle" title="Abrir painel" role="button" tabindex="0" aria-label="Abrir painel">›</div>
 
-  <div class="gerencial-painel" id="gerencialPainel" aria-hidden="true">
-    <div class="gerencial-painel-inner" id="gerencial-panel-content">
+  <div class="gerencial-painel" id="gerencialPainel">
+    <div id="gerencialPainelConteudo">
       <p class="text-muted small mb-0">Selecione uma linha para ver detalhes.</p>
     </div>
   </div>
@@ -163,11 +163,11 @@
   const configEl = document.getElementById('gerencial-config');
   if (!configEl) return;
 
-  let panelsMap = {};
+  let painelDados = {};
   const panelsDataEl = document.getElementById('gerencial-panels-data');
   if (panelsDataEl) {
     try {
-      panelsMap = JSON.parse(panelsDataEl.textContent);
+      painelDados = JSON.parse(panelsDataEl.textContent);
     } catch (err) {
       console.error('Erro ao carregar dados do painel gerencial:', err);
     }
@@ -175,12 +175,14 @@
 
   const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
   const csrfToken = csrfInput ? csrfInput.value : '';
-  const panel = document.getElementById('gerencialPainel');
-  const panelContent = document.getElementById('gerencial-panel-content');
-  const panelToggle = document.getElementById('gerencialToggle');
+  const wrap = document.getElementById('gerencialWrap');
+  const toggle = document.getElementById('gerencialToggle');
+  const painel = document.getElementById('gerencialPainel');
+  const painelConteudo = document.getElementById('gerencialPainelConteudo');
   const podeHomologar = {{ pode_homologar|yesno:"true,false" }};
   const podeEditarEntradaDai = {{ pode_editar_entrada_dai|yesno:"true,false" }};
   let linhaSelecionada = null;
+  let dadosSelecionados = null;
   let panelData = null;
 
   function escapeHtml(text) {
@@ -238,10 +240,10 @@
     const osPk = panelData.os_pk;
     const prodPk = panelData.producao_pk;
 
-    panelContent.querySelectorAll('[data-save-os]').forEach(function (btn) {
+    panelConteudo.querySelectorAll('[data-save-os]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const campo = btn.dataset.saveOs;
-        const input = panelContent.querySelector('[data-field-os="' + campo + '"]');
+        const input = panelConteudo.querySelector('[data-field-os="' + campo + '"]');
         const valor = input ? input.value : '';
         postCampo('/os/' + osPk + '/editar-campo/', campo, valor).then(function (data) {
           if (campo === 'apelido') {
@@ -260,10 +262,10 @@
     });
 
     if (prodPk) {
-      panelContent.querySelectorAll('[data-save-prod]').forEach(function (btn) {
+      panelConteudo.querySelectorAll('[data-save-prod]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           const campo = btn.dataset.saveProd;
-          const input = panelContent.querySelector('[data-field-prod="' + campo + '"]');
+          const input = panelConteudo.querySelector('[data-field-prod="' + campo + '"]');
           const valor = input ? input.value : '';
           postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor).then(function (data) {
             if (campo === 'modelo_sugerido') {
@@ -304,7 +306,7 @@
         });
       });
 
-      const statusSelect = panelContent.querySelector('#panel-status-producao');
+      const statusSelect = panelConteudo.querySelector('#panel-status-producao');
       if (statusSelect && podeHomologar) {
         statusSelect.addEventListener('change', function () {
           const formData = new FormData();
@@ -326,10 +328,10 @@
       }
     }
 
-    panelContent.querySelectorAll('[data-comentario]').forEach(function (btn) {
+    panelConteudo.querySelectorAll('[data-comentario]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const secao = btn.dataset.comentario;
-        const textarea = panelContent.querySelector('[data-comentario-texto="' + secao + '"]');
+        const textarea = panelConteudo.querySelector('[data-comentario-texto="' + secao + '"]');
         const texto = textarea ? textarea.value.trim() : '';
         if (!texto) return;
         const usaProd = btn.dataset.comentarioProd === '1' && prodPk;
@@ -490,76 +492,62 @@
     html += '<dt class="col-5">DESTINO</dt><dd class="col-7">' + escapeHtml(data.destino) + '</dd>';
     html += '</dl>' + blocoComentario('produtos', true) + '</section>';
 
-    panelContent.innerHTML = html;
-    bindPanelEvents();
+    return html;
   }
 
-  function limparSelecaoLinha() {
-    document.querySelectorAll('.gerencial-row').forEach(function (r) {
-      r.classList.remove('table-active');
-    });
-    linhaSelecionada = null;
+  function abrirPainel(dados, trElement) {
+    if (linhaSelecionada) linhaSelecionada.classList.remove('selecionada');
+    linhaSelecionada = trElement;
+    trElement.classList.add('selecionada');
+
+    dadosSelecionados = dados;
+    panelData = dados;
+    painelConteudo.innerHTML = renderPanel(dados);
+    bindPanelEvents();
+
+    wrap.classList.remove('painel-colapsado');
+    toggle.textContent = '›';
+    toggle.title = 'Fechar painel';
   }
 
   function fecharPainel() {
-    panel.classList.remove('aberto');
-    panel.setAttribute('aria-hidden', 'true');
-    panelToggle.textContent = '›';
-    limparSelecaoLinha();
-  }
-
-  function abrirPainel(row) {
-    if (!row) return;
-    document.querySelectorAll('.gerencial-row').forEach(function (r) {
-      r.classList.remove('table-active');
-    });
-    row.classList.add('table-active');
-    linhaSelecionada = row;
-    const osPk = row.dataset.osPk;
-    const data = panelsMap[osPk] || panelsMap[String(osPk)];
-    if (!data) {
-      console.error('Dados do painel não encontrados para OS', osPk);
-      return;
-    }
-    renderPanel(data);
-    panel.classList.add('aberto');
-    panel.setAttribute('aria-hidden', 'false');
-    panelToggle.textContent = '‹';
-  }
-
-  const tabelaGerencial = document.getElementById('tabela-gerencial');
-  if (tabelaGerencial) {
-    tabelaGerencial.addEventListener('click', function (e) {
-      if (e.target.closest('a')) return;
-      if (e.target.closest('.filtro-coluna-btn') || e.target.closest('.filtro-coluna-menu')) return;
-      const row = e.target.closest('.gerencial-row');
-      if (!row) return;
-      abrirPainel(row);
-    });
-  }
-
-  panelToggle.addEventListener('click', function () {
-    if (panel.classList.contains('aberto')) {
-      fecharPainel();
-      return;
-    }
+    wrap.classList.add('painel-colapsado');
+    toggle.textContent = '›';
+    toggle.title = 'Abrir painel';
     if (linhaSelecionada) {
-      const osPk = linhaSelecionada.dataset.osPk;
-      const data = panelsMap[osPk] || panelsMap[String(osPk)];
-      if (data) {
-        renderPanel(data);
-        panel.classList.add('aberto');
-        panel.setAttribute('aria-hidden', 'false');
-        panelToggle.textContent = '‹';
+      linhaSelecionada.classList.remove('selecionada');
+      linhaSelecionada = null;
+    }
+  }
+
+  toggle.addEventListener('click', function () {
+    if (wrap.classList.contains('painel-colapsado')) {
+      if (dadosSelecionados) {
+        wrap.classList.remove('painel-colapsado');
+        toggle.title = 'Fechar painel';
       }
+    } else {
+      fecharPainel();
     }
   });
 
-  panelToggle.addEventListener('keydown', function (e) {
+  toggle.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      panelToggle.click();
+      toggle.click();
     }
+  });
+
+  document.getElementById('tabela-gerencial').addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    if (e.target.closest('.filtro-coluna-btn') || e.target.closest('.filtro-coluna-menu')) return;
+
+    const tr = e.target.closest('tr[data-os-pk]');
+    if (!tr) return;
+
+    const osPk = tr.dataset.osPk;
+    const dados = painelDados[osPk] || painelDados[String(osPk)];
+    if (dados) abrirPainel(dados, tr);
   });
 
   document.getElementById('btn-salvar-colunas').addEventListener('click', function () {
