@@ -519,3 +519,30 @@ Pendente definir se RECOMPRA e RECURSO ITBI serão tratados como
 valores de "Requerimento" ou de "Finalidade" no SIPRAC antes de
 implementar o cálculo automático. Campo calculado — não precisa
 ser armazenado no banco.
+
+### 15.14 Observação por imóvel na OS
+O campo OBSERVAÇÃO_IMÓVEL da planilha gerencial EAV registra observações
+específicas sobre um imóvel no contexto de uma OS (ex: "Imóvel em área de
+regularização fundiária", "Acesso restrito — agendar vistoria").
+
+No SIPRAC, OsImovel não possui campo de observação. Avaliar futuramente
+se é mais adequado:
+- Adicionar campo observacao em OsImovel (observação por imóvel por OS)
+- Usar o modelo Comentario com referência ao OsImovel
+- Manter apenas a observacao_interna em Imovel (observação permanente
+  independente de OS)
+
+### 15.15 Metas por tipo de produção técnica
+A planilha gerencial EAV possui dois campos relacionados a metas:
+- metaTargets: metas mensais por tipo de trabalho (LA, PT, PTF, etc.)
+  definidas pela chefia para a equipe
+- metaWeightedOverrides: ajuste de peso por tipo de trabalho
+  (ex: LA vale 2 pontos, PT vale 1 ponto) para cálculo ponderado
+  de produtividade
+
+No SIPRAC, MetaPesquisa cobre apenas o módulo de pesquisa de dados.
+Avaliar futuramente se faz sentido criar MetaProducao — metas mensais
+por tipo de produção técnica por unidade — considerando:
+- Se a Direção estabelece metas formais por tipo de trabalho
+- Se o peso ponderado por tipo é relevante para avaliação de desempenho
+- Integração com o dashboard gerencial e relatórios de produtividade
