@@ -176,7 +176,7 @@ body {
 }
 
 .gerencial-wrap.painel-colapsado {
-  grid-template-columns: minmax(0, 1fr) 20px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .gerencial-tabela-wrap {
@@ -274,30 +274,34 @@ body {
 }
 
 .gerencial-painel-toggle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: #e9ecef;
-  border-left: 1px solid #dee2e6;
-  cursor: pointer;
-  font-size: 11px;
-  user-select: none;
-  color: #6c757d;
-}
-
-.gerencial-painel-toggle:hover {
-  background: #d0d7de;
-  color: #1a3a5c;
-}
-
-.gerencial-wrap.painel-colapsado .gerencial-painel {
   display: none;
 }
 
-.gerencial-wrap:not(.painel-colapsado) .gerencial-painel-toggle {
+.gerencial-painel-fechar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px;
+  background: white;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.gerencial-painel-fechar button {
+  padding: 2px 8px;
+  font-size: 13px;
+  background: #f0f4f8;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.gerencial-painel-fechar button:hover {
+  background: #e2e8f0;
+}
+
+.gerencial-wrap.painel-colapsado .gerencial-painel {
   display: none;
 }
 

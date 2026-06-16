@@ -140,9 +140,10 @@
   <div class="gerencial-painel-toggle" id="gerencialToggle" title="Abrir painel" role="button" tabindex="0" aria-label="Abrir painel">›</div>
 
   <div class="gerencial-painel" id="gerencialPainel">
-    <div id="gerencialPainelConteudo">
-      <p class="text-muted small mb-0">Selecione uma linha para ver detalhes.</p>
+    <div class="gerencial-painel-fechar">
+      <button id="gerencialFechar" title="Fechar painel" type="button">✕ Fechar</button>
     </div>
+    <div id="gerencialPainelConteudo"></div>
   </div>
 </div>
 </div>
@@ -519,6 +520,8 @@
       linhaSelecionada = null;
     }
   }
+
+  document.getElementById('gerencialFechar').addEventListener('click', fecharPainel);
 
   toggle.addEventListener('click', function () {
     if (wrap.classList.contains('painel-colapsado')) {
