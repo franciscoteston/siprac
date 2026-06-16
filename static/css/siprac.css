@@ -164,6 +164,13 @@ body {
   max-width: 100%;
   overflow-x: hidden;
   box-sizing: border-box;
+  padding: 1.5rem 1.5rem 0;
+}
+
+body.gerencial-mode .siprac-content {
+  padding: 0;
+  max-width: none;
+  overflow-x: hidden;
 }
 
 .gerencial-wrap {
@@ -173,6 +180,10 @@ body {
   height: calc(100vh - 140px);
   overflow: hidden;
   transition: grid-template-columns 0.2s ease;
+  margin: 0 -1.5rem;
+  width: calc(100% + 3rem);
+  max-width: 100vw;
+  box-sizing: border-box;
 }
 
 .gerencial-wrap.painel-colapsado {
@@ -189,8 +200,7 @@ body {
   height: 100%;
 }
 
-.gerencial-painel-toggle,
-.gerencial-painel {
+.gerencial-wrap:not(.painel-colapsado) .gerencial-painel {
   grid-column: 2;
   grid-row: 1;
 }
