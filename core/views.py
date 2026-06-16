@@ -1550,16 +1550,50 @@ GRUPOS_COLUNAS_GERENCIAL = [
     ),
 ]
 
+COLUNAS_GERENCIAL_NOVAS = {
+    "entrada_eav",
+    "origem",
+    "num_endereco",
+    "num_unidade",
+    "num_bloco",
+    "finalidade_imovel",
+    "area_territorial",
+    "area_construida",
+    "bairro",
+    "rh_valor",
+    "apelido",
+    "modelo_sugerido",
+    "prioridade",
+    "prazo_eav",
+    "prazo_recompra_itbi",
+    "mes_cronograma",
+    "prazo_aval",
+    "entrega_aval",
+    "revisor",
+    "entrega_rev",
+    "entrega_aju",
+    "ajustes_ok",
+    "envio_sei",
+    "status_producao",
+    "la_pt_ptf",
+    "doc_sei",
+    "destino",
+}
+
 COLUNAS_GERENCIAL_PADRAO = [
     "entrada_dai",
+    "entrada_eav",
     "requerimento",
     "finalidade",
     "ctm",
     "logradouro",
     "numero_imovel",
+    "bairro",
     "avaliador",
     "tipo_trabalho",
+    "prazo_eav",
     "dias_sei",
+    "status_producao",
 ]
 
 STATUS_GERENCIAL_CARDS = [
@@ -1617,6 +1651,12 @@ def _colunas_visiveis_gerencial(servidor):
         try:
             preferencia = servidor.preferencia_gerencial
             colunas = preferencia.colunas_visiveis or []
+            if colunas:
+                colunas_salvas = set(colunas)
+                if not colunas_salvas.intersection(COLUNAS_GERENCIAL_NOVAS):
+                    preferencia.colunas_visiveis = list(COLUNAS_GERENCIAL_PADRAO)
+                    preferencia.save(update_fields=["colunas_visiveis"])
+                    colunas = preferencia.colunas_visiveis
         except PreferenciaGerencial.DoesNotExist:
             colunas = list(COLUNAS_GERENCIAL_PADRAO)
         saved_set = set(colunas) if colunas else set(COLUNAS_GERENCIAL_PADRAO)
