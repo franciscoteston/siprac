@@ -1630,6 +1630,27 @@ def _carregar_mapas_gerencial(os_ids):
     return producoes, processos, imoveis
 
 
+def _destino_pos_homologacao(os_obj, producao):
+    if not producao or not producao.data_homologacao:
+        return "—"
+    enc = (
+        Encaminhamento.objects.filter(
+            os=os_obj,
+            data_hora__date__gte=producao.data_homologacao,
+        )
+        .select_related("unidade_externa_destino", "unidade_interna_destino")
+        .order_by("-data_hora")
+        .first()
+    )
+    if not enc:
+        return "—"
+    if enc.unidade_externa_destino:
+        return enc.unidade_externa_destino.nome
+    if enc.unidade_interna_destino:
+        return enc.unidade_interna_destino.sigla
+    return "—"
+
+
 def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, unidade):
     hoje = timezone.localdate()
     entrada_unidade = data_entrada_unidade(os_obj, unidade) if unidade else None
@@ -1671,12 +1692,40 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         else "—"
     )
     numero_producao = "—"
+    la_pt_ptf = "—"
+    if producao and producao.tipo_producao:
+        la_pt_ptf = producao.tipo_producao.prefixo
     if (
         producao
         and producao.status == Producao.STATUS_HOMOLOGADO
         and producao.numero_producao
     ):
         numero_producao = producao.numero_producao
+        la_pt_ptf = producao.numero_producao
+
+    prazo_interno_iso = (
+        producao.prazo_interno.isoformat()
+        if producao and producao.prazo_interno
+        else ""
+    )
+    prazo_interno_display = (
+        _formatar_data_br(producao.prazo_interno)
+        if producao and producao.prazo_interno
+        else "—"
+    )
+    mes_cronograma_iso = (
+        producao.mes_cronograma.strftime("%Y-%m")
+        if producao and producao.mes_cronograma
+        else ""
+    )
+    mes_cronograma_display = (
+        _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
+    )
+    entrada_eav = (
+        timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
+        if entrada_unidade
+        else "—"
+    )
 
     cells = {
         "apelido": os_obj.apelido or "—",
@@ -1747,116 +1796,94 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "os_pk": os_obj.pk,
         "producao_pk": producao.pk if producao else None,
         "numero_os": os_obj.numero_os,
-        "apelido": os_obj.apelido or "",
         "processo_sei": processo_sei or "—",
         "processo_pk": processo_pk,
-        "entrada_dai": entrada_dai.isoformat() if entrada_dai else "",
-        "entrada_dai_display": _formatar_data_br(entrada_dai),
-        "entrada_unidade_display": (
-            timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
-            if entrada_unidade
-            else "—"
-        ),
+        "entrada_dai": _formatar_data_br(entrada_dai),
+        "entrada_dai_iso": entrada_dai.isoformat() if entrada_dai else "",
+        "entrada_eav": entrada_eav,
+        "origem": "—",
         "requerimento": os_obj.tipo_demanda.descricao,
         "finalidade": os_obj.finalidade.descricao,
-        "prazo_tipo": os_obj.prazo_tipo,
-        "prazo_tipo_display": dict(OS.PRAZO_TIPO_CHOICES).get(
-            os_obj.prazo_tipo,
-            os_obj.prazo_tipo,
-        ),
-        "prazo_data": os_obj.prazo_data.isoformat() if os_obj.prazo_data else "",
-        "prazo_data_display": _formatar_data_br(os_obj.prazo_data),
+        "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
+        "logradouro": (os_imovel.nom_logradouro if os_imovel and os_imovel.nom_logradouro else "—"),
+        "num_endereco": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
+        "num_unidade": (os_imovel.num_unidade if os_imovel and os_imovel.num_unidade else "—"),
+        "num_bloco": (os_imovel.num_bloco if os_imovel and os_imovel.num_bloco else "—"),
+        "numero_imovel": identificacao_imovel,
+        "finalidade_imovel": (os_imovel.des_finalidade if os_imovel and os_imovel.des_finalidade else "—"),
+        "area_territorial": area_territorial,
+        "area_construida": area_construida,
+        "bairro": (os_imovel.bairro if os_imovel and os_imovel.bairro else "—"),
+        "rh_valor": rh_valor,
+        "apelido": os_obj.apelido or "",
+        "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else ""),
+        "prioridade": os_obj.prioridade or "NORMAL",
+        "prazo_eav": prazo_interno_display,
+        "prazo_eav_iso": prazo_interno_iso,
         "dias_sei": dias_sei,
-        "prioridade": os_obj.prioridade,
-        "imovel": {
-            "ctm": os_imovel.cod_logradouro if os_imovel else None,
-            "logradouro": os_imovel.nom_logradouro if os_imovel else "",
-            "numero": os_imovel.num_endereco if os_imovel else "",
-            "unidade": os_imovel.num_unidade if os_imovel else "",
-            "lote_fiscal": os_imovel.num_bloco if os_imovel else "",
-            "identificacao": identificacao_imovel,
-            "finalidade": os_imovel.des_finalidade if os_imovel else "",
-            "area_territorial": area_territorial if area_territorial != "—" else "",
-            "area_construida": area_construida if area_construida != "—" else "",
-            "bairro": os_imovel.bairro if os_imovel else "",
-            "rh_valor": os_imovel.rh_valor if os_imovel else None,
-        },
-        "producao": {
-            "status": producao.status if producao else "",
-            "status_label": (
-                dict(Producao.STATUS_CHOICES).get(producao.status, "—")
-                if producao
-                else "—"
-            ),
-            "modelo_sugerido": producao.modelo_sugerido if producao else "",
-            "prazo_interno": (
-                producao.prazo_interno.isoformat()
-                if producao and producao.prazo_interno
-                else ""
-            ),
-            "prazo_interno_display": (
-                _formatar_data_br(producao.prazo_interno) if producao else "—"
-            ),
-            "mes_cronograma": (
-                producao.mes_cronograma.strftime("%Y-%m")
-                if producao and producao.mes_cronograma
-                else ""
-            ),
-            "mes_cronograma_display": (
-                _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
-            ),
-            "servidor_responsavel_id": (
-                producao.servidor_responsavel_id if producao else None
-            ),
-            "servidor_responsavel_nome": (
-                producao.servidor_responsavel.nome
-                if producao and producao.servidor_responsavel
-                else "—"
-            ),
-            "revisor_id": producao.revisor_id if producao else None,
-            "revisor_nome": (
-                producao.revisor.nome if producao and producao.revisor else "—"
-            ),
-            "data_entrega_avaliacao": (
-                producao.data_entrega_avaliacao.isoformat()
-                if producao and producao.data_entrega_avaliacao
-                else ""
-            ),
-            "data_entrega_avaliacao_display": (
-                _formatar_data_br(producao.data_entrega_avaliacao) if producao else "—"
-            ),
-            "data_entrega_revisao": (
-                producao.data_entrega_revisao.isoformat()
-                if producao and producao.data_entrega_revisao
-                else ""
-            ),
-            "data_entrega_revisao_display": (
-                _formatar_data_br(producao.data_entrega_revisao) if producao else "—"
-            ),
-            "data_entrega_ajustes": (
-                producao.data_entrega_ajustes.isoformat()
-                if producao and producao.data_entrega_ajustes
-                else ""
-            ),
-            "data_entrega_ajustes_display": (
-                _formatar_data_br(producao.data_entrega_ajustes) if producao else "—"
-            ),
-            "data_homologacao_display": (
-                _formatar_data_br(producao.data_homologacao) if producao else "—"
-            ),
-            "tipo_prefixo": (
-                producao.tipo_producao.prefixo
-                if producao and producao.tipo_producao
-                else "—"
-            ),
-            "tipo_descricao": (
-                producao.tipo_producao.descricao
-                if producao and producao.tipo_producao
-                else "—"
-            ),
-            "numero_producao": numero_producao if numero_producao != "—" else "",
-            "numero_sei": producao.numero_sei if producao else "",
-        },
+        "mes_cronograma": mes_cronograma_display,
+        "mes_cronograma_iso": mes_cronograma_iso,
+        "avaliador_nome": (
+            producao.servidor_responsavel.nome
+            if producao and producao.servidor_responsavel
+            else "—"
+        ),
+        "avaliador_id": producao.servidor_responsavel_id if producao else None,
+        "prazo_aval": prazo_interno_display,
+        "prazo_aval_iso": prazo_interno_iso,
+        "entrega_aval": (
+            _formatar_data_br(producao.data_entrega_avaliacao)
+            if producao and producao.data_entrega_avaliacao
+            else "—"
+        ),
+        "entrega_aval_iso": (
+            producao.data_entrega_avaliacao.isoformat()
+            if producao and producao.data_entrega_avaliacao
+            else ""
+        ),
+        "revisor_nome": (
+            producao.revisor.nome if producao and producao.revisor else "—"
+        ),
+        "revisor_id": producao.revisor_id if producao else None,
+        "entrega_rev": (
+            _formatar_data_br(producao.data_entrega_revisao)
+            if producao and producao.data_entrega_revisao
+            else "—"
+        ),
+        "entrega_rev_iso": (
+            producao.data_entrega_revisao.isoformat()
+            if producao and producao.data_entrega_revisao
+            else ""
+        ),
+        "entrega_aju": (
+            _formatar_data_br(producao.data_entrega_ajustes)
+            if producao and producao.data_entrega_ajustes
+            else "—"
+        ),
+        "entrega_aju_iso": (
+            producao.data_entrega_ajustes.isoformat()
+            if producao and producao.data_entrega_ajustes
+            else ""
+        ),
+        "envio_sei": (
+            _formatar_data_br(producao.data_homologacao)
+            if producao and producao.data_homologacao
+            else "—"
+        ),
+        "status": producao.status if producao else "",
+        "status_label": (
+            dict(Producao.STATUS_CHOICES).get(producao.status, "—")
+            if producao
+            else "—"
+        ),
+        "la_pt_ptf": la_pt_ptf,
+        "tipo_trabalho": (
+            producao.tipo_producao.descricao
+            if producao and producao.tipo_producao
+            else "—"
+        ),
+        "doc_sei": (producao.numero_sei if producao and producao.numero_sei else "—"),
+        "destino": _destino_pos_homologacao(os_obj, producao),
     }
 
     return {
