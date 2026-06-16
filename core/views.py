@@ -1594,6 +1594,11 @@ COLUNAS_GERENCIAL_PADRAO = [
     "rh_valor",
     "numero_imovel",
     "bairro",
+    "apelido",
+    "modelo_sugerido",
+    "prioridade",
+    "prazo_recompra_itbi",
+    "mes_cronograma",
     "avaliador",
     "tipo_trabalho",
     "prazo_eav",
@@ -1871,12 +1876,16 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "bairro": (os_imovel.bairro or "—") if os_imovel else "—",
         "rh_valor": rh_valor,
         "apelido": os_obj.apelido or "—",
-        "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
+        "modelo_sugerido": (producao.modelo_sugerido or "—") if producao else "—",
         "prioridade": PRIORIDADE_OS_LABELS.get(os_obj.prioridade, os_obj.prioridade or "—"),
         "prazo_eav": prazo_interno_display,
         "dias_sei": dias_sei,
         "prazo_recompra_itbi": "—",
-        "mes_cronograma": mes_cronograma_display,
+        "mes_cronograma": (
+            producao.mes_cronograma.strftime("%m/%Y")
+            if producao and producao.mes_cronograma
+            else "—"
+        ),
         "avaliador": (
             producao.servidor_responsavel.nome
             if producao and producao.servidor_responsavel
