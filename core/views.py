@@ -1600,6 +1600,13 @@ COLUNAS_GERENCIAL_PADRAO = [
     "prazo_recompra_itbi",
     "mes_cronograma",
     "avaliador",
+    "prazo_aval",
+    "entrega_aval",
+    "revisor",
+    "entrega_rev",
+    "entrega_aju",
+    "ajustes_ok",
+    "envio_sei",
     "tipo_trabalho",
     "prazo_eav",
     "dias_sei",
@@ -1891,26 +1898,30 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
             if producao and producao.servidor_responsavel
             else "—"
         ),
-        "prazo_aval": prazo_interno_display,
+        "prazo_aval": (
+            producao.prazo_interno.strftime("%d/%m/%Y")
+            if producao and producao.prazo_interno
+            else "—"
+        ),
         "entrega_aval": (
-            _formatar_data_br(producao.data_entrega_avaliacao)
+            producao.data_entrega_avaliacao.strftime("%d/%m/%Y")
             if producao and producao.data_entrega_avaliacao
             else "—"
         ),
         "revisor": (producao.revisor.nome if producao and producao.revisor else "—"),
         "entrega_rev": (
-            _formatar_data_br(producao.data_entrega_revisao)
+            producao.data_entrega_revisao.strftime("%d/%m/%Y")
             if producao and producao.data_entrega_revisao
             else "—"
         ),
         "entrega_aju": (
-            _formatar_data_br(producao.data_entrega_ajustes)
+            producao.data_entrega_ajustes.strftime("%d/%m/%Y")
             if producao and producao.data_entrega_ajustes
             else "—"
         ),
         "ajustes_ok": "—",
         "envio_sei": (
-            _formatar_data_br(producao.data_homologacao)
+            producao.data_homologacao.strftime("%d/%m/%Y")
             if producao and producao.data_homologacao
             else "—"
         ),
