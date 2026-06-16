@@ -65,7 +65,7 @@
         <a class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}"
            href="{% url 'dashboard' %}">Dashboard</a>
         <a class="nav-link{% if request.resolver_match.url_name == 'os_list' %} active{% endif %}"
-           href="{% url 'os_list' %}">Ordens de serviço</a>
+           href="{% if request.perfil_acesso and request.perfil_acesso.pode_homologar or request.perfil_acesso and request.perfil_acesso.visibilidade_total %}{% url 'os_list' %}?view=gerencial{% else %}{% url 'os_list' %}{% endif %}">Ordens de serviço</a>
         <div class="dropdown">
           <a class="nav-link dropdown-toggle{% if request.resolver_match.url_name == 'imovel_list' or request.resolver_match.url_name == 'imovel_mapa' or request.resolver_match.url_name == 'imovel_novo' or request.resolver_match.url_name == 'imovel_detalhe' or request.resolver_match.url_name == 'imovel_editar' %} active{% endif %}"
              href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">

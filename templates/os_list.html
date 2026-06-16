@@ -4,14 +4,26 @@
 {% block title %}Ordens de serviço — SIPRAC{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0 text-dark">Ordens de serviço</h1>
   {% if request.perfil_acesso and request.perfil_acesso.pode_criar_os %}
   <a href="{% url 'os_nova' %}" class="btn btn-primary siprac-btn-primary">+ Nova OS</a>
   {% endif %}
 </div>
 
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link{% if view_mode != 'gerencial' %} active{% endif %}"
+       href="?view=lista{% if query_string_filtros %}&{{ query_string_filtros }}{% endif %}">Lista</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link{% if view_mode == 'gerencial' %} active{% endif %}"
+       href="?view=gerencial{% if query_string_filtros %}&{{ query_string_filtros }}{% endif %}">Gerencial</a>
+  </li>
+</ul>
+
 <form method="get" class="card siprac-card mb-4">
+  <input type="hidden" name="view" value="{{ view_mode|default:'lista' }}">
   <div class="card-body">
     <div class="row g-3 align-items-end">
       <div class="col-md-2">
@@ -64,6 +76,10 @@
     </div>
   </div>
 </form>
+
+{% if view_mode == 'gerencial' %}
+{% include 'os_gerencial.html' %}
+{% else %}
 
 <div class="table-responsive">
   <table class="table table-hover siprac-table align-middle mb-0">
@@ -121,7 +137,7 @@
   <ul class="pagination pagination-sm justify-content-center mb-0">
     {% if page_obj.has_previous %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}&aguarda_retorno={{ filtro_aguarda_retorno }}&prazo={{ filtro_prazo }}&unidade={{ filtro_unidade }}">Anterior</a>
+      <a class="page-link" href="?view=lista&page={{ page_obj.previous_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}&aguarda_retorno={{ filtro_aguarda_retorno }}&prazo={{ filtro_prazo }}&unidade={{ filtro_unidade }}">Anterior</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -133,7 +149,7 @@
 
     {% if page_obj.has_next %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}&aguarda_retorno={{ filtro_aguarda_retorno }}&prazo={{ filtro_prazo }}&unidade={{ filtro_unidade }}">Próxima</a>
+      <a class="page-link" href="?view=lista&page={{ page_obj.next_page_number }}&macroetapa={{ filtro_macroetapa }}&natureza={{ filtro_natureza }}&prioridade={{ filtro_prioridade }}&status_producao={{ filtro_status_producao }}&q={{ filtro_q }}&aguarda_retorno={{ filtro_aguarda_retorno }}&prazo={{ filtro_prazo }}&unidade={{ filtro_unidade }}">Próxima</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Próxima</span></li>
@@ -141,9 +157,12 @@
   </ul>
 </nav>
 {% endif %}
+
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
+{% if view_mode != 'gerencial' %}
 <script>
 document.querySelectorAll('.siprac-os-row').forEach(function (row) {
   row.addEventListener('click', function () {
@@ -151,4 +170,5 @@ document.querySelectorAll('.siprac-os-row').forEach(function (row) {
   });
 });
 </script>
+{% endif %}
 {% endblock %}

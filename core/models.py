@@ -990,6 +990,28 @@ class MetaPesquisa(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Preferências da visão gerencial
+# ---------------------------------------------------------------------------
+
+
+class PreferenciaGerencial(models.Model):
+    servidor = models.OneToOneField(
+        Servidor,
+        on_delete=models.CASCADE,
+        related_name="preferencia_gerencial",
+    )
+    colunas_visiveis = models.JSONField(default=list)
+
+    class Meta:
+        db_table = "preferencia_gerencial"
+        verbose_name = "preferência gerencial"
+        verbose_name_plural = "preferências gerenciais"
+
+    def __str__(self):
+        return f"Preferências gerenciais — {self.servidor}"
+
+
+# ---------------------------------------------------------------------------
 # Auditoria
 # ---------------------------------------------------------------------------
 

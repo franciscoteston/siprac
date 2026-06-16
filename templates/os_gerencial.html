@@ -1,0 +1,490 @@
+{% load siprac_filters %}
+<form class="d-none" id="gerencial-csrf">{% csrf_token %}</form>
+
+<div class="gerencial-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    {% if filtros_coluna_ativos %}
+    <a href="?{{ query_string_gerencial_base }}"
+       class="btn btn-outline-secondary btn-sm">Limpar filtros de coluna</a>
+    {% endif %}
+  </div>
+  <div class="dropdown">
+    <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button"
+            id="btn-colunas-gerencial" data-bs-toggle="dropdown" aria-expanded="false">
+      Colunas ▼
+    </button>
+    <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 240px;" id="menu-colunas-gerencial">
+      <p class="small text-muted mb-2">Colunas visíveis</p>
+      <div id="lista-colunas-gerencial">
+        {% for col_id, col_meta in colunas_gerencial_config.items %}
+        <div class="form-check">
+          <input class="form-check-input coluna-gerencial-check" type="checkbox"
+                 value="{{ col_id }}" id="col-check-{{ col_id }}"
+                 {% if col_id in colunas_gerencial_visiveis %}checked{% endif %}>
+          <label class="form-check-label small" for="col-check-{{ col_id }}">{{ col_meta.label }}</label>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-primary btn-sm siprac-btn-primary w-100 mt-2" id="btn-salvar-colunas">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<div class="row g-2 mb-3">
+  {% for status in status_gerencial_cards %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <a href="?{{ urls_status_gerencial|get_item:status }}"
+       class="text-decoration-none">
+      <div class="card siprac-card gerencial-status-card h-100{% if filtro_status_producao == status %} border-primary{% endif %}">
+        <div class="card-body py-2 px-3 text-center">
+          <div class="small text-muted">{{ status|status_producao_display }}</div>
+          <div class="fw-bold fs-5">{{ contagens_status_gerencial|get_item:status|default:0 }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="gerencial-layout" id="gerencial-layout">
+  <div class="gerencial-table-wrap flex-grow-1">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover siprac-table gerencial-table align-middle mb-0" id="tabela-gerencial">
+        <thead class="table-light">
+          <tr>
+            <th class="gerencial-col-fixa">Processo SEI</th>
+            <th class="gerencial-col-fixa">Status</th>
+            {% for col_id in colunas_gerencial_visiveis %}
+            <th class="gerencial-col-config" data-col="{{ col_id }}">
+              <div class="d-flex align-items-center gap-1">
+                <span>{{ colunas_gerencial_labels|get_item:col_id }}</span>
+                <div class="dropdown d-inline">
+                  <button type="button" class="btn btn-link btn-sm p-0 text-muted filtro-coluna-btn"
+                          data-bs-toggle="dropdown" data-col="{{ col_id }}"
+                          aria-label="Filtrar {{ col_id }}">▼</button>
+                  <ul class="dropdown-menu dropdown-menu-sm filtro-coluna-menu" data-col="{{ col_id }}">
+                    <li><a class="dropdown-item small" href="?{{ query_string_gerencial_base }}">(todos)</a></li>
+                    {% for opcao in opcoes_filtro_coluna|get_item:col_id %}
+                    <li>
+                      <a class="dropdown-item small{% if filtros_coluna_ativos|get_item:col_id == opcao %} active{% endif %}"
+                         href="?{{ query_string_gerencial_base }}&fg_{{ col_id }}={{ opcao|urlencode }}">{{ opcao }}</a>
+                    </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% if filtros_coluna_ativos|get_item:col_id %}
+                <span class="badge bg-primary rounded-pill" style="font-size:9px;">●</span>
+                {% endif %}
+              </div>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas_gerencial %}
+          <tr class="gerencial-row" data-os-pk="{{ linha.os_pk }}" data-panel='{{ linha.panel_json|escapejs }}'>
+            <td class="gerencial-col-fixa">
+              {% if linha.processo_pk %}
+              <a href="{% url 'processo_detail' linha.processo_pk %}" class="text-decoration-none"
+                 onclick="event.stopPropagation();">{{ linha.processo_sei }}</a>
+              {% else %}{{ linha.processo_sei }}{% endif %}
+            </td>
+            <td class="gerencial-col-fixa">
+              {% if linha.status_producao %}
+              <span class="badge bg-{{ linha.status_producao|status_producao_cor }}">{{ linha.status_producao_label }}</span>
+              {% else %}—{% endif %}
+            </td>
+            {% for col_id in colunas_gerencial_visiveis %}
+            <td class="gerencial-col-config gerencial-cell" data-col="{{ col_id }}" data-os-pk="{{ linha.os_pk }}">
+              {% if col_id == 'dias_sei' %}
+                {% with dias=linha.cells.dias_sei %}
+                  {% if dias != None %}
+                  <span class="{{ dias|cor_prazo }}">{{ dias|label_prazo }}</span>
+                  {% else %}—{% endif %}
+                {% endwith %}
+              {% else %}
+                {{ linha.cells|get_item:col_id }}
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="50" class="text-muted text-center py-4">Nenhuma OS encontrada.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-3" aria-label="Paginação gerencial">
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?{{ query_string_gerencial_base }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+          <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?{{ query_string_gerencial_base }}&page={{ page_obj.next_page_number }}">Próxima</a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+
+  <aside class="gerencial-panel collapsed" id="gerencial-panel" aria-hidden="true">
+    <button type="button" class="gerencial-panel-toggle" id="gerencial-panel-toggle" aria-label="Recolher painel">›</button>
+    <div class="gerencial-panel-resizer" id="gerencial-panel-resizer"></div>
+    <div class="gerencial-panel-inner" id="gerencial-panel-content">
+      <p class="text-muted small mb-0">Selecione uma linha para ver detalhes.</p>
+    </div>
+  </aside>
+</div>
+
+<script type="application/json" id="gerencial-config">
+{
+  "preferenciasUrl": "{% url 'api_preferencias_gerencial' %}",
+  "podeHomologar": {{ pode_homologar|yesno:"true,false" }},
+  "podeEditarEntradaDai": {{ pode_editar_entrada_dai|yesno:"true,false" }},
+  "colunasVisiveis": {{ colunas_gerencial_visiveis_json|safe }}
+}
+</script>
+
+<script>
+(function () {
+  const configEl = document.getElementById('gerencial-config');
+  if (!configEl) return;
+
+  const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
+  const csrfToken = csrfInput ? csrfInput.value : '';
+  const panel = document.getElementById('gerencial-panel');
+  const panelContent = document.getElementById('gerencial-panel-content');
+  const panelToggle = document.getElementById('gerencial-panel-toggle');
+  const layout = document.getElementById('gerencial-layout');
+  const resizer = document.getElementById('gerencial-panel-resizer');
+  let linhaSelecionada = null;
+  let panelData = null;
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+  }
+
+  function postCampo(url, campo, valor) {
+    const formData = new FormData();
+    formData.append('campo', campo);
+    formData.append('valor', valor || '');
+    formData.append('csrfmiddlewaretoken', csrfToken);
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+      body: formData,
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok || !data.sucesso) throw new Error(data.erro || 'Erro ao salvar.');
+        return data;
+      });
+    });
+  }
+
+  function atualizarCelula(osPk, colId, html) {
+    document.querySelectorAll('.gerencial-cell[data-os-pk="' + osPk + '"][data-col="' + colId + '"]').forEach(function (td) {
+      td.innerHTML = html;
+    });
+  }
+
+  function diasSeiHtml(dias) {
+    if (dias == null) return '—';
+    var cls = 'text-success';
+    var label = dias + ' dia(s)';
+    if (dias < 0) { cls = 'text-danger fw-bold'; label = 'Vencido há ' + Math.abs(dias) + ' dia(s)'; }
+    else if (dias === 0) { cls = 'text-danger'; label = 'Vence hoje'; }
+    else if (dias <= 7) cls = 'text-danger';
+    else if (dias <= 15) cls = 'text-warning';
+    return '<span class="' + cls + '">' + label + '</span>';
+  }
+
+  function bindPanelEvents() {
+    if (!panelData) return;
+    const osPk = panelData.os_pk;
+    const prodPk = panelData.producao_pk;
+
+    panelContent.querySelectorAll('[data-save-os]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const campo = btn.dataset.saveOs;
+        const input = panelContent.querySelector('[data-field-os="' + campo + '"]');
+        const valor = input ? input.value : '';
+        postCampo('/os/' + osPk + '/editar-campo/', campo, valor).then(function (data) {
+          if (campo === 'apelido') {
+            atualizarCelula(osPk, 'apelido', escapeHtml(data.valor || '—'));
+          }
+          if (campo === 'prazo_data') {
+            atualizarCelula(osPk, 'prazo_os', escapeHtml(data.valor_display || '—'));
+            if (data.dias_sei != null) atualizarCelula(osPk, 'dias_sei', diasSeiHtml(data.dias_sei));
+          }
+          if (campo === 'data_entrada_divisao') {
+            atualizarCelula(osPk, 'entrada_dai', escapeHtml(data.valor_display || '—'));
+          }
+        }).catch(function (e) { alert(e.message); });
+      });
+    });
+
+    if (prodPk) {
+      panelContent.querySelectorAll('[data-save-prod]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const campo = btn.dataset.saveProd;
+          const input = panelContent.querySelector('[data-field-prod="' + campo + '"]');
+          const valor = input ? input.value : '';
+          postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor).then(function (data) {
+            if (campo === 'modelo_sugerido') atualizarCelula(osPk, 'modelo_sugerido', escapeHtml(data.valor || '—'));
+            if (campo === 'servidor_responsavel') atualizarCelula(osPk, 'avaliador', escapeHtml(data.valor || '—'));
+            if (campo === 'revisor') atualizarCelula(osPk, 'revisor', escapeHtml(data.valor || '—'));
+            if (campo === 'mes_cronograma') atualizarCelula(osPk, 'mes_cronograma', escapeHtml(data.valor_display || '—'));
+            if (campo === 'prazo_interno') atualizarCelula(osPk, 'prazo_os', escapeHtml(data.valor_display || '—'));
+          }).catch(function (e) { alert(e.message); });
+        });
+      });
+
+      const statusSelect = panelContent.querySelector('#panel-status-producao');
+      if (statusSelect) {
+        statusSelect.addEventListener('change', function () {
+          const formData = new FormData();
+          formData.append('acao', 'transicao');
+          formData.append('novo_status', statusSelect.value);
+          formData.append('csrfmiddlewaretoken', csrfToken);
+          fetch('/producoes/' + prodPk + '/status/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            body: formData,
+          }).then(function (r) {
+            return r.json().then(function (data) {
+              if (!r.ok || !data.sucesso) throw new Error(data.erro || 'Erro ao alterar status.');
+              location.reload();
+            });
+          }).catch(function (e) { alert(e.message); });
+        });
+      }
+    }
+
+    panelContent.querySelectorAll('[data-comentario]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const alvo = btn.dataset.comentario;
+        const textarea = panelContent.querySelector('[data-comentario-texto="' + alvo + '"]');
+        const texto = textarea ? textarea.value.trim() : '';
+        if (!texto) return;
+        const url = alvo === 'os' ? '/os/' + osPk + '/comentarios/' : '/producoes/' + prodPk + '/comentarios/';
+        const formData = new FormData();
+        formData.append('texto', texto);
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+          body: formData,
+        }).then(function (r) {
+          return r.json().then(function (data) {
+            if (!r.ok) throw new Error(data.erro || 'Erro ao comentar.');
+            textarea.value = '';
+            alert('Comentário registrado.');
+          });
+        }).catch(function (e) { alert(e.message); });
+      });
+    });
+  }
+
+  function renderPanel(data) {
+    panelData = data;
+    const p = data.producao || {};
+    const im = data.imovel || {};
+    const titulo = data.numero_os + (data.apelido ? ' <span class="badge bg-light text-dark border">' + escapeHtml(data.apelido) + '</span>' : '');
+    let html = '';
+    html += '<div class="gerencial-panel-header mb-3 pb-2 border-bottom">';
+    html += '<div class="fw-semibold">' + titulo + '</div>';
+    html += '<div class="mt-1"><span class="badge bg-secondary">' + escapeHtml(p.status_label || '—') + '</span></div>';
+    html += '<a href="/os/' + data.os_pk + '/" class="small d-inline-block mt-2">Ver OS completa →</a>';
+    html += '</div>';
+
+    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Informações de Entrada</h6><dl class="row mb-0 small gerencial-dl">';
+    html += '<dt class="col-5">Processo SEI</dt><dd class="col-7">' + escapeHtml(data.processo_sei) + '</dd>';
+    html += '<dt class="col-5">Entrada DAI</dt><dd class="col-7">';
+    if ({{ pode_editar_entrada_dai|yesno:"true,false" }}) {
+      html += '<input type="date" class="form-control form-control-sm" data-field-os="data_entrada_divisao" value="' + escapeHtml(data.entrada_dai) + '">';
+      html += ' <button type="button" class="btn btn-outline-primary btn-sm py-0" data-save-os="data_entrada_divisao">Salvar</button>';
+    } else {
+      html += escapeHtml(data.entrada_dai_display);
+    }
+    html += '</dd>';
+    html += '<dt class="col-5">Entrada unidade</dt><dd class="col-7">' + escapeHtml(data.entrada_unidade_display) + '</dd>';
+    html += '<dt class="col-5">Requerimento</dt><dd class="col-7">' + escapeHtml(data.requerimento) + '</dd>';
+    html += '<dt class="col-5">Finalidade</dt><dd class="col-7">' + escapeHtml(data.finalidade) + '</dd>';
+    html += '<dt class="col-5">Prazo</dt><dd class="col-7">';
+    if ({{ pode_homologar|yesno:"true,false" }}) {
+      html += '<select class="form-select form-select-sm mb-1" data-field-os="prazo_tipo">';
+      {% for valor, label in prazo_tipo_opcoes %}
+      html += '<option value="{{ valor }}"' + (data.prazo_tipo === '{{ valor }}' ? ' selected' : '') + '>{{ label }}</option>';
+      {% endfor %}
+      html += '</select>';
+      html += '<input type="date" class="form-control form-control-sm" data-field-os="prazo_data" value="' + escapeHtml(data.prazo_data) + '">';
+      html += ' <button type="button" class="btn btn-outline-primary btn-sm py-0" data-save-os="prazo_tipo">Salvar tipo</button>';
+      html += ' <button type="button" class="btn btn-outline-primary btn-sm py-0" data-save-os="prazo_data">Salvar data</button>';
+    } else {
+      html += escapeHtml(data.prazo_tipo_display) + ' — ' + escapeHtml(data.prazo_data_display);
+    }
+    html += '</dd></dl>';
+    html += '<textarea class="form-control form-control-sm mt-2" rows="2" placeholder="Comentário…" data-comentario-texto="os"></textarea>';
+    html += '<button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-comentario="os">Comentar</button>';
+    html += '</section>';
+
+    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Informações do Imóvel</h6><dl class="row mb-0 small gerencial-dl">';
+    html += '<dt class="col-5">CTM</dt><dd class="col-7">' + escapeHtml(im.ctm != null ? im.ctm : '—') + '</dd>';
+    html += '<dt class="col-5">Logradouro</dt><dd class="col-7">' + escapeHtml(im.logradouro || '—') + '</dd>';
+    html += '<dt class="col-5">Nº</dt><dd class="col-7">' + escapeHtml(im.numero || '—') + '</dd>';
+    html += '<dt class="col-5">Unidade</dt><dd class="col-7">' + escapeHtml(im.unidade || '—') + '</dd>';
+    html += '<dt class="col-5">Lote Fiscal</dt><dd class="col-7">' + escapeHtml(im.lote_fiscal || '—') + '</dd>';
+    html += '<dt class="col-5">Nº Imóvel</dt><dd class="col-7">' + escapeHtml(im.identificacao || '—') + '</dd>';
+    html += '<dt class="col-5">Finalidade</dt><dd class="col-7">' + escapeHtml(im.finalidade || '—') + '</dd>';
+    html += '<dt class="col-5">Área Territorial</dt><dd class="col-7">' + escapeHtml(im.area_territorial || '—') + '</dd>';
+    html += '<dt class="col-5">Área Construída</dt><dd class="col-7">' + escapeHtml(im.area_construida || '—') + '</dd>';
+    html += '<dt class="col-5">Bairro</dt><dd class="col-7">' + escapeHtml(im.bairro || '—') + '</dd>';
+    html += '<dt class="col-5">RH</dt><dd class="col-7">' + escapeHtml(im.rh_valor != null ? im.rh_valor : '—') + '</dd>';
+    html += '</dl></section>';
+
+    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Triagem</h6>';
+    if ({{ pode_homologar|yesno:"true,false" }} && data.producao_pk) {
+      html += '<label class="form-label small mb-0">Apelido</label>';
+      html += '<input type="text" class="form-control form-control-sm mb-2" data-field-os="apelido" value="' + escapeHtml(data.apelido) + '">';
+      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-os="apelido">Salvar apelido</button>';
+      html += '<label class="form-label small mb-0">Modelo sugerido</label>';
+      html += '<input type="text" class="form-control form-control-sm mb-2" data-field-prod="modelo_sugerido" value="' + escapeHtml(p.modelo_sugerido || '') + '">';
+      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="modelo_sugerido">Salvar modelo</button>';
+      html += '<label class="form-label small mb-0">Prioridade</label>';
+      html += '<select class="form-select form-select-sm mb-2" data-field-os="prioridade">';
+      {% for pr in prioridades_os %}
+      html += '<option value="{{ pr }}"' + (data.prioridade === '{{ pr }}' ? ' selected' : '') + '>{{ pr|prioridade_display }}</option>';
+      {% endfor %}
+      html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-os="prioridade">Salvar prioridade</button>';
+      html += '<label class="form-label small mb-0">Prazo interno</label>';
+      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="prazo_interno" value="' + escapeHtml(p.prazo_interno || '') + '">';
+      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="prazo_interno">Salvar prazo interno</button>';
+    }
+    html += '<dl class="row mb-0 small gerencial-dl"><dt class="col-5">DIAS_SEI</dt><dd class="col-7">' + diasSeiHtml(data.dias_sei) + '</dd>';
+    html += '<dt class="col-5">Prazo Recompra/ITBI</dt><dd class="col-7">—</dd>';
+    if ({{ pode_homologar|yesno:"true,false" }} && data.producao_pk) {
+      html += '<dt class="col-5">Mês cronograma</dt><dd class="col-7">';
+      html += '<input type="month" class="form-control form-control-sm" data-field-prod="mes_cronograma" value="' + escapeHtml(p.mes_cronograma || '') + '">';
+      html += ' <button type="button" class="btn btn-outline-primary btn-sm py-0" data-save-prod="mes_cronograma">Salvar</button></dd>';
+    }
+    html += '</dl></section>';
+
+    if (data.producao_pk) {
+      html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Prazos / Fluxo</h6>';
+      if ({{ pode_homologar|yesno:"true,false" }}) {
+        html += '<label class="form-label small">Avaliador</label><select class="form-select form-select-sm mb-2" data-field-prod="servidor_responsavel">';
+        html += '<option value="">—</option>';
+        {% for srv in servidores %}
+        html += '<option value="{{ srv.pk }}"' + (String(p.servidor_responsavel_id) === '{{ srv.pk }}' ? ' selected' : '') + '>{{ srv.nome|escapejs }}</option>';
+        {% endfor %}
+        html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="servidor_responsavel">Salvar avaliador</button>';
+        html += '<label class="form-label small">Revisor</label><select class="form-select form-select-sm mb-2" data-field-prod="revisor">';
+        html += '<option value="">—</option>';
+        {% for srv in servidores_revisores %}
+        html += '<option value="{{ srv.pk }}"' + (String(p.revisor_id) === '{{ srv.pk }}' ? ' selected' : '') + '>{{ srv.nome|escapejs }}</option>';
+        {% endfor %}
+        html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="revisor">Salvar revisor</button>';
+        ['data_entrega_avaliacao','data_entrega_revisao','data_entrega_ajustes'].forEach(function(campo) {
+          html += '<label class="form-label small">' + campo + '</label>';
+          html += '<input type="date" class="form-control form-control-sm mb-1" data-field-prod="' + campo + '" value="' + escapeHtml(p[campo] || '') + '">';
+          html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="' + campo + '">Salvar</button>';
+        });
+      }
+      html += '<dl class="row small gerencial-dl"><dt class="col-5">Homologação</dt><dd class="col-7">' + escapeHtml(p.data_homologacao_display || '—') + '</dd></dl>';
+      html += '<label class="form-label small">Status</label><select class="form-select form-select-sm" id="panel-status-producao">';
+      {% for valor, label in status_producao_opcoes_gerencial %}
+      html += '<option value="{{ valor }}"' + (p.status === '{{ valor }}' ? ' selected' : '') + '>{{ label }}</option>';
+      {% endfor %}
+      html += '</select></section>';
+
+      html += '<section class="mb-2"><h6 class="small fw-semibold text-muted">Produtos</h6>';
+      html += '<dl class="row small gerencial-dl mb-0">';
+      html += '<dt class="col-5">Tipo</dt><dd class="col-7">' + escapeHtml(p.tipo_prefixo) + ' — ' + escapeHtml(p.tipo_descricao) + '</dd>';
+      html += '<dt class="col-5">Nº produção</dt><dd class="col-7">' + escapeHtml(p.numero_producao || '—') + '</dd>';
+      html += '<dt class="col-5">Nº SEI doc.</dt><dd class="col-7">' + escapeHtml(p.numero_sei || '—') + '</dd>';
+      html += '</dl></section>';
+    }
+
+    panelContent.innerHTML = html;
+    bindPanelEvents();
+  }
+
+  document.querySelectorAll('.gerencial-row').forEach(function (row) {
+    row.addEventListener('click', function (e) {
+      if (e.target.closest('a')) return;
+      document.querySelectorAll('.gerencial-row').forEach(function (r) { r.classList.remove('table-active'); });
+      row.classList.add('table-active');
+      linhaSelecionada = row;
+      try {
+        const data = JSON.parse(row.getAttribute('data-panel'));
+        renderPanel(data);
+        panel.classList.remove('collapsed');
+        panel.setAttribute('aria-hidden', 'false');
+        panelToggle.textContent = '‹';
+      } catch (err) {
+        console.error(err);
+      }
+    });
+  });
+
+  panelToggle.addEventListener('click', function () {
+    panel.classList.toggle('collapsed');
+    const aberto = !panel.classList.contains('collapsed');
+    panel.setAttribute('aria-hidden', aberto ? 'false' : 'true');
+    panelToggle.textContent = aberto ? '‹' : '›';
+  });
+
+  if (resizer) {
+    let dragging = false;
+    resizer.addEventListener('mousedown', function (e) {
+      dragging = true;
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      const rect = layout.getBoundingClientRect();
+      const largura = Math.min(Math.max(rect.right - e.clientX, 280), 600);
+      panel.style.width = largura + 'px';
+    });
+    document.addEventListener('mouseup', function () { dragging = false; });
+  }
+
+  document.getElementById('btn-salvar-colunas').addEventListener('click', function () {
+    const colunas = [];
+    document.querySelectorAll('.coluna-gerencial-check:checked').forEach(function (cb) {
+      colunas.push(cb.value);
+    });
+    fetch('{% url "api_preferencias_gerencial" %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ colunas_visiveis: colunas }),
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok || !data.sucesso) throw new Error(data.erro || 'Erro ao salvar colunas.');
+        location.reload();
+      });
+    }).catch(function (e) { alert(e.message); });
+  });
+})();
+</script>

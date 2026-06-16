@@ -89,6 +89,7 @@ from core.models import (
     OS,
     OsImovel,
     OsProcesso,
+    PreferenciaGerencial,
     ProcessoSei,
     LogAuditoria,
     Producao,
@@ -1451,10 +1452,476 @@ class OSCreateView(RequerLoginMixin, FormView):
         return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
 
 
+COLUNAS_GERENCIAL_CONFIG = {
+    "apelido": {"label": "Apelido"},
+    "entrada_dai": {"label": "Entrada DAI"},
+    "entrada_unidade": {"label": "Entrada unidade"},
+    "requerimento": {"label": "Requerimento"},
+    "finalidade": {"label": "Finalidade"},
+    "ctm": {"label": "CTM"},
+    "logradouro": {"label": "Logradouro"},
+    "numero": {"label": "Nº"},
+    "avaliador": {"label": "Avaliador"},
+    "revisor": {"label": "Revisor"},
+    "tipo_trabalho": {"label": "Tipo trabalho"},
+    "numero_producao": {"label": "Nº produção"},
+    "prazo_os": {"label": "Prazo OS"},
+    "dias_sei": {"label": "DIAS_SEI"},
+    "mes_cronograma": {"label": "Mês cronograma"},
+    "modelo_sugerido": {"label": "Modelo sugerido"},
+}
+
+COLUNAS_GERENCIAL_PADRAO = [
+    "apelido",
+    "entrada_dai",
+    "entrada_unidade",
+    "requerimento",
+    "finalidade",
+    "tipo_trabalho",
+    "prazo_os",
+    "dias_sei",
+]
+
+STATUS_GERENCIAL_CARDS = [
+    Producao.STATUS_ENTRADA,
+    Producao.STATUS_DISTRIBUIDO,
+    Producao.STATUS_EM_ELABORACAO,
+    Producao.STATUS_PARA_REVISAO,
+    Producao.STATUS_PARA_AJUSTES,
+    Producao.STATUS_HOMOLOGADO,
+]
+
+
+def _query_string_os_list(request, **overrides):
+    params = request.GET.copy()
+    params.pop("page", None)
+    for chave, valor in overrides.items():
+        if valor is None:
+            params.pop(chave, None)
+        elif valor == "":
+            params.pop(chave, None)
+        else:
+            params[chave] = valor
+    return params.urlencode()
+
+
+def _query_string_filtros_os_list(request):
+    params = request.GET.copy()
+    params.pop("page", None)
+    params.pop("view", None)
+    for coluna in COLUNAS_GERENCIAL_CONFIG:
+        params.pop(f"fg_{coluna}", None)
+    return params.urlencode()
+
+
+def _query_string_gerencial(request, **overrides):
+    params = request.GET.copy()
+    params.pop("page", None)
+    for coluna in COLUNAS_GERENCIAL_CONFIG:
+        params.pop(f"fg_{coluna}", None)
+    params["view"] = "gerencial"
+    for chave, valor in overrides.items():
+        if valor is None:
+            params.pop(chave, None)
+        elif valor == "":
+            params.pop(chave, None)
+        else:
+            params[chave] = valor
+    return params.urlencode()
+
+
+def _colunas_visiveis_gerencial(servidor):
+    if servidor is None:
+        return list(COLUNAS_GERENCIAL_PADRAO)
+    try:
+        preferencia = servidor.preferencia_gerencial
+    except PreferenciaGerencial.DoesNotExist:
+        return list(COLUNAS_GERENCIAL_PADRAO)
+    colunas = preferencia.colunas_visiveis or []
+    validas = [c for c in colunas if c in COLUNAS_GERENCIAL_CONFIG]
+    return validas or list(COLUNAS_GERENCIAL_PADRAO)
+
+
+def _pode_editar_entrada_dai(request):
+    perfil = getattr(request, "perfil_acesso", None)
+    if perfil is None:
+        return False
+    return (
+        perfil.pode_criar_os
+        or perfil.pode_homologar
+        or perfil.visibilidade_total
+    )
+
+
+def _formatar_data_br(data):
+    if not data:
+        return "—"
+    return data.strftime("%d/%m/%Y")
+
+
+def _formatar_mes_cronograma(data):
+    if not data:
+        return "—"
+    return data.strftime("%m/%Y")
+
+
+def _carregar_mapas_gerencial(os_ids):
+    producoes = {}
+    for producao in (
+        Producao.objects.filter(os_id__in=os_ids)
+        .exclude(status__in=STATUS_PRODUCAO_FINAL)
+        .select_related(
+            "tipo_producao",
+            "servidor_responsavel",
+            "revisor",
+        )
+        .order_by("os_id", "-data_criacao", "-id")
+    ):
+        if producao.os_id not in producoes:
+            producoes[producao.os_id] = producao
+
+    processos = {
+        vinculo.os_id: vinculo
+        for vinculo in OsProcesso.objects.filter(
+            os_id__in=os_ids,
+            tipo_vinculo="PRINCIPAL",
+        ).select_related("processo_sei")
+    }
+
+    imoveis = {}
+    for os_imovel in (
+        OsImovel.objects.filter(os_id__in=os_ids)
+        .select_related("imovel")
+        .order_by("os_id", "pk")
+    ):
+        if os_imovel.os_id not in imoveis:
+            imoveis[os_imovel.os_id] = os_imovel
+
+    return producoes, processos, imoveis
+
+
+def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, unidade):
+    hoje = timezone.localdate()
+    entrada_unidade = data_entrada_unidade(os_obj, unidade) if unidade else None
+    if processo_vinculo and processo_vinculo.data_entrada_divisao:
+        entrada_dai = processo_vinculo.data_entrada_divisao
+    else:
+        entrada_dai = os_obj.data_entrada_divisao
+
+    dias_sei = None
+    if os_obj.prazo_data:
+        dias_sei = (os_obj.prazo_data - hoje).days
+
+    processo_sei = None
+    processo_pk = None
+    if processo_vinculo and processo_vinculo.processo_sei:
+        processo_sei = processo_vinculo.processo_sei.numero_processo
+        processo_pk = processo_vinculo.processo_sei_id
+
+    identificacao_imovel = "—"
+    if os_imovel and os_imovel.imovel:
+        if os_imovel.imovel.inscricao_cadastral:
+            identificacao_imovel = str(os_imovel.imovel.inscricao_cadastral)
+        elif os_imovel.imovel.codigo_isic:
+            identificacao_imovel = os_imovel.imovel.codigo_isic
+
+    cells = {
+        "apelido": os_obj.apelido or "—",
+        "entrada_dai": _formatar_data_br(entrada_dai),
+        "entrada_unidade": (
+            timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
+            if entrada_unidade
+            else "—"
+        ),
+        "requerimento": os_obj.tipo_demanda.descricao,
+        "finalidade": os_obj.finalidade.descricao,
+        "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
+        "logradouro": (os_imovel.nom_logradouro if os_imovel and os_imovel.nom_logradouro else "—"),
+        "numero": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
+        "avaliador": (
+            producao.servidor_responsavel.nome
+            if producao and producao.servidor_responsavel
+            else "—"
+        ),
+        "revisor": (producao.revisor.nome if producao and producao.revisor else "—"),
+        "tipo_trabalho": (
+            producao.tipo_producao.prefixo if producao and producao.tipo_producao else "—"
+        ),
+        "numero_producao": (
+            producao.numero_producao
+            if producao and producao.numero_producao
+            else "—"
+        ),
+        "prazo_os": _formatar_data_br(os_obj.prazo_data),
+        "dias_sei": dias_sei,
+        "mes_cronograma": (
+            _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
+        ),
+        "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
+    }
+
+    panel_data = {
+        "os_pk": os_obj.pk,
+        "producao_pk": producao.pk if producao else None,
+        "numero_os": os_obj.numero_os,
+        "apelido": os_obj.apelido or "",
+        "processo_sei": processo_sei or "—",
+        "processo_pk": processo_pk,
+        "entrada_dai": entrada_dai.isoformat() if entrada_dai else "",
+        "entrada_dai_display": _formatar_data_br(entrada_dai),
+        "entrada_unidade_display": (
+            timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
+            if entrada_unidade
+            else "—"
+        ),
+        "requerimento": os_obj.tipo_demanda.descricao,
+        "finalidade": os_obj.finalidade.descricao,
+        "prazo_tipo": os_obj.prazo_tipo,
+        "prazo_tipo_display": dict(OS.PRAZO_TIPO_CHOICES).get(
+            os_obj.prazo_tipo,
+            os_obj.prazo_tipo,
+        ),
+        "prazo_data": os_obj.prazo_data.isoformat() if os_obj.prazo_data else "",
+        "prazo_data_display": _formatar_data_br(os_obj.prazo_data),
+        "dias_sei": dias_sei,
+        "prioridade": os_obj.prioridade,
+        "imovel": {
+            "ctm": os_imovel.cod_logradouro if os_imovel else None,
+            "logradouro": os_imovel.nom_logradouro if os_imovel else "",
+            "numero": os_imovel.num_endereco if os_imovel else "",
+            "unidade": os_imovel.num_unidade if os_imovel else "",
+            "lote_fiscal": os_imovel.num_bloco if os_imovel else "",
+            "identificacao": identificacao_imovel,
+            "finalidade": os_imovel.des_finalidade if os_imovel else "",
+            "area_territorial": (
+                str(os_imovel.area_territorial) if os_imovel and os_imovel.area_territorial else ""
+            ),
+            "area_construida": (
+                str(os_imovel.area_construida) if os_imovel and os_imovel.area_construida else ""
+            ),
+            "bairro": os_imovel.bairro if os_imovel else "",
+            "rh_valor": os_imovel.rh_valor if os_imovel else None,
+        },
+        "producao": {
+            "status": producao.status if producao else "",
+            "status_label": (
+                dict(Producao.STATUS_CHOICES).get(producao.status, "—")
+                if producao
+                else "—"
+            ),
+            "modelo_sugerido": producao.modelo_sugerido if producao else "",
+            "prazo_interno": (
+                producao.prazo_interno.isoformat()
+                if producao and producao.prazo_interno
+                else ""
+            ),
+            "prazo_interno_display": (
+                _formatar_data_br(producao.prazo_interno) if producao else "—"
+            ),
+            "mes_cronograma": (
+                producao.mes_cronograma.strftime("%Y-%m")
+                if producao and producao.mes_cronograma
+                else ""
+            ),
+            "mes_cronograma_display": (
+                _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
+            ),
+            "servidor_responsavel_id": (
+                producao.servidor_responsavel_id if producao else None
+            ),
+            "servidor_responsavel_nome": (
+                producao.servidor_responsavel.nome
+                if producao and producao.servidor_responsavel
+                else "—"
+            ),
+            "revisor_id": producao.revisor_id if producao else None,
+            "revisor_nome": (
+                producao.revisor.nome if producao and producao.revisor else "—"
+            ),
+            "data_entrega_avaliacao": (
+                producao.data_entrega_avaliacao.isoformat()
+                if producao and producao.data_entrega_avaliacao
+                else ""
+            ),
+            "data_entrega_revisao": (
+                producao.data_entrega_revisao.isoformat()
+                if producao and producao.data_entrega_revisao
+                else ""
+            ),
+            "data_entrega_ajustes": (
+                producao.data_entrega_ajustes.isoformat()
+                if producao and producao.data_entrega_ajustes
+                else ""
+            ),
+            "data_homologacao_display": (
+                _formatar_data_br(producao.data_homologacao) if producao else "—"
+            ),
+            "tipo_prefixo": (
+                producao.tipo_producao.prefixo
+                if producao and producao.tipo_producao
+                else "—"
+            ),
+            "tipo_descricao": (
+                producao.tipo_producao.descricao
+                if producao and producao.tipo_producao
+                else "—"
+            ),
+            "numero_producao": producao.numero_producao if producao else "",
+            "numero_sei": producao.numero_sei if producao else "",
+        },
+    }
+
+    return {
+        "os_pk": os_obj.pk,
+        "producao_pk": producao.pk if producao else None,
+        "numero_os": os_obj.numero_os,
+        "apelido": os_obj.apelido or "",
+        "processo_sei": processo_sei or "—",
+        "processo_pk": processo_pk,
+        "status_producao": producao.status if producao else "",
+        "status_producao_label": (
+            dict(Producao.STATUS_CHOICES).get(producao.status, "—")
+            if producao
+            else "—"
+        ),
+        "cells": cells,
+        "panel": panel_data,
+        "panel_json": json.dumps(panel_data, default=str),
+    }
+
+
+def _montar_linhas_gerencial(os_queryset, unidade):
+    os_list = list(
+        os_queryset.select_related("natureza", "tipo_demanda", "finalidade"),
+    )
+    os_ids = [os_obj.pk for os_obj in os_list]
+    if not os_ids:
+        return []
+
+    producoes, processos, imoveis = _carregar_mapas_gerencial(os_ids)
+    linhas = []
+    for os_obj in os_list:
+        linhas.append(
+            _serializar_linha_gerencial(
+                os_obj,
+                producoes.get(os_obj.pk),
+                processos.get(os_obj.pk),
+                imoveis.get(os_obj.pk),
+                unidade,
+            ),
+        )
+    return linhas
+
+
+def _filtrar_linhas_coluna_gerencial(linhas, request):
+    filtradas = linhas
+    for coluna in COLUNAS_GERENCIAL_CONFIG:
+        valor = (request.GET.get(f"fg_{coluna}") or "").strip()
+        if not valor:
+            continue
+        if coluna == "dias_sei":
+            filtradas = [
+                linha
+                for linha in filtradas
+                if linha["cells"].get("dias_sei") is not None
+                and str(linha["cells"]["dias_sei"]) == valor
+            ]
+        else:
+            filtradas = [
+                linha
+                for linha in filtradas
+                if linha["cells"].get(coluna) == valor
+            ]
+    return filtradas
+
+
+def _opcoes_filtro_coluna_gerencial(linhas):
+    opcoes = {}
+    for coluna in COLUNAS_GERENCIAL_CONFIG:
+        valores = set()
+        for linha in linhas:
+            valor = linha["cells"].get(coluna)
+            if coluna == "dias_sei":
+                if valor is not None:
+                    valores.add(str(valor))
+            elif valor and valor != "—":
+                valores.add(valor)
+        opcoes[coluna] = sorted(valores, key=lambda item: (item == "—", item))
+    return opcoes
+
+
+def _contagens_status_gerencial(os_ids):
+    contagens = {status: 0 for status in STATUS_GERENCIAL_CARDS}
+    if not os_ids:
+        return contagens
+    for item in (
+        Producao.objects.filter(os_id__in=os_ids)
+        .values("status")
+        .annotate(total=Count("id"))
+    ):
+        if item["status"] in contagens:
+            contagens[item["status"]] = item["total"]
+    return contagens
+
+
+def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
+    servidor = _obter_servidor(request.user)
+    unidade = _obter_unidade_principal_servidor(servidor)
+    os_ids = list(queryset_completo.values_list("pk", flat=True))
+    linhas_base = _montar_linhas_gerencial(queryset_completo, unidade)
+    linhas_filtradas = _filtrar_linhas_coluna_gerencial(linhas_base, request)
+    os_ids_filtrados = {linha["os_pk"] for linha in linhas_filtradas}
+
+    filtros_coluna_ativos = {
+        coluna: request.GET.get(f"fg_{coluna}", "").strip()
+        for coluna in COLUNAS_GERENCIAL_CONFIG
+        if request.GET.get(f"fg_{coluna}", "").strip()
+    }
+
+    perfil = getattr(request, "perfil_acesso", None)
+    pode_homologar = perfil is not None and perfil.pode_homologar
+    colunas_visiveis = _colunas_visiveis_gerencial(servidor)
+
+    return {
+        "linhas_gerencial": linhas_pagina,
+        "colunas_gerencial_config": COLUNAS_GERENCIAL_CONFIG,
+        "colunas_gerencial_labels": {
+            chave: meta["label"] for chave, meta in COLUNAS_GERENCIAL_CONFIG.items()
+        },
+        "colunas_gerencial_visiveis": colunas_visiveis,
+        "colunas_gerencial_visiveis_json": json.dumps(colunas_visiveis),
+        "contagens_status_gerencial": _contagens_status_gerencial(os_ids),
+        "opcoes_filtro_coluna": _opcoes_filtro_coluna_gerencial(linhas_base),
+        "filtros_coluna_ativos": filtros_coluna_ativos,
+        "status_gerencial_cards": STATUS_GERENCIAL_CARDS,
+        "query_string_base": _query_string_os_list(request),
+        "query_string_gerencial_base": _query_string_gerencial(request),
+        "urls_status_gerencial": {
+            status: _query_string_gerencial(request, status_producao=status)
+            for status in STATUS_GERENCIAL_CARDS
+        },
+        "pode_homologar": pode_homologar,
+        "pode_editar_entrada_dai": _pode_editar_entrada_dai(request),
+        "servidores": Servidor.objects.order_by("nome"),
+        "servidores_revisores": (
+            _servidores_revisores_da_unidade(servidor) if pode_homologar else Servidor.objects.none()
+        ),
+        "prioridades_os": ["NORMAL", "PRIORITARIO", "URGENTE"],
+        "prazo_tipo_opcoes": OS.PRAZO_TIPO_CHOICES,
+        "status_producao_opcoes_gerencial": Producao.STATUS_CHOICES,
+        "os_ids_filtrados_count": len(os_ids_filtrados),
+    }
+
+
 class OSListView(RequerLoginMixin, ListView):
     template_name = "os_list.html"
     context_object_name = "ordens"
     paginate_by = 20
+
+    def get_paginate_by(self, queryset):
+        if self.request.GET.get("view") == "gerencial":
+            return 50
+        return self.paginate_by
 
     def get_queryset(self):
         queryset = _aplicar_visibilidade_os(
@@ -1462,10 +1929,25 @@ class OSListView(RequerLoginMixin, ListView):
             self.request,
         )
         queryset = _aplicar_filtros_os(queryset, self.request)
+        self._qs_gerencial_completo = queryset
+
+        if self.request.GET.get("view") == "gerencial":
+            servidor = _obter_servidor(self.request.user)
+            unidade = _obter_unidade_principal_servidor(servidor)
+            linhas = _montar_linhas_gerencial(queryset, unidade)
+            linhas = _filtrar_linhas_coluna_gerencial(linhas, self.request)
+            os_ids = [linha["os_pk"] for linha in linhas]
+            if os_ids:
+                queryset = queryset.filter(pk__in=os_ids)
+            else:
+                queryset = queryset.none()
+
         return _ordenar_queryset_os_fila(queryset)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        view_mode = self.request.GET.get("view", "lista")
+        context["view_mode"] = view_mode
         context["filtro_macroetapa"] = self.request.GET.get("macroetapa", "")
         context["filtro_natureza"] = self.request.GET.get("natureza", "")
         context["filtro_prioridade"] = self.request.GET.get("prioridade", "")
@@ -1482,6 +1964,27 @@ class OSListView(RequerLoginMixin, ListView):
             .order_by("macroetapa")
         )
         context["prioridades"] = ["NORMAL", "PRIORITARIO", "URGENTE"]
+        context["query_string_lista"] = _query_string_os_list(
+            self.request,
+            view="lista",
+        )
+        context["query_string_gerencial"] = _query_string_os_list(
+            self.request,
+            view="gerencial",
+        )
+        context["query_string_filtros"] = _query_string_filtros_os_list(self.request)
+
+        if view_mode == "gerencial":
+            servidor = _obter_servidor(self.request.user)
+            unidade = _obter_unidade_principal_servidor(servidor)
+            linhas_pagina = _montar_linhas_gerencial(context["ordens"], unidade)
+            context.update(
+                _contexto_gerencial_os_list(
+                    self.request,
+                    getattr(self, "_qs_gerencial_completo", self.get_queryset()),
+                    linhas_pagina,
+                ),
+            )
         return context
 
 
@@ -3051,9 +3554,16 @@ CAMPOS_DATA_PRODUCAO = frozenset(
         "data_entrega_avaliacao",
         "data_entrega_revisao",
         "data_entrega_ajustes",
+        "prazo_interno",
     },
 )
-CAMPOS_EDITAVEIS_PRODUCAO = frozenset({"modelo_sugerido", "revisor"}) | CAMPOS_DATA_PRODUCAO
+CAMPOS_EDITAVEIS_PRODUCAO = frozenset(
+    {"modelo_sugerido", "revisor", "servidor_responsavel", "mes_cronograma"},
+) | CAMPOS_DATA_PRODUCAO
+
+CAMPOS_EDITAVEIS_OS = frozenset(
+    {"apelido", "prioridade", "prazo_tipo", "prazo_data", "data_entrada_divisao"},
+)
 
 
 def _formatar_data_resposta_json(data):
@@ -3106,12 +3616,66 @@ class ProducaoEditarCampoView(RequerHomologarMixin, View):
                         status=400,
                     )
             producao.save(update_fields=[campo])
-            resposta_data = _formatar_data_resposta_json(getattr(producao, campo))
+            resposta = _formatar_data_resposta_json(getattr(producao, campo))
             return JsonResponse(
                 {
                     "sucesso": True,
                     "campo": campo,
-                    **resposta_data,
+                    **resposta,
+                },
+            )
+
+        if campo == "servidor_responsavel":
+            if not valor:
+                producao.servidor_responsavel = None
+            else:
+                try:
+                    producao.servidor_responsavel = Servidor.objects.get(pk=int(valor))
+                except (Servidor.DoesNotExist, ValueError, TypeError):
+                    return JsonResponse(
+                        {"sucesso": False, "erro": "Avaliador inválido."},
+                        status=400,
+                    )
+            producao.save(update_fields=["servidor_responsavel"])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": (
+                        producao.servidor_responsavel.nome
+                        if producao.servidor_responsavel
+                        else ""
+                    ),
+                    "valor_id": producao.servidor_responsavel_id,
+                },
+            )
+
+        if campo == "mes_cronograma":
+            if not valor:
+                producao.mes_cronograma = None
+            else:
+                try:
+                    if len(valor) == 7 and valor[4] == "-":
+                        ano, mes = valor.split("-")
+                        producao.mes_cronograma = datetime.date(int(ano), int(mes), 1)
+                    else:
+                        producao.mes_cronograma = datetime.date.fromisoformat(valor)
+                except ValueError:
+                    return JsonResponse(
+                        {"sucesso": False, "erro": "Mês do cronograma inválido."},
+                        status=400,
+                    )
+            producao.save(update_fields=["mes_cronograma"])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": (
+                        producao.mes_cronograma.strftime("%Y-%m")
+                        if producao.mes_cronograma
+                        else ""
+                    ),
+                    "valor_display": _formatar_mes_cronograma(producao.mes_cronograma),
                 },
             )
 
@@ -3133,6 +3697,168 @@ class ProducaoEditarCampoView(RequerHomologarMixin, View):
                 "campo": campo,
                 "valor": producao.revisor.nome if producao.revisor else "",
                 "revisor_id": producao.revisor_id,
+            },
+        )
+
+
+class OSEditarCampoView(RequerLoginMixin, View):
+    def post(self, request, pk):
+        os_obj = get_object_or_404(
+            OS.objects.select_related("tipo_demanda", "finalidade"),
+            pk=pk,
+        )
+        campo = (request.POST.get("campo") or "").strip()
+        valor = (request.POST.get("valor") or "").strip()
+        perfil = getattr(request, "perfil_acesso", None)
+
+        if campo not in CAMPOS_EDITAVEIS_OS:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Campo não permitido."},
+                status=400,
+            )
+
+        if campo == "data_entrada_divisao":
+            if not _pode_editar_entrada_dai(request):
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
+            if not valor:
+                data_valor = None
+            else:
+                try:
+                    data_valor = datetime.date.fromisoformat(valor)
+                except ValueError:
+                    return JsonResponse(
+                        {"sucesso": False, "erro": "Data inválida."},
+                        status=400,
+                    )
+            os_obj.data_entrada_divisao = data_valor
+            os_obj.save(update_fields=["data_entrada_divisao"])
+            vinculo = OsProcesso.objects.filter(
+                os=os_obj,
+                tipo_vinculo="PRINCIPAL",
+            ).first()
+            if vinculo:
+                vinculo.data_entrada_divisao = data_valor
+                vinculo.save(update_fields=["data_entrada_divisao"])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    **_formatar_data_resposta_json(data_valor),
+                },
+            )
+
+        if not perfil or not perfil.pode_homologar:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        if campo == "apelido":
+            os_obj.apelido = valor or None
+            os_obj.save(update_fields=["apelido"])
+            return JsonResponse(
+                {"sucesso": True, "campo": campo, "valor": os_obj.apelido or ""},
+            )
+
+        if campo == "prioridade":
+            if valor not in {"NORMAL", "PRIORITARIO", "URGENTE"}:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Prioridade inválida."},
+                    status=400,
+                )
+            os_obj.prioridade = valor
+            os_obj.save(update_fields=["prioridade"])
+            return JsonResponse({"sucesso": True, "campo": campo, "valor": valor})
+
+        if campo == "prazo_tipo":
+            tipos = {item[0] for item in OS.PRAZO_TIPO_CHOICES}
+            if valor not in tipos:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Tipo de prazo inválido."},
+                    status=400,
+                )
+            os_obj.prazo_tipo = valor
+            os_obj.save(update_fields=["prazo_tipo"])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": dict(OS.PRAZO_TIPO_CHOICES).get(valor, valor),
+                },
+            )
+
+        if campo == "prazo_data":
+            if not valor:
+                os_obj.prazo_data = None
+            else:
+                try:
+                    os_obj.prazo_data = datetime.date.fromisoformat(valor)
+                except ValueError:
+                    return JsonResponse(
+                        {"sucesso": False, "erro": "Data inválida."},
+                        status=400,
+                    )
+            os_obj.save(update_fields=["prazo_data"])
+            hoje = timezone.localdate()
+            dias = (
+                (os_obj.prazo_data - hoje).days if os_obj.prazo_data else None
+            )
+            resposta = _formatar_data_resposta_json(os_obj.prazo_data)
+            resposta["dias_sei"] = dias
+            return JsonResponse({"sucesso": True, "campo": campo, **resposta})
+
+        return JsonResponse(
+            {"sucesso": False, "erro": "Campo não suportado."},
+            status=400,
+        )
+
+
+class PreferenciaGerencialView(RequerLoginJSONMixin, View):
+    def get(self, request):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse({"error": MSG_SEM_PERMISSAO}, status=403)
+        return JsonResponse(
+            {
+                "colunas_visiveis": _colunas_visiveis_gerencial(servidor),
+                "colunas_disponiveis": [
+                    {"id": chave, "label": meta["label"]}
+                    for chave, meta in COLUNAS_GERENCIAL_CONFIG.items()
+                ],
+            },
+        )
+
+    def post(self, request):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse({"sucesso": False, "erro": MSG_SEM_PERMISSAO}, status=403)
+
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"sucesso": False, "erro": "JSON inválido."},
+                status=400,
+            )
+
+        colunas = payload.get("colunas_visiveis", [])
+        if not isinstance(colunas, list):
+            return JsonResponse(
+                {"sucesso": False, "erro": "colunas_visiveis deve ser uma lista."},
+                status=400,
+            )
+
+        validas = [c for c in colunas if c in COLUNAS_GERENCIAL_CONFIG]
+        preferencia, _ = PreferenciaGerencial.objects.get_or_create(servidor=servidor)
+        preferencia.colunas_visiveis = validas or list(COLUNAS_GERENCIAL_PADRAO)
+        preferencia.save(update_fields=["colunas_visiveis"])
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "colunas_visiveis": preferencia.colunas_visiveis,
             },
         )
 
