@@ -1461,7 +1461,6 @@ class OSCreateView(RequerLoginMixin, FormView):
 COLUNAS_GERENCIAL_CONFIG = {
     "entrada_dai": {"label": "Entrada DAI"},
     "entrada_eav": {"label": "Entrada EAV"},
-    "origem": {"label": "Origem"},
     "requerimento": {"label": "Requerimento"},
     "finalidade": {"label": "Finalidade"},
     "ctm": {"label": "CTM"},
@@ -1500,7 +1499,7 @@ COLUNAS_GERENCIAL_CONFIG = {
 GRUPOS_COLUNAS_GERENCIAL = [
     (
         "INFORMAÇÕES DE ENTRADA",
-        ["entrada_dai", "entrada_eav", "origem", "requerimento", "finalidade"],
+        ["entrada_dai", "entrada_eav", "requerimento", "finalidade"],
     ),
     (
         "INFORMAÇÕES DO IMÓVEL",
@@ -1552,7 +1551,6 @@ GRUPOS_COLUNAS_GERENCIAL = [
 
 COLUNAS_GERENCIAL_NOVAS = {
     "entrada_eav",
-    "origem",
     "num_endereco",
     "num_unidade",
     "num_bloco",
@@ -1587,6 +1585,13 @@ COLUNAS_GERENCIAL_PADRAO = [
     "finalidade",
     "ctm",
     "logradouro",
+    "num_endereco",
+    "num_unidade",
+    "num_bloco",
+    "finalidade_imovel",
+    "area_territorial",
+    "area_construida",
+    "rh_valor",
     "numero_imovel",
     "bairro",
     "avaliador",
@@ -1803,8 +1808,8 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         else "—"
     )
     rh_valor = (
-        str(os_imovel.rh_valor)
-        if os_imovel and os_imovel.rh_valor is not None
+        (str(os_imovel.rh_valor) if os_imovel.rh_valor else "—")
+        if os_imovel
         else "—"
     )
     numero_producao = "—"
@@ -1852,19 +1857,18 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
     cells = {
         "entrada_dai": _formatar_data_br(entrada_dai),
         "entrada_eav": entrada_eav,
-        "origem": "—",
         "requerimento": os_obj.tipo_demanda.descricao,
         "finalidade": os_obj.finalidade.descricao,
         "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
-        "logradouro": (os_imovel.nom_logradouro if os_imovel and os_imovel.nom_logradouro else "—"),
-        "num_endereco": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
-        "num_unidade": (os_imovel.num_unidade if os_imovel and os_imovel.num_unidade else "—"),
-        "num_bloco": (os_imovel.num_bloco if os_imovel and os_imovel.num_bloco else "—"),
+        "logradouro": (os_imovel.nom_logradouro or "—") if os_imovel else "—",
+        "num_endereco": (os_imovel.num_endereco or "—") if os_imovel else "—",
+        "num_unidade": (os_imovel.num_unidade or "—") if os_imovel else "—",
+        "num_bloco": (os_imovel.num_bloco or "—") if os_imovel else "—",
         "numero_imovel": identificacao_imovel,
-        "finalidade_imovel": (os_imovel.des_finalidade if os_imovel and os_imovel.des_finalidade else "—"),
+        "finalidade_imovel": (os_imovel.des_finalidade or "—") if os_imovel else "—",
         "area_territorial": area_territorial,
         "area_construida": area_construida,
-        "bairro": (os_imovel.bairro if os_imovel and os_imovel.bairro else "—"),
+        "bairro": (os_imovel.bairro or "—") if os_imovel else "—",
         "rh_valor": rh_valor,
         "apelido": os_obj.apelido or "—",
         "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
