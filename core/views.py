@@ -115,6 +115,12 @@ PRIORIDADE_ORDEM = {
     "NORMAL": 2,
 }
 
+PRIORIDADE_OS_LABELS = {
+    "NORMAL": "Normal",
+    "PRIORITARIO": "Prioritário",
+    "URGENTE": "Urgente",
+}
+
 STATUS_PRODUCAO_FINAL = [
     Producao.STATUS_HOMOLOGADO,
     Producao.STATUS_CANCELADO,
@@ -1822,7 +1828,7 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "rh_valor": rh_valor,
         "apelido": os_obj.apelido or "—",
         "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
-        "prioridade": os_obj.get_prioridade_display(),
+        "prioridade": PRIORIDADE_OS_LABELS.get(os_obj.prioridade, os_obj.prioridade or "—"),
         "prazo_eav": prazo_interno_display,
         "dias_sei": dias_sei,
         "prazo_recompra_itbi": "—",
