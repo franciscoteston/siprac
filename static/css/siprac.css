@@ -213,33 +213,63 @@ body.gerencial-mode .siprac-content {
 }
 
 .gerencial-tabela-wrap thead th {
-  background: #1a3a5c;
   color: white;
   padding: 6px 10px;
   white-space: nowrap;
-  position: sticky;
-  top: 0;
-  z-index: 10;
   font-size: 12px;
   text-align: center;
   border-right: 1px solid #2a4a6c;
 }
 
 .gerencial-tabela-wrap thead th.grupo-header {
-  background: #0d2137;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  text-align: center;
   border-right: 2px solid #1a3a5c;
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
 
+/* Linha 1 do thead — grupos */
+.gerencial-tabela-wrap thead tr:nth-child(1) th {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #0d2137;
+}
+
+/* Linha 2 do thead — colunas */
 .gerencial-tabela-wrap thead tr:nth-child(2) th {
-  top: 28px;
+  position: sticky;
+  top: 29px;
+  z-index: 10;
+  background: #1a3a5c;
+}
+
+/* Célula FIXO da linha 1 — sticky horizontal E vertical */
+.gerencial-tabela-wrap thead tr:nth-child(1) th:first-child {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  background: #0d2137;
+}
+
+/* Processo SEI — sticky horizontal */
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1) {
+  position: sticky;
+  left: 0;
+  top: 29px;
+  z-index: 15;
+  background: #1a3a5c;
+}
+
+/* Status — sticky horizontal */
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
+  position: sticky;
+  left: 180px;
+  top: 29px;
+  z-index: 15;
+  background: #1a3a5c;
 }
 
 .gerencial-tabela-wrap td {
@@ -250,44 +280,26 @@ body.gerencial-mode .siprac-content {
   border-right: 1px solid #f0f0f0;
 }
 
-.gerencial-tabela-wrap th:first-child,
-.gerencial-tabela-wrap td:first-child {
+.gerencial-tabela-wrap td:nth-child(1) {
   position: sticky;
   left: 0;
-  z-index: 5;
-}
-
-.gerencial-tabela-wrap th:first-child {
-  z-index: 11;
-}
-
-.gerencial-tabela-wrap td:first-child {
-  background: white;
   z-index: 4;
+  background: white;
 }
 
-.gerencial-tabela-wrap th:nth-child(2),
 .gerencial-tabela-wrap td:nth-child(2) {
   position: sticky;
   left: 180px;
-  z-index: 5;
+  z-index: 4;
   background: white;
 }
 
-.gerencial-tabela-wrap th:nth-child(2) {
-  background: #1a3a5c;
-  z-index: 11;
-}
-
-.gerencial-tabela-wrap tr:hover td,
-.gerencial-tabela-wrap tr:hover td:first-child,
+.gerencial-tabela-wrap tr:hover td:nth-child(1),
 .gerencial-tabela-wrap tr:hover td:nth-child(2) {
   background: #f0f4f8;
-  cursor: pointer;
 }
 
-.gerencial-tabela-wrap tr.table-active td,
-.gerencial-tabela-wrap tr.table-active td:first-child,
+.gerencial-tabela-wrap tr.table-active td:nth-child(1),
 .gerencial-tabela-wrap tr.table-active td:nth-child(2) {
   background: #dbeafe;
 }
