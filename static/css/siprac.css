@@ -191,7 +191,11 @@ body {
   background: #f8f9fa;
 }
 
-.gerencial-table tbody tr.table-active .gerencial-col-fixa {
+.gerencial-table tbody .gerencial-row {
+  cursor: pointer;
+}
+
+.gerencial-table tbody .gerencial-row.table-active .gerencial-col-fixa {
   background: #cfe2ff;
 }
 

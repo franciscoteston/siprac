@@ -1453,7 +1453,6 @@ class OSCreateView(RequerLoginMixin, FormView):
 
 
 COLUNAS_GERENCIAL_CONFIG = {
-    "apelido": {"label": "Apelido"},
     "entrada_dai": {"label": "Entrada DAI"},
     "entrada_unidade": {"label": "Entrada unidade"},
     "requerimento": {"label": "Requerimento"},
@@ -1461,22 +1460,39 @@ COLUNAS_GERENCIAL_CONFIG = {
     "ctm": {"label": "CTM"},
     "logradouro": {"label": "Logradouro"},
     "numero": {"label": "Nº"},
+    "unidade": {"label": "Unidade"},
+    "lote_fiscal": {"label": "Lote Fiscal"},
+    "numero_imovel": {"label": "Nº Imóvel"},
+    "finalidade_imovel": {"label": "Finalidade Imóvel"},
+    "area_territorial": {"label": "Área Territorial"},
+    "area_construida": {"label": "Área Construída"},
+    "bairro": {"label": "Bairro"},
+    "rh_valor": {"label": "RH_VALOR"},
+    "apelido": {"label": "Apelido"},
+    "modelo_sugerido": {"label": "Modelo sugerido"},
+    "mes_cronograma": {"label": "Mês cronograma"},
     "avaliador": {"label": "Avaliador"},
     "revisor": {"label": "Revisor"},
-    "tipo_trabalho": {"label": "Tipo trabalho"},
-    "numero_producao": {"label": "Nº produção"},
+    "prazo_avaliador": {"label": "Prazo avaliador"},
+    "entrega_avaliacao": {"label": "Entrega avaliação"},
+    "entrega_revisao": {"label": "Entrega revisão"},
+    "entrega_ajustes": {"label": "Entrega ajustes"},
+    "data_homologacao": {"label": "Data homologação"},
     "prazo_os": {"label": "Prazo OS"},
     "dias_sei": {"label": "DIAS_SEI"},
-    "mes_cronograma": {"label": "Mês cronograma"},
-    "modelo_sugerido": {"label": "Modelo sugerido"},
+    "tipo_trabalho": {"label": "Tipo trabalho"},
+    "numero_producao": {"label": "Nº produção"},
+    "numero_sei": {"label": "Nº SEI documento"},
 }
 
 COLUNAS_GERENCIAL_PADRAO = [
-    "apelido",
     "entrada_dai",
-    "entrada_unidade",
     "requerimento",
     "finalidade",
+    "ctm",
+    "logradouro",
+    "numero_imovel",
+    "avaliador",
     "tipo_trabalho",
     "prazo_os",
     "dias_sei",
@@ -1565,11 +1581,25 @@ def _formatar_mes_cronograma(data):
     return data.strftime("%m/%Y")
 
 
+def _formatar_decimal_br(valor):
+    if valor is None:
+        return "—"
+    try:
+        from decimal import Decimal
+
+        value = Decimal(str(valor))
+        parts = f"{value:,.2f}".split(".")
+        inteiro = parts[0].replace(",", ".")
+        return f"{inteiro},{parts[1]}"
+    except Exception:
+        return str(valor) if valor else "—"
+
+
 def _carregar_mapas_gerencial(os_ids):
     producoes = {}
     for producao in (
         Producao.objects.filter(os_id__in=os_ids)
-        .exclude(status__in=STATUS_PRODUCAO_FINAL)
+        .exclude(status=Producao.STATUS_CANCELADO)
         .select_related(
             "tipo_producao",
             "servidor_responsavel",
@@ -1625,6 +1655,29 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         elif os_imovel.imovel.codigo_isic:
             identificacao_imovel = os_imovel.imovel.codigo_isic
 
+    area_territorial = (
+        _formatar_decimal_br(os_imovel.area_territorial)
+        if os_imovel and os_imovel.area_territorial is not None
+        else "—"
+    )
+    area_construida = (
+        _formatar_decimal_br(os_imovel.area_construida)
+        if os_imovel and os_imovel.area_construida is not None
+        else "—"
+    )
+    rh_valor = (
+        str(os_imovel.rh_valor)
+        if os_imovel and os_imovel.rh_valor is not None
+        else "—"
+    )
+    numero_producao = "—"
+    if (
+        producao
+        and producao.status == Producao.STATUS_HOMOLOGADO
+        and producao.numero_producao
+    ):
+        numero_producao = producao.numero_producao
+
     cells = {
         "apelido": os_obj.apelido or "—",
         "entrada_dai": _formatar_data_br(entrada_dai),
@@ -1638,26 +1691,56 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
         "logradouro": (os_imovel.nom_logradouro if os_imovel and os_imovel.nom_logradouro else "—"),
         "numero": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
+        "unidade": (os_imovel.num_unidade if os_imovel and os_imovel.num_unidade else "—"),
+        "lote_fiscal": (os_imovel.num_bloco if os_imovel and os_imovel.num_bloco else "—"),
+        "numero_imovel": identificacao_imovel,
+        "finalidade_imovel": (os_imovel.des_finalidade if os_imovel and os_imovel.des_finalidade else "—"),
+        "area_territorial": area_territorial,
+        "area_construida": area_construida,
+        "bairro": (os_imovel.bairro if os_imovel and os_imovel.bairro else "—"),
+        "rh_valor": rh_valor,
+        "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
+        "mes_cronograma": (
+            _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
+        ),
         "avaliador": (
             producao.servidor_responsavel.nome
             if producao and producao.servidor_responsavel
             else "—"
         ),
         "revisor": (producao.revisor.nome if producao and producao.revisor else "—"),
+        "prazo_avaliador": (
+            _formatar_data_br(producao.prazo_interno)
+            if producao and producao.prazo_interno
+            else "—"
+        ),
+        "entrega_avaliacao": (
+            _formatar_data_br(producao.data_entrega_avaliacao)
+            if producao and producao.data_entrega_avaliacao
+            else "—"
+        ),
+        "entrega_revisao": (
+            _formatar_data_br(producao.data_entrega_revisao)
+            if producao and producao.data_entrega_revisao
+            else "—"
+        ),
+        "entrega_ajustes": (
+            _formatar_data_br(producao.data_entrega_ajustes)
+            if producao and producao.data_entrega_ajustes
+            else "—"
+        ),
+        "data_homologacao": (
+            _formatar_data_br(producao.data_homologacao)
+            if producao and producao.data_homologacao
+            else "—"
+        ),
         "tipo_trabalho": (
             producao.tipo_producao.prefixo if producao and producao.tipo_producao else "—"
         ),
-        "numero_producao": (
-            producao.numero_producao
-            if producao and producao.numero_producao
-            else "—"
-        ),
+        "numero_producao": numero_producao,
+        "numero_sei": (producao.numero_sei if producao and producao.numero_sei else "—"),
         "prazo_os": _formatar_data_br(os_obj.prazo_data),
         "dias_sei": dias_sei,
-        "mes_cronograma": (
-            _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
-        ),
-        "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
     }
 
     panel_data = {
@@ -1693,12 +1776,8 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
             "lote_fiscal": os_imovel.num_bloco if os_imovel else "",
             "identificacao": identificacao_imovel,
             "finalidade": os_imovel.des_finalidade if os_imovel else "",
-            "area_territorial": (
-                str(os_imovel.area_territorial) if os_imovel and os_imovel.area_territorial else ""
-            ),
-            "area_construida": (
-                str(os_imovel.area_construida) if os_imovel and os_imovel.area_construida else ""
-            ),
+            "area_territorial": area_territorial if area_territorial != "—" else "",
+            "area_construida": area_construida if area_construida != "—" else "",
             "bairro": os_imovel.bairro if os_imovel else "",
             "rh_valor": os_imovel.rh_valor if os_imovel else None,
         },
@@ -1743,15 +1822,24 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
                 if producao and producao.data_entrega_avaliacao
                 else ""
             ),
+            "data_entrega_avaliacao_display": (
+                _formatar_data_br(producao.data_entrega_avaliacao) if producao else "—"
+            ),
             "data_entrega_revisao": (
                 producao.data_entrega_revisao.isoformat()
                 if producao and producao.data_entrega_revisao
                 else ""
             ),
+            "data_entrega_revisao_display": (
+                _formatar_data_br(producao.data_entrega_revisao) if producao else "—"
+            ),
             "data_entrega_ajustes": (
                 producao.data_entrega_ajustes.isoformat()
                 if producao and producao.data_entrega_ajustes
                 else ""
+            ),
+            "data_entrega_ajustes_display": (
+                _formatar_data_br(producao.data_entrega_ajustes) if producao else "—"
             ),
             "data_homologacao_display": (
                 _formatar_data_br(producao.data_homologacao) if producao else "—"
@@ -1766,7 +1854,7 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
                 if producao and producao.tipo_producao
                 else "—"
             ),
-            "numero_producao": producao.numero_producao if producao else "",
+            "numero_producao": numero_producao if numero_producao != "—" else "",
             "numero_sei": producao.numero_sei if producao else "",
         },
     }
@@ -1900,6 +1988,11 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
             status: _query_string_gerencial(request, status_producao=status)
             for status in STATUS_GERENCIAL_CARDS
         },
+        "gerencial_panels_json": json.dumps(
+            {str(linha["os_pk"]): linha["panel"] for linha in linhas_pagina},
+            default=str,
+            ensure_ascii=False,
+        ),
         "pode_homologar": pode_homologar,
         "pode_editar_entrada_dai": _pode_editar_entrada_dai(request),
         "servidores": Servidor.objects.order_by("nome"),

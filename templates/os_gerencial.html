@@ -82,7 +82,7 @@
         </thead>
         <tbody>
           {% for linha in linhas_gerencial %}
-          <tr class="gerencial-row" data-os-pk="{{ linha.os_pk }}" data-panel='{{ linha.panel_json|escapejs }}'>
+          <tr class="gerencial-row" data-os-pk="{{ linha.os_pk }}">
             <td class="gerencial-col-fixa">
               {% if linha.processo_pk %}
               <a href="{% url 'processo_detail' linha.processo_pk %}" class="text-decoration-none"
@@ -147,6 +147,8 @@
   </aside>
 </div>
 
+<script type="application/json" id="gerencial-panels-data">{{ gerencial_panels_json|safe }}</script>
+
 <script type="application/json" id="gerencial-config">
 {
   "preferenciasUrl": "{% url 'api_preferencias_gerencial' %}",
@@ -160,6 +162,16 @@
 (function () {
   const configEl = document.getElementById('gerencial-config');
   if (!configEl) return;
+
+  let panelsMap = {};
+  const panelsDataEl = document.getElementById('gerencial-panels-data');
+  if (panelsDataEl) {
+    try {
+      panelsMap = JSON.parse(panelsDataEl.textContent);
+    } catch (err) {
+      console.error('Erro ao carregar dados do painel gerencial:', err);
+    }
+  }
 
   const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
   const csrfToken = csrfInput ? csrfInput.value : '';
@@ -248,7 +260,18 @@
             if (campo === 'servidor_responsavel') atualizarCelula(osPk, 'avaliador', escapeHtml(data.valor || '—'));
             if (campo === 'revisor') atualizarCelula(osPk, 'revisor', escapeHtml(data.valor || '—'));
             if (campo === 'mes_cronograma') atualizarCelula(osPk, 'mes_cronograma', escapeHtml(data.valor_display || '—'));
-            if (campo === 'prazo_interno') atualizarCelula(osPk, 'prazo_os', escapeHtml(data.valor_display || '—'));
+            if (campo === 'prazo_interno') {
+              atualizarCelula(osPk, 'prazo_avaliador', escapeHtml(data.valor_display || '—'));
+            }
+            if (campo === 'data_entrega_avaliacao') {
+              atualizarCelula(osPk, 'entrega_avaliacao', escapeHtml(data.valor_display || '—'));
+            }
+            if (campo === 'data_entrega_revisao') {
+              atualizarCelula(osPk, 'entrega_revisao', escapeHtml(data.valor_display || '—'));
+            }
+            if (campo === 'data_entrega_ajustes') {
+              atualizarCelula(osPk, 'entrega_ajustes', escapeHtml(data.valor_display || '—'));
+            }
           }).catch(function (e) { alert(e.message); });
         });
       });
@@ -425,23 +448,35 @@
     bindPanelEvents();
   }
 
-  document.querySelectorAll('.gerencial-row').forEach(function (row) {
-    row.addEventListener('click', function (e) {
-      if (e.target.closest('a')) return;
-      document.querySelectorAll('.gerencial-row').forEach(function (r) { r.classList.remove('table-active'); });
-      row.classList.add('table-active');
-      linhaSelecionada = row;
-      try {
-        const data = JSON.parse(row.getAttribute('data-panel'));
-        renderPanel(data);
-        panel.classList.remove('collapsed');
-        panel.setAttribute('aria-hidden', 'false');
-        panelToggle.textContent = '‹';
-      } catch (err) {
-        console.error(err);
-      }
+  function abrirPainel(row) {
+    if (!row) return;
+    document.querySelectorAll('.gerencial-row').forEach(function (r) {
+      r.classList.remove('table-active');
     });
-  });
+    row.classList.add('table-active');
+    linhaSelecionada = row;
+    const osPk = row.dataset.osPk;
+    const data = panelsMap[osPk] || panelsMap[String(osPk)];
+    if (!data) {
+      console.error('Dados do painel não encontrados para OS', osPk);
+      return;
+    }
+    renderPanel(data);
+    panel.classList.remove('collapsed');
+    panel.setAttribute('aria-hidden', 'false');
+    panelToggle.textContent = '‹';
+  }
+
+  const tabelaGerencial = document.getElementById('tabela-gerencial');
+  if (tabelaGerencial) {
+    tabelaGerencial.addEventListener('click', function (e) {
+      if (e.target.closest('a')) return;
+      if (e.target.closest('.filtro-coluna-btn') || e.target.closest('.filtro-coluna-menu')) return;
+      const row = e.target.closest('.gerencial-row');
+      if (!row) return;
+      abrirPainel(row);
+    });
+  }
 
   panelToggle.addEventListener('click', function () {
     panel.classList.toggle('collapsed');
