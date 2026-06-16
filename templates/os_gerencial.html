@@ -47,7 +47,7 @@
   {% endfor %}
 </div>
 
-<div class="gerencial-wrap painel-colapsado" id="gerencialWrap">
+<div class="gerencial-wrap" id="gerencialWrap">
   <div class="gerencial-tabela-wrap" id="gerencialTabelaWrap">
       <table class="table table-sm table-hover siprac-table align-middle mb-0" id="tabela-gerencial">
         <thead>
@@ -137,11 +137,9 @@
     {% endif %}
   </div>
 
-  <div class="gerencial-painel-toggle" id="gerencialToggle" title="Abrir painel" role="button" tabindex="0" aria-label="Abrir painel">›</div>
-
-  <div class="gerencial-painel" id="gerencialPainel">
-    <div class="gerencial-painel-fechar">
-      <button id="gerencialFechar" title="Fechar painel" type="button">✕ Fechar</button>
+  <div class="gerencial-painel" id="gerencialPainel" style="display:none;">
+    <div style="padding:8px; border-bottom:1px solid #dee2e6; text-align:right;">
+      <button id="gerencialFechar" type="button">✕ Fechar</button>
     </div>
     <div id="gerencialPainelConteudo"></div>
   </div>
@@ -177,22 +175,13 @@
   const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
   const csrfToken = csrfInput ? csrfInput.value : '';
   const wrap = document.getElementById('gerencialWrap');
-  const toggle = document.getElementById('gerencialToggle');
+  const painel = document.getElementById('gerencialPainel');
+  const fechar = document.getElementById('gerencialFechar');
   const painelConteudo = document.getElementById('gerencialPainelConteudo');
-  const tabelaWrap = document.getElementById('gerencialTabelaWrap');
-  const tabelaGerencial = document.getElementById('tabela-gerencial');
-  const btnFechar = document.getElementById('gerencialFechar');
   const podeHomologar = {{ pode_homologar|yesno:"true,false" }};
   const podeEditarEntradaDai = {{ pode_editar_entrada_dai|yesno:"true,false" }};
   let linhaSelecionada = null;
-  let dadosSelecionados = null;
   let panelData = null;
-
-  function obterDadosPainel(osPk) {
-    if (osPk == null || osPk === '') return null;
-    const chave = String(osPk);
-    return painelDados[chave] || painelDados[osPk] || null;
-  }
 
   function escapeHtml(text) {
     const div = document.createElement('div');
@@ -504,93 +493,34 @@
     return html;
   }
 
-  function abrirPainel(dados, trElement) {
-    if (!wrap || !painelConteudo || !trElement || !dados) return;
-
-    if (linhaSelecionada) linhaSelecionada.classList.remove('selecionada');
-    linhaSelecionada = trElement;
-    trElement.classList.add('selecionada');
-
-    dadosSelecionados = dados;
-    panelData = dados;
+  function abrirPainel(dados, tr) {
+    if (linhaSelecionada) linhaSelecionada.classList.remove('table-active');
+    linhaSelecionada = tr;
+    tr.classList.add('table-active');
     painelConteudo.innerHTML = renderPanel(dados);
     bindPanelEvents();
-
-    wrap.classList.remove('painel-colapsado');
-    if (toggle) {
-      toggle.textContent = '›';
-      toggle.title = 'Fechar painel';
-    }
+    painel.style.display = 'block';
+    wrap.classList.add('painel-aberto');
   }
 
   function fecharPainel() {
-    if (!wrap) return;
-    wrap.classList.add('painel-colapsado');
-    if (toggle) {
-      toggle.textContent = '›';
-      toggle.title = 'Abrir painel';
-    }
+    painel.style.display = 'none';
+    wrap.classList.remove('painel-aberto');
     if (linhaSelecionada) {
-      linhaSelecionada.classList.remove('selecionada');
+      linhaSelecionada.classList.remove('table-active');
       linhaSelecionada = null;
     }
   }
 
-  if (btnFechar) {
-    btnFechar.addEventListener('click', fecharPainel);
-  }
+  fechar.addEventListener('click', fecharPainel);
 
-  if (toggle) {
-    toggle.addEventListener('click', function () {
-      if (wrap.classList.contains('painel-colapsado')) {
-        if (dadosSelecionados && linhaSelecionada) {
-          abrirPainel(dadosSelecionados, linhaSelecionada);
-        } else if (dadosSelecionados) {
-          wrap.classList.remove('painel-colapsado');
-          if (painelConteudo && !painelConteudo.innerHTML.trim()) {
-            painelConteudo.innerHTML = renderPanel(dadosSelecionados);
-            bindPanelEvents();
-          }
-        }
-      } else {
-        fecharPainel();
-      }
-    });
-
-    toggle.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggle.click();
-      }
-    });
-  }
-
-  if (tabelaWrap) {
-    tabelaWrap.addEventListener('click', function (e) {
-      if (e.target.closest('a')) return;
-      if (e.target.closest('.filtro-coluna-btn') || e.target.closest('.filtro-coluna-menu')) return;
-      if (e.target.closest('.pagination')) return;
-
-      const tr = e.target.closest('tr[data-os-pk]');
-      if (!tr) return;
-
-      const dados = obterDadosPainel(tr.dataset.osPk);
-      if (dados) {
-        abrirPainel(dados, tr);
-      }
-    });
-  } else if (tabelaGerencial) {
-    tabelaGerencial.addEventListener('click', function (e) {
-      if (e.target.closest('a')) return;
-      if (e.target.closest('.filtro-coluna-btn') || e.target.closest('.filtro-coluna-menu')) return;
-
-      const tr = e.target.closest('tr[data-os-pk]');
-      if (!tr) return;
-
-      const dados = obterDadosPainel(tr.dataset.osPk);
-      if (dados) abrirPainel(dados, tr);
-    });
-  }
+  document.getElementById('tabela-gerencial').addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    const tr = e.target.closest('tr[data-os-pk]');
+    if (!tr) return;
+    const dados = painelDados[tr.dataset.osPk];
+    if (dados) abrirPainel(dados, tr);
+  });
 
   document.getElementById('btn-salvar-colunas').addEventListener('click', function () {
     const colunas = [];
