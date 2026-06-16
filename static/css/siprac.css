@@ -266,14 +266,29 @@ body.gerencial-mode .siprac-content {
   z-index: 4;
 }
 
+.gerencial-tabela-wrap th:nth-child(2),
+.gerencial-tabela-wrap td:nth-child(2) {
+  position: sticky;
+  left: 180px;
+  z-index: 5;
+  background: white;
+}
+
+.gerencial-tabela-wrap th:nth-child(2) {
+  background: #1a3a5c;
+  z-index: 11;
+}
+
 .gerencial-tabela-wrap tr:hover td,
-.gerencial-tabela-wrap tr:hover td:first-child {
+.gerencial-tabela-wrap tr:hover td:first-child,
+.gerencial-tabela-wrap tr:hover td:nth-child(2) {
   background: #f0f4f8;
   cursor: pointer;
 }
 
 .gerencial-tabela-wrap tr.table-active td,
-.gerencial-tabela-wrap tr.table-active td:first-child {
+.gerencial-tabela-wrap tr.table-active td:first-child,
+.gerencial-tabela-wrap tr.table-active td:nth-child(2) {
   background: #dbeafe;
 }
 

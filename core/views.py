@@ -1489,7 +1489,6 @@ COLUNAS_GERENCIAL_CONFIG = {
     "entrega_aju": {"label": "ENTREGA_AJU"},
     "ajustes_ok": {"label": "AJUSTES_OK"},
     "envio_sei": {"label": "ENVIO_SEI"},
-    "status_producao": {"label": "STATUS"},
     "la_pt_ptf": {"label": "LA_PT_PTF"},
     "tipo_trabalho": {"label": "TIPO_TRABALHO"},
     "doc_sei": {"label": "DOC_SEI"},
@@ -1540,7 +1539,6 @@ GRUPOS_COLUNAS_GERENCIAL = [
             "entrega_aju",
             "ajustes_ok",
             "envio_sei",
-            "status_producao",
         ],
     ),
     (
@@ -1572,7 +1570,6 @@ COLUNAS_GERENCIAL_NOVAS = {
     "entrega_aju",
     "ajustes_ok",
     "envio_sei",
-    "status_producao",
     "la_pt_ptf",
     "doc_sei",
     "destino",
@@ -1610,7 +1607,6 @@ COLUNAS_GERENCIAL_PADRAO = [
     "tipo_trabalho",
     "prazo_eav",
     "dias_sei",
-    "status_producao",
     "la_pt_ptf",
     "doc_sei",
     "destino",
@@ -1920,7 +1916,6 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
             if producao and producao.data_homologacao
             else "—"
         ),
-        "status_producao": status_producao_label,
         "la_pt_ptf": la_pt_ptf,
         "tipo_trabalho": (
             producao.tipo_producao.prefixo
