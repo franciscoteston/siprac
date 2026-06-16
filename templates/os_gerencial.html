@@ -47,7 +47,7 @@
 </div>
 
 <div class="gerencial-layout" id="gerencial-layout">
-  <div class="gerencial-tabela-wrap">
+  <div class="gerencial-tabela-wrap" id="gerencialTabelaWrap">
       <table class="table table-sm table-hover siprac-table gerencial-table align-middle mb-0" id="tabela-gerencial">
         <thead>
           <tr>
@@ -136,12 +136,13 @@
     {% endif %}
   </div>
 
-  <aside class="gerencial-painel" id="gerencial-panel" aria-hidden="true">
-    <button type="button" class="gerencial-painel-toggle" id="gerencial-panel-toggle" aria-label="Recolher painel">›</button>
+  <div class="gerencial-painel-toggle" id="gerencialToggle" title="Abrir/fechar painel" role="button" tabindex="0" aria-label="Abrir/fechar painel">›</div>
+
+  <div class="gerencial-painel" id="gerencialPainel" aria-hidden="true">
     <div class="gerencial-painel-inner" id="gerencial-panel-content">
       <p class="text-muted small mb-0">Selecione uma linha para ver detalhes.</p>
     </div>
-  </aside>
+  </div>
 </div>
 
 <script type="application/json" id="gerencial-panels-data">{{ gerencial_panels_json|safe }}</script>
@@ -172,9 +173,9 @@
 
   const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
   const csrfToken = csrfInput ? csrfInput.value : '';
-  const panel = document.getElementById('gerencial-panel');
+  const panel = document.getElementById('gerencialPainel');
   const panelContent = document.getElementById('gerencial-panel-content');
-  const panelToggle = document.getElementById('gerencial-panel-toggle');
+  const panelToggle = document.getElementById('gerencialToggle');
   const podeHomologar = {{ pode_homologar|yesno:"true,false" }};
   const podeEditarEntradaDai = {{ pode_editar_entrada_dai|yesno:"true,false" }};
   let linhaSelecionada = null;
@@ -491,6 +492,20 @@
     bindPanelEvents();
   }
 
+  function limparSelecaoLinha() {
+    document.querySelectorAll('.gerencial-row').forEach(function (r) {
+      r.classList.remove('table-active');
+    });
+    linhaSelecionada = null;
+  }
+
+  function fecharPainel() {
+    panel.classList.remove('aberto');
+    panel.setAttribute('aria-hidden', 'true');
+    panelToggle.textContent = '›';
+    limparSelecaoLinha();
+  }
+
   function abrirPainel(row) {
     if (!row) return;
     document.querySelectorAll('.gerencial-row').forEach(function (r) {
@@ -522,10 +537,27 @@
   }
 
   panelToggle.addEventListener('click', function () {
-    panel.classList.toggle('aberto');
-    const aberto = panel.classList.contains('aberto');
-    panel.setAttribute('aria-hidden', aberto ? 'false' : 'true');
-    panelToggle.textContent = aberto ? '‹' : '›';
+    if (panel.classList.contains('aberto')) {
+      fecharPainel();
+      return;
+    }
+    if (linhaSelecionada) {
+      const osPk = linhaSelecionada.dataset.osPk;
+      const data = panelsMap[osPk] || panelsMap[String(osPk)];
+      if (data) {
+        renderPanel(data);
+        panel.classList.add('aberto');
+        panel.setAttribute('aria-hidden', 'false');
+        panelToggle.textContent = '‹';
+      }
+    }
+  });
+
+  panelToggle.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      panelToggle.click();
+    }
   });
 
   document.getElementById('btn-salvar-colunas').addEventListener('click', function () {

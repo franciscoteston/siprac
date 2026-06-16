@@ -161,17 +161,19 @@ body {
 
 /* Visão gerencial /os/?view=gerencial */
 .gerencial-layout {
-  position: relative;
-  display: block;
+  display: flex;
+  flex-direction: row;
   width: 100%;
+  height: calc(100vh - 180px);
+  overflow: hidden;
 }
 
-.gerencial-tabela-wrap,
-.gerencial-table-wrap {
-  width: 100%;
+.gerencial-tabela-wrap {
+  flex: 1 1 auto;
   overflow-x: auto;
   overflow-y: auto;
-  max-height: calc(100vh - 220px);
+  min-width: 0;
+  transition: flex 0.2s ease;
 }
 
 .gerencial-table {
@@ -243,50 +245,43 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.gerencial-painel,
-.gerencial-panel {
-  position: fixed;
-  top: 60px;
-  right: 0;
-  width: 400px;
-  height: calc(100vh - 60px);
+.gerencial-painel {
+  flex: 0 0 0;
+  width: 0;
+  overflow: hidden;
   overflow-y: auto;
+  border-left: none;
+  transition: flex 0.2s ease, width 0.2s ease;
   background: #fff;
+}
+
+.gerencial-painel.aberto {
+  flex: 0 0 400px;
+  width: 400px;
   border-left: 2px solid #dee2e6;
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  transform: translateX(100%);
-  transition: transform 0.2s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.gerencial-painel.aberto,
-.gerencial-panel.aberto {
-  transform: translateX(0);
-}
-
-.gerencial-painel-toggle,
-.gerencial-panel-toggle {
-  position: absolute;
-  left: -20px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 48px;
-  border: 1px solid #dee2e6;
-  border-right: none;
-  border-radius: 4px 0 0 4px;
-  background: #fff;
-  color: var(--azul-escuro);
-  font-size: 1rem;
-  line-height: 1;
+.gerencial-painel-toggle {
+  flex: 0 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  border-left: 1px solid #dee2e6;
   cursor: pointer;
-  z-index: 1001;
-  padding: 0;
-  box-shadow: -2px 0 6px rgba(0, 0, 0, 0.08);
+  font-size: 12px;
+  writing-mode: vertical-rl;
+  user-select: none;
+  align-self: stretch;
 }
 
-.gerencial-painel-inner,
-.gerencial-panel-inner {
+.gerencial-painel-toggle:hover {
+  background: #e0e0e0;
+}
+
+.gerencial-painel-inner {
   padding: 1rem 1rem 1.5rem;
 }
 
