@@ -2989,6 +2989,27 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         self.producao_obj.status = status_novo
         self.producao_obj.save(update_fields=campos_atualizar)
 
+        hoje = timezone.localdate()
+        campos_data = []
+        if status_novo == Producao.STATUS_PARA_REVISAO:
+            if status_anterior == Producao.STATUS_PARA_AJUSTES:
+                if not self.producao_obj.data_entrega_ajustes:
+                    self.producao_obj.data_entrega_ajustes = hoje
+                    campos_data.append("data_entrega_ajustes")
+            elif not self.producao_obj.data_entrega_avaliacao:
+                self.producao_obj.data_entrega_avaliacao = hoje
+                campos_data.append("data_entrega_avaliacao")
+        elif (
+            status_novo == Producao.STATUS_PARA_AJUSTES
+            and status_anterior == Producao.STATUS_PARA_REVISAO
+            and not self.producao_obj.data_entrega_revisao
+        ):
+            self.producao_obj.data_entrega_revisao = hoje
+            campos_data.append("data_entrega_revisao")
+
+        if campos_data:
+            self.producao_obj.save(update_fields=campos_data)
+
         _criar_producao_status_log(
             self.producao_obj,
             status_anterior,
@@ -3020,7 +3041,23 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
 
-CAMPOS_EDITAVEIS_PRODUCAO = frozenset({"modelo_sugerido", "revisor"})
+CAMPOS_DATA_PRODUCAO = frozenset(
+    {
+        "data_entrega_avaliacao",
+        "data_entrega_revisao",
+        "data_entrega_ajustes",
+    },
+)
+CAMPOS_EDITAVEIS_PRODUCAO = frozenset({"modelo_sugerido", "revisor"}) | CAMPOS_DATA_PRODUCAO
+
+
+def _formatar_data_resposta_json(data):
+    if data is None:
+        return {"valor": "", "valor_display": "—"}
+    return {
+        "valor": data.isoformat(),
+        "valor_display": data.strftime("%d/%m/%Y"),
+    }
 
 
 class ProducaoEditarCampoView(RequerHomologarMixin, View):
@@ -3049,6 +3086,27 @@ class ProducaoEditarCampoView(RequerHomologarMixin, View):
                     "sucesso": True,
                     "campo": campo,
                     "valor": producao.modelo_sugerido or "",
+                },
+            )
+
+        if campo in CAMPOS_DATA_PRODUCAO:
+            if not valor:
+                setattr(producao, campo, None)
+            else:
+                try:
+                    setattr(producao, campo, datetime.date.fromisoformat(valor))
+                except ValueError:
+                    return JsonResponse(
+                        {"sucesso": False, "erro": "Data inválida."},
+                        status=400,
+                    )
+            producao.save(update_fields=[campo])
+            resposta_data = _formatar_data_resposta_json(getattr(producao, campo))
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    **resposta_data,
                 },
             )
 

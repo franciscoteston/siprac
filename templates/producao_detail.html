@@ -139,6 +139,110 @@
 </div>
 
 <div class="card siprac-card mb-4">
+  <div class="card-header bg-white fw-semibold">Datas do fluxo</div>
+  <div class="card-body">
+    <dl class="row mb-0 small">
+      {% if pode_homologar or producao.data_entrega_avaliacao %}
+      <dt class="col-sm-4">Data de entrega da avaliação</dt>
+      <dd class="col-sm-8">
+        {% if pode_homologar %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="date"
+                 id="data-entrega-avaliacao-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 180px"
+                 value="{% if producao.data_entrega_avaliacao %}{{ producao.data_entrega_avaliacao|date:'Y-m-d' }}{% endif %}">
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
+                  data-campo="data_entrega_avaliacao"
+                  data-input="data-entrega-avaliacao-input"
+                  data-display="display-data-entrega-avaliacao"
+                  data-erro="erro-data-entrega-avaliacao">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-data-entrega-avaliacao"></div>
+        <span class="d-none" id="display-data-entrega-avaliacao">
+          {% if producao.data_entrega_avaliacao %}{{ producao.data_entrega_avaliacao|date:"d/m/Y" }}{% else %}—{% endif %}
+        </span>
+        {% elif producao.data_entrega_avaliacao %}
+          {{ producao.data_entrega_avaliacao|date:"d/m/Y" }}
+        {% endif %}
+      </dd>
+      {% endif %}
+
+      {% if pode_homologar or producao.data_entrega_revisao %}
+      <dt class="col-sm-4">Data de entrega da revisão</dt>
+      <dd class="col-sm-8">
+        {% if pode_homologar %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="date"
+                 id="data-entrega-revisao-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 180px"
+                 value="{% if producao.data_entrega_revisao %}{{ producao.data_entrega_revisao|date:'Y-m-d' }}{% endif %}">
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
+                  data-campo="data_entrega_revisao"
+                  data-input="data-entrega-revisao-input"
+                  data-display="display-data-entrega-revisao"
+                  data-erro="erro-data-entrega-revisao">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-data-entrega-revisao"></div>
+        <span class="d-none" id="display-data-entrega-revisao">
+          {% if producao.data_entrega_revisao %}{{ producao.data_entrega_revisao|date:"d/m/Y" }}{% else %}—{% endif %}
+        </span>
+        {% elif producao.data_entrega_revisao %}
+          {{ producao.data_entrega_revisao|date:"d/m/Y" }}
+        {% endif %}
+      </dd>
+      {% endif %}
+
+      {% if pode_homologar or producao.data_entrega_ajustes %}
+      <dt class="col-sm-4">Data de entrega dos ajustes</dt>
+      <dd class="col-sm-8">
+        {% if pode_homologar %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="date"
+                 id="data-entrega-ajustes-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 180px"
+                 value="{% if producao.data_entrega_ajustes %}{{ producao.data_entrega_ajustes|date:'Y-m-d' }}{% endif %}">
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
+                  data-campo="data_entrega_ajustes"
+                  data-input="data-entrega-ajustes-input"
+                  data-display="display-data-entrega-ajustes"
+                  data-erro="erro-data-entrega-ajustes">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-data-entrega-ajustes"></div>
+        <span class="d-none" id="display-data-entrega-ajustes">
+          {% if producao.data_entrega_ajustes %}{{ producao.data_entrega_ajustes|date:"d/m/Y" }}{% else %}—{% endif %}
+        </span>
+        {% elif producao.data_entrega_ajustes %}
+          {{ producao.data_entrega_ajustes|date:"d/m/Y" }}
+        {% endif %}
+      </dd>
+      {% endif %}
+
+      {% if pode_homologar or producao.data_homologacao %}
+      <dt class="col-sm-4">Data de homologação</dt>
+      <dd class="col-sm-8" id="display-data-homologacao">
+        {% if producao.data_homologacao %}{{ producao.data_homologacao|date:"d/m/Y" }}{% else %}—{% endif %}
+      </dd>
+      {% endif %}
+    </dl>
+    {% if not pode_homologar and not producao.data_entrega_avaliacao and not producao.data_entrega_revisao and not producao.data_entrega_ajustes and not producao.data_homologacao %}
+    <p class="text-muted small mb-0">Nenhuma data registrada.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card siprac-card mb-4">
   <div class="card-header bg-white fw-semibold">Histórico de status</div>
   <div class="card-body p-0">
     <div class="table-responsive">
@@ -500,6 +604,58 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   }
+
+  function salvarCampoProducao(campo, inputEl, erroEl) {
+    if (!inputEl) {
+      return;
+    }
+    var formData = new FormData();
+    formData.append('campo', campo);
+    formData.append('valor', inputEl.value.trim());
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch(editarCampoUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      },
+      body: formData,
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          if (!response.ok || !data.sucesso) {
+            throw new Error(data.erro || 'Erro ao salvar campo.');
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        if (inputEl.type === 'date') {
+          inputEl.value = data.valor || '';
+        } else {
+          inputEl.value = data.valor || '';
+        }
+        if (erroEl) {
+          erroEl.classList.add('d-none');
+        }
+      })
+      .catch(function (error) {
+        if (erroEl) {
+          erroEl.textContent = error.message;
+          erroEl.classList.remove('d-none');
+        }
+      });
+  }
+
+  document.querySelectorAll('.btn-salvar-data-fluxo').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var inputEl = document.getElementById(btn.dataset.input);
+      var erroEl = document.getElementById(btn.dataset.erro);
+      salvarCampoProducao(btn.dataset.campo, inputEl, erroEl);
+    });
+  });
 
   if (formPrazos) {
     formPrazos.addEventListener('submit', function (event) {

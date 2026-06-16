@@ -784,6 +784,21 @@ class Producao(models.Model):
         related_name="producoes_homologadas",
     )
     data_homologacao = models.DateField(null=True, blank=True)
+    data_entrega_avaliacao = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de entrega da avaliação",
+    )
+    data_entrega_revisao = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de entrega da revisão",
+    )
+    data_entrega_ajustes = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de entrega dos ajustes",
+    )
     observacao = models.TextField(null=True, blank=True)
     prazo_interno = models.DateField(
         null=True,
