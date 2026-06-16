@@ -55,6 +55,20 @@
         <div class="card-body">
           <p class="card-text text-muted mb-1">OSs com prazo próximo</p>
           <p class="card-value mb-0">{{ card_prazo_proximo }}</p>
+          {% if os_prazo_proximo %}
+          <ul class="list-unstyled small mb-0 mt-2">
+            {% for item in os_prazo_proximo|slice:":5" %}
+            <li class="d-flex justify-content-between gap-2">
+              <span class="text-truncate">{{ item.numero_os }}</span>
+              {% if item.dias_restantes is not None %}
+              <span class="text-nowrap {{ item.dias_restantes|cor_prazo }}">{{ item.dias_restantes|label_prazo }}</span>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
         </div>
       </div>
     </a>

@@ -88,7 +88,14 @@
         <td>{% if os.processo_sei_numero %}{{ os.processo_sei_numero }}{% else %}—{% endif %}</td>
         <td>{{ os.natureza.descricao }}</td>
         <td>{% if os.macroetapa_atual %}{{ os.macroetapa_atual|macroetapa_display }}{% else %}—{% endif %}</td>
-        <td>{% if os.prazo_data %}{{ os.prazo_data|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+        <td>
+          {% if os.prazo_data %}
+            {{ os.prazo_data|date:"d/m/Y" }}
+            {% with dias=os.prazo_data|dias_ate_prazo %}
+            <div class="small {{ dias|cor_prazo }}">{{ dias|label_prazo }}</div>
+            {% endwith %}
+          {% else %}—{% endif %}
+        </td>
         <td>{% if os.prazo_interno %}{{ os.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td>
           {% if os.prioridade == 'URGENTE' %}

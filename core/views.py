@@ -325,12 +325,17 @@ def _obter_os_prazo_proximo(os_ids=None):
     resultado = []
     for os_obj in ordens:
         dias = (hoje - os_obj.prazo).days
+        dias_restantes = None
+        if os_obj.prazo_data:
+            dias_restantes = (os_obj.prazo_data - hoje).days
         resultado.append(
             {
                 "pk": os_obj.pk,
                 "numero_os": os_obj.numero_os,
                 "processo_sei": os_obj.processo_sei_numero or "—",
                 "dias": dias,
+                "dias_restantes": dias_restantes,
+                "prazo_data": os_obj.prazo_data,
             },
         )
     return sorted(resultado, key=lambda item: item["dias"], reverse=True)

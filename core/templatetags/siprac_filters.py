@@ -193,6 +193,41 @@ def prazo_tipo_display(value):
 
 
 @register.filter
+def dias_ate_prazo(prazo_data):
+    """Retorna número de dias restantes até prazo_data. Negativo se vencido."""
+    if not prazo_data:
+        return None
+    hoje = timezone.localdate()
+    return (prazo_data - hoje).days
+
+
+@register.filter
+def cor_prazo(dias):
+    """Retorna classe CSS Bootstrap conforme dias restantes."""
+    if dias is None:
+        return ""
+    if dias < 0:
+        return "text-danger fw-bold"
+    if dias <= 7:
+        return "text-danger"
+    if dias <= 15:
+        return "text-warning"
+    return "text-success"
+
+
+@register.filter
+def label_prazo(dias):
+    """Retorna texto legível dos dias restantes."""
+    if dias is None:
+        return "—"
+    if dias < 0:
+        return f"Vencido há {abs(dias)} dia(s)"
+    if dias == 0:
+        return "Vence hoje"
+    return f"{dias} dia(s)"
+
+
+@register.filter
 def decimal_br_simples(value):
     """Formata decimal sem casas decimais: 492000.00 → 492.000"""
     if value is None:

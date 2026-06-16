@@ -509,3 +509,13 @@ O sistema EAV possui dois status intermediários não implementados no SIPRAC:
 Avaliar futuramente se esses estados intermediários são relevantes
 operacionalmente para a DAI, considerando o volume de trabalho e
 a necessidade de granularidade no rastreio do fluxo de revisão.
+
+### 15.13 Prazo Recompra ou ITBI
+Campo calculado presente na planilha gerencial EAV:
+- Finalidade RECURSO ITBI: data de entrada na unidade + 120 dias
+- Finalidade RECOMPRA: data de entrada na unidade + 60 dias
+
+Pendente definir se RECOMPRA e RECURSO ITBI serão tratados como
+valores de "Requerimento" ou de "Finalidade" no SIPRAC antes de
+implementar o cálculo automático. Campo calculado — não precisa
+ser armazenado no banco.

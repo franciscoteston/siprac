@@ -86,10 +86,19 @@
           </dd>
           <dt class="col-sm-4">Prioridade</dt>
           <dd class="col-sm-8">{{ os.prioridade|prioridade_display }}</dd>
-          <dt class="col-sm-4">Tipo de prazo</dt>
-          <dd class="col-sm-8">{{ os.prazo_tipo|prazo_tipo_display }}</dd>
-          <dt class="col-sm-4">Data do prazo</dt>
-          <dd class="col-sm-8">{% if os.prazo_data %}{{ os.prazo_data|date:"d/m/Y" }}{% else %}—{% endif %}</dd>
+          <dt class="col-sm-4">Prazo</dt>
+          <dd class="col-sm-8">
+            {% if os.prazo_data %}
+              {% with dias=os.prazo_data|dias_ate_prazo %}
+              {{ os.prazo_tipo|prazo_tipo_display }} — {{ os.prazo_data|date:"d/m/Y" }} —
+              <span class="{{ dias|cor_prazo }}">{{ dias|label_prazo }}</span>
+              {% endwith %}
+            {% elif os.prazo_tipo and os.prazo_tipo != 'SEM_PRIORIDADE' %}
+              {{ os.prazo_tipo|prazo_tipo_display }} — —
+            {% else %}
+              —
+            {% endif %}
+          </dd>
           <dt class="col-sm-4">Observação</dt>
           <dd class="col-sm-8">{% if os.observacao %}{{ os.observacao }}{% else %}—{% endif %}</dd>
         </dl>
