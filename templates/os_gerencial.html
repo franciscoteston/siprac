@@ -1,6 +1,7 @@
 {% load siprac_filters %}
 <form class="d-none" id="gerencial-csrf">{% csrf_token %}</form>
 
+<div class="gerencial-view">
 <div class="gerencial-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <div class="d-flex flex-wrap gap-2 align-items-center">
     {% if filtros_coluna_ativos %}
@@ -143,6 +144,7 @@
       <p class="text-muted small mb-0">Selecione uma linha para ver detalhes.</p>
     </div>
   </div>
+</div>
 </div>
 
 <script type="application/json" id="gerencial-panels-data">{{ gerencial_panels_json|safe }}</script>
