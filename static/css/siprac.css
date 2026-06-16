@@ -266,7 +266,7 @@ body.gerencial-mode .siprac-content {
 /* Status — sticky horizontal */
 .gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
   position: sticky;
-  left: 180px;
+  left: 160px;
   top: 29px;
   z-index: 15;
   background: #1a3a5c;
@@ -289,17 +289,23 @@ body.gerencial-mode .siprac-content {
 
 .gerencial-tabela-wrap td:nth-child(2) {
   position: sticky;
-  left: 180px;
+  left: 160px;
   z-index: 4;
   background: white;
 }
 
-.gerencial-tabela-wrap tr:hover td:nth-child(1),
+.gerencial-tabela-wrap tr:hover td:nth-child(1) {
+  background: #f0f4f8;
+}
+
 .gerencial-tabela-wrap tr:hover td:nth-child(2) {
   background: #f0f4f8;
 }
 
-.gerencial-tabela-wrap tr.table-active td:nth-child(1),
+.gerencial-tabela-wrap tr.table-active td:nth-child(1) {
+  background: #dbeafe;
+}
+
 .gerencial-tabela-wrap tr.table-active td:nth-child(2) {
   background: #dbeafe;
 }
