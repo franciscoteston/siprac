@@ -1454,14 +1454,15 @@ class OSCreateView(RequerLoginMixin, FormView):
 
 COLUNAS_GERENCIAL_CONFIG = {
     "entrada_dai": {"label": "Entrada DAI"},
-    "entrada_unidade": {"label": "Entrada unidade"},
+    "entrada_eav": {"label": "Entrada EAV"},
+    "origem": {"label": "Origem"},
     "requerimento": {"label": "Requerimento"},
     "finalidade": {"label": "Finalidade"},
     "ctm": {"label": "CTM"},
     "logradouro": {"label": "Logradouro"},
-    "numero": {"label": "Nº"},
-    "unidade": {"label": "Unidade"},
-    "lote_fiscal": {"label": "Lote Fiscal"},
+    "num_endereco": {"label": "Nº"},
+    "num_unidade": {"label": "Unidade"},
+    "num_bloco": {"label": "Lote Fiscal"},
     "numero_imovel": {"label": "Nº Imóvel"},
     "finalidade_imovel": {"label": "Finalidade Imóvel"},
     "area_territorial": {"label": "Área Territorial"},
@@ -1469,21 +1470,79 @@ COLUNAS_GERENCIAL_CONFIG = {
     "bairro": {"label": "Bairro"},
     "rh_valor": {"label": "RH_VALOR"},
     "apelido": {"label": "Apelido"},
-    "modelo_sugerido": {"label": "Modelo sugerido"},
-    "mes_cronograma": {"label": "Mês cronograma"},
-    "avaliador": {"label": "Avaliador"},
-    "revisor": {"label": "Revisor"},
-    "prazo_avaliador": {"label": "Prazo avaliador"},
-    "entrega_avaliacao": {"label": "Entrega avaliação"},
-    "entrega_revisao": {"label": "Entrega revisão"},
-    "entrega_ajustes": {"label": "Entrega ajustes"},
-    "data_homologacao": {"label": "Data homologação"},
-    "prazo_os": {"label": "Prazo OS"},
+    "modelo_sugerido": {"label": "MOD_SUGERIDO"},
+    "prioridade": {"label": "PRIORIDADE"},
+    "prazo_eav": {"label": "Prazo EAV"},
     "dias_sei": {"label": "DIAS_SEI"},
-    "tipo_trabalho": {"label": "Tipo trabalho"},
-    "numero_producao": {"label": "Nº produção"},
-    "numero_sei": {"label": "Nº SEI documento"},
+    "prazo_recompra_itbi": {"label": "Prazo Recompra/ITBI"},
+    "mes_cronograma": {"label": "CRONOG"},
+    "avaliador": {"label": "AVALIADOR"},
+    "prazo_aval": {"label": "PRAZO_AVAL"},
+    "entrega_aval": {"label": "ENTREGA_AVAL"},
+    "revisor": {"label": "REVISOR"},
+    "entrega_rev": {"label": "ENTREGA_REV"},
+    "entrega_aju": {"label": "ENTREGA_AJU"},
+    "ajustes_ok": {"label": "AJUSTES_OK"},
+    "envio_sei": {"label": "ENVIO_SEI"},
+    "status_producao": {"label": "STATUS"},
+    "la_pt_ptf": {"label": "LA_PT_PTF"},
+    "tipo_trabalho": {"label": "TIPO_TRABALHO"},
+    "doc_sei": {"label": "DOC_SEI"},
+    "destino": {"label": "DESTINO"},
 }
+
+GRUPOS_COLUNAS_GERENCIAL = [
+    (
+        "INFORMAÇÕES DE ENTRADA",
+        ["entrada_dai", "entrada_eav", "origem", "requerimento", "finalidade"],
+    ),
+    (
+        "INFORMAÇÕES DO IMÓVEL",
+        [
+            "ctm",
+            "logradouro",
+            "num_endereco",
+            "num_unidade",
+            "num_bloco",
+            "numero_imovel",
+            "finalidade_imovel",
+            "area_territorial",
+            "area_construida",
+            "bairro",
+            "rh_valor",
+        ],
+    ),
+    (
+        "TRIAGEM",
+        [
+            "apelido",
+            "modelo_sugerido",
+            "prioridade",
+            "prazo_eav",
+            "dias_sei",
+            "prazo_recompra_itbi",
+            "mes_cronograma",
+        ],
+    ),
+    (
+        "PRAZOS",
+        [
+            "avaliador",
+            "prazo_aval",
+            "entrega_aval",
+            "revisor",
+            "entrega_rev",
+            "entrega_aju",
+            "ajustes_ok",
+            "envio_sei",
+            "status_producao",
+        ],
+    ),
+    (
+        "PRODUTOS",
+        ["la_pt_ptf", "tipo_trabalho", "doc_sei", "destino"],
+    ),
+]
 
 COLUNAS_GERENCIAL_PADRAO = [
     "entrada_dai",
@@ -1494,7 +1553,6 @@ COLUNAS_GERENCIAL_PADRAO = [
     "numero_imovel",
     "avaliador",
     "tipo_trabalho",
-    "prazo_os",
     "dias_sei",
 ]
 
@@ -1548,14 +1606,26 @@ def _query_string_gerencial(request, **overrides):
 
 def _colunas_visiveis_gerencial(servidor):
     if servidor is None:
-        return list(COLUNAS_GERENCIAL_PADRAO)
-    try:
-        preferencia = servidor.preferencia_gerencial
-    except PreferenciaGerencial.DoesNotExist:
-        return list(COLUNAS_GERENCIAL_PADRAO)
-    colunas = preferencia.colunas_visiveis or []
-    validas = [c for c in colunas if c in COLUNAS_GERENCIAL_CONFIG]
-    return validas or list(COLUNAS_GERENCIAL_PADRAO)
+        saved_set = set(COLUNAS_GERENCIAL_PADRAO)
+    else:
+        try:
+            preferencia = servidor.preferencia_gerencial
+            colunas = preferencia.colunas_visiveis or []
+        except PreferenciaGerencial.DoesNotExist:
+            colunas = list(COLUNAS_GERENCIAL_PADRAO)
+        saved_set = set(colunas) if colunas else set(COLUNAS_GERENCIAL_PADRAO)
+    ordenadas = [c for c in COLUNAS_GERENCIAL_CONFIG if c in saved_set]
+    return ordenadas or list(COLUNAS_GERENCIAL_PADRAO)
+
+
+def _grupos_header_gerencial(colunas_visiveis):
+    visiveis = set(colunas_visiveis)
+    grupos = []
+    for titulo, colunas in GRUPOS_COLUNAS_GERENCIAL:
+        count = sum(1 for coluna in colunas if coluna in visiveis)
+        if count > 0:
+            grupos.append({"titulo": titulo, "colspan": count})
+    return grupos
 
 
 def _pode_editar_entrada_dai(request):
@@ -1727,69 +1797,73 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         else "—"
     )
 
+    status_producao_label = (
+        dict(Producao.STATUS_CHOICES).get(producao.status, "—")
+        if producao
+        else "—"
+    )
+
     cells = {
-        "apelido": os_obj.apelido or "—",
         "entrada_dai": _formatar_data_br(entrada_dai),
-        "entrada_unidade": (
-            timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
-            if entrada_unidade
-            else "—"
-        ),
+        "entrada_eav": entrada_eav,
+        "origem": "—",
         "requerimento": os_obj.tipo_demanda.descricao,
         "finalidade": os_obj.finalidade.descricao,
         "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
         "logradouro": (os_imovel.nom_logradouro if os_imovel and os_imovel.nom_logradouro else "—"),
-        "numero": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
-        "unidade": (os_imovel.num_unidade if os_imovel and os_imovel.num_unidade else "—"),
-        "lote_fiscal": (os_imovel.num_bloco if os_imovel and os_imovel.num_bloco else "—"),
+        "num_endereco": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
+        "num_unidade": (os_imovel.num_unidade if os_imovel and os_imovel.num_unidade else "—"),
+        "num_bloco": (os_imovel.num_bloco if os_imovel and os_imovel.num_bloco else "—"),
         "numero_imovel": identificacao_imovel,
         "finalidade_imovel": (os_imovel.des_finalidade if os_imovel and os_imovel.des_finalidade else "—"),
         "area_territorial": area_territorial,
         "area_construida": area_construida,
         "bairro": (os_imovel.bairro if os_imovel and os_imovel.bairro else "—"),
         "rh_valor": rh_valor,
+        "apelido": os_obj.apelido or "—",
         "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else "—"),
-        "mes_cronograma": (
-            _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
-        ),
+        "prioridade": os_obj.get_prioridade_display(),
+        "prazo_eav": prazo_interno_display,
+        "dias_sei": dias_sei,
+        "prazo_recompra_itbi": "—",
+        "mes_cronograma": mes_cronograma_display,
         "avaliador": (
             producao.servidor_responsavel.nome
             if producao and producao.servidor_responsavel
             else "—"
         ),
-        "revisor": (producao.revisor.nome if producao and producao.revisor else "—"),
-        "prazo_avaliador": (
-            _formatar_data_br(producao.prazo_interno)
-            if producao and producao.prazo_interno
-            else "—"
-        ),
-        "entrega_avaliacao": (
+        "prazo_aval": prazo_interno_display,
+        "entrega_aval": (
             _formatar_data_br(producao.data_entrega_avaliacao)
             if producao and producao.data_entrega_avaliacao
             else "—"
         ),
-        "entrega_revisao": (
+        "revisor": (producao.revisor.nome if producao and producao.revisor else "—"),
+        "entrega_rev": (
             _formatar_data_br(producao.data_entrega_revisao)
             if producao and producao.data_entrega_revisao
             else "—"
         ),
-        "entrega_ajustes": (
+        "entrega_aju": (
             _formatar_data_br(producao.data_entrega_ajustes)
             if producao and producao.data_entrega_ajustes
             else "—"
         ),
-        "data_homologacao": (
+        "ajustes_ok": "—",
+        "envio_sei": (
             _formatar_data_br(producao.data_homologacao)
             if producao and producao.data_homologacao
             else "—"
         ),
+        "status_producao": status_producao_label,
+        "la_pt_ptf": la_pt_ptf,
         "tipo_trabalho": (
-            producao.tipo_producao.prefixo if producao and producao.tipo_producao else "—"
+            producao.tipo_producao.descricao
+            if producao and producao.tipo_producao
+            else "—"
         ),
-        "numero_producao": numero_producao,
-        "numero_sei": (producao.numero_sei if producao and producao.numero_sei else "—"),
-        "prazo_os": _formatar_data_br(os_obj.prazo_data),
-        "dias_sei": dias_sei,
+        "doc_sei": (producao.numero_sei if producao and producao.numero_sei else "—"),
+        "destino": _destino_pos_homologacao(os_obj, producao),
     }
 
     panel_data = {
@@ -2005,6 +2079,7 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
         },
         "colunas_gerencial_visiveis": colunas_visiveis,
         "colunas_gerencial_visiveis_json": json.dumps(colunas_visiveis),
+        "grupos_colunas_gerencial": _grupos_header_gerencial(colunas_visiveis),
         "contagens_status_gerencial": _contagens_status_gerencial(os_ids),
         "opcoes_filtro_coluna": _opcoes_filtro_coluna_gerencial(linhas_base),
         "filtros_coluna_ativos": filtros_coluna_ativos,

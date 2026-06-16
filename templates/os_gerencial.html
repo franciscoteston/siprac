@@ -52,11 +52,17 @@
       <table class="table table-sm table-hover siprac-table align-middle mb-0" id="tabela-gerencial">
         <thead>
           <tr>
+            <th colspan="2" class="grupo-header">FIXO</th>
+            {% for grupo in grupos_colunas_gerencial %}
+            <th colspan="{{ grupo.colspan }}" class="grupo-header">{{ grupo.titulo }}</th>
+            {% endfor %}
+          </tr>
+          <tr>
             <th class="gerencial-col-fixa">Processo SEI</th>
             <th class="gerencial-col-fixa">Status</th>
             {% for col_id in colunas_gerencial_visiveis %}
             <th class="gerencial-col-config" data-col="{{ col_id }}">
-              <div class="d-flex align-items-center gap-1">
+              <div class="d-flex align-items-center gap-1 justify-content-center">
                 <span>{{ colunas_gerencial_labels|get_item:col_id }}</span>
                 <div class="dropdown d-inline">
                   <button type="button" class="btn btn-link btn-sm p-0 text-muted filtro-coluna-btn"
@@ -252,8 +258,9 @@
             panelData.entrada_dai = data.valor_display || '—';
             atualizarCelula(osPk, 'entrada_dai', escapeHtml(data.valor_display || '—'));
           }
-          if (campo === 'prioridade') {
+            if (campo === 'prioridade') {
             panelData.prioridade = valor;
+            atualizarCelula(osPk, 'prioridade', escapeHtml(valor));
           }
         }).catch(function (e) { alert(e.message); });
       });
@@ -286,19 +293,20 @@
               const display = data.valor_display || '—';
               panelData.prazo_eav = display;
               panelData.prazo_aval = display;
-              atualizarCelula(osPk, 'prazo_avaliador', escapeHtml(display));
+              atualizarCelula(osPk, 'prazo_eav', escapeHtml(display));
+              atualizarCelula(osPk, 'prazo_aval', escapeHtml(display));
             }
             if (campo === 'data_entrega_avaliacao') {
               panelData.entrega_aval = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_avaliacao', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'entrega_aval', escapeHtml(data.valor_display || '—'));
             }
             if (campo === 'data_entrega_revisao') {
               panelData.entrega_rev = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_revisao', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'entrega_rev', escapeHtml(data.valor_display || '—'));
             }
             if (campo === 'data_entrega_ajustes') {
               panelData.entrega_aju = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_ajustes', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'entrega_aju', escapeHtml(data.valor_display || '—'));
             }
           }).catch(function (e) { alert(e.message); });
         });
