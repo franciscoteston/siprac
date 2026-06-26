@@ -1,1 +1,1 @@
-web: gunicorn siprac.wsgi --log-file -
+web: bash start.sh
