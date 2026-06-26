@@ -2,4 +2,5 @@
 set -o errexit
 
 pip install -r requirements.txt
+pip show gunicorn
 python manage.py collectstatic --noinput
