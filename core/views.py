@@ -3371,7 +3371,13 @@ def _buscar_registros_siat(busca):
         if busca.isdigit():
             dados = siat_index.buscar_por_inscricao(int(busca))
             return "inscricao", [dados] if dados else []
-        return "logradouro", siat_index.buscar_por_logradouro(busca)
+        if siat_index.indice_logradouro_disponivel():
+            return "logradouro", siat_index.buscar_por_logradouro(busca)
+        return "logradouro", buscar_por_logradouro_no_arquivo(
+            busca,
+            SIAT_ARQUIVO_PATH,
+            limite=20,
+        )
 
     if busca.isdigit() and len(busca) == 12:
         registros = buscar_bloco_no_arquivo(busca, SIAT_ARQUIVO_PATH, limite=20)

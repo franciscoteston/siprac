@@ -1,21 +1,35 @@
+import os
 import threading
 
 from core.siat_parser import parse_linha_siat
+
+SIAT_INDEX_ENABLED = os.environ.get("SIAT_INDEX_ENABLED", "True") == "True"
+SIAT_INDEX_LOGRADOURO_ENABLED = (
+    os.environ.get("SIAT_INDEX_LOGRADOURO", "True") == "True"
+)
 
 _lock = threading.Lock()
 _indice_inscricoes = {}
 _indice_blocos = {}
 _indice_logradouros = {}
 _carregado = False
+_logradouro_habilitado = False
 
 
 def carregar_indice(filepath):
     """Carrega índices em memória a partir do arquivo SIAT."""
     global _indice_inscricoes, _indice_blocos, _indice_logradouros, _carregado
+    global _logradouro_habilitado
+
+    if not SIAT_INDEX_ENABLED:
+        with _lock:
+            _carregado = False
+            _logradouro_habilitado = False
+        return
 
     inscricoes = {}
     blocos = {}
-    logradouros = {}
+    logradouros = {} if SIAT_INDEX_LOGRADOURO_ENABLED else None
 
     with open(filepath, "r", encoding="utf-8", errors="replace") as arquivo:
         cabecalho = [coluna.strip() for coluna in arquivo.readline().split("|")]
@@ -36,7 +50,7 @@ def carregar_indice(filepath):
                 inscricoes[insc] = dados
             if bloco:
                 blocos.setdefault(bloco, []).append(dados)
-            if logr:
+            if logradouros is not None and logr:
                 lista = logradouros.setdefault(logr, [])
                 if len(lista) < 5:
                     lista.append(dados)
@@ -44,13 +58,19 @@ def carregar_indice(filepath):
     with _lock:
         _indice_inscricoes = inscricoes
         _indice_blocos = blocos
-        _indice_logradouros = logradouros
+        _indice_logradouros = logradouros or {}
         _carregado = True
+        _logradouro_habilitado = SIAT_INDEX_LOGRADOURO_ENABLED
 
 
 def indice_pronto():
     with _lock:
         return _carregado
+
+
+def indice_logradouro_disponivel():
+    with _lock:
+        return _carregado and _logradouro_habilitado
 
 
 def buscar_por_inscricao(inscricao_int):

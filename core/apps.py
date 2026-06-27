@@ -19,6 +19,16 @@ class CoreConfig(AppConfig):
             thread.start()
 
     def _carregar_indice(self, filepath):
-        from core import siat_index
+        import logging
 
-        siat_index.carregar_indice(filepath)
+        try:
+            from core import siat_index
+
+            siat_index.carregar_indice(filepath)
+        except MemoryError:
+            logging.getLogger(__name__).error(
+                "Memória insuficiente para carregar índice SIAT completo. "
+                "Busca por logradouro usará fallback de streaming."
+            )
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Erro ao carregar índice SIAT: {e}")
