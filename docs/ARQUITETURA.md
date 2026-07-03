@@ -546,3 +546,14 @@ por tipo de produção técnica por unidade — considerando:
 - Se a Direção estabelece metas formais por tipo de trabalho
 - Se o peso ponderado por tipo é relevante para avaliação de desempenho
 - Integração com o dashboard gerencial e relatórios de produtividade
+
+### 15.16 Correção de encoding nos dropdowns do formulário de OS
+No ambiente Railway (Linux/UTF-8), os textos dos dropdowns de Natureza
+estão exibindo caracteres corrompidos (ex: "Tribut Írio ÔÇô IPTU" em vez
+de "Tributário – IPTU"). Isso indica que os dados foram inseridos no banco
+com encoding incorreto (provavelmente via fixture gerada no Windows com
+encoding Latin-1/Windows-1252).
+
+Ação necessária: verificar o encoding dos dados de domínio (Natureza,
+TipoDemanda, Finalidade, CombinacaoValida) no banco do Railway e
+regenerar o dump em UTF-8 correto antes da próxima carga de dados.
