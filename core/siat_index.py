@@ -16,15 +16,22 @@ _carregado = False
 _logradouro_habilitado = False
 
 
+def marcar_recarregando():
+    """Marca o índice como indisponível (ex.: antes de recarregar em background)."""
+    global _carregado, _logradouro_habilitado
+    with _lock:
+        _carregado = False
+        _logradouro_habilitado = False
+
+
 def carregar_indice(filepath):
     """Carrega índices em memória a partir do arquivo SIAT."""
     global _indice_inscricoes, _indice_blocos, _indice_logradouros, _carregado
     global _logradouro_habilitado
 
+    marcar_recarregando()
+
     if not SIAT_INDEX_ENABLED:
-        with _lock:
-            _carregado = False
-            _logradouro_habilitado = False
         return
 
     inscricoes = {}
@@ -71,6 +78,24 @@ def indice_pronto():
 def indice_logradouro_disponivel():
     with _lock:
         return _carregado and _logradouro_habilitado
+
+
+def status_indice():
+    """Retorna status do índice em memória (thread-safe)."""
+    if not SIAT_INDEX_ENABLED:
+        return {
+            "carregado": True,
+            "total_inscricoes": 0,
+            "total_blocos": 0,
+            "logradouro_disponivel": False,
+        }
+    with _lock:
+        return {
+            "carregado": _carregado,
+            "total_inscricoes": len(_indice_inscricoes),
+            "total_blocos": len(_indice_blocos),
+            "logradouro_disponivel": _carregado and _logradouro_habilitado,
+        }
 
 
 def buscar_por_inscricao(inscricao_int):

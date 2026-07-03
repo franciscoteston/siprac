@@ -34,8 +34,76 @@
         Carregar novo arquivo
       </button>
     </form>
+
+    <div id="siat-indice-status"
+         class="alert alert-info mt-3 mb-0{% if not indice_recarregando %} d-none{% endif %}"
+         role="status"
+         aria-live="polite">
+      Índice carregando...
+    </div>
   </div>
 </div>
+
+{% if indice_recarregando %}
+<script>
+(function () {
+  var statusEl = document.getElementById('siat-indice-status');
+  var statusUrl = '{% url "api_siat_status_indice" %}';
+  var intervaloMs = 5000;
+  var timerId = null;
+
+  function formatarNumero(n) {
+    return Number(n || 0).toLocaleString('pt-BR');
+  }
+
+  function atualizarStatus(data) {
+    if (!statusEl) return;
+    statusEl.classList.remove('d-none');
+    if (data.carregado) {
+      statusEl.classList.remove('alert-info');
+      statusEl.classList.add('alert-success');
+      statusEl.textContent =
+        'Índice pronto — ' +
+        formatarNumero(data.total_inscricoes) +
+        ' inscrições disponíveis para busca';
+      if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      return;
+    }
+    statusEl.classList.remove('alert-success');
+    statusEl.classList.add('alert-info');
+    statusEl.textContent =
+      'Índice carregando... ' +
+      formatarNumero(data.total_inscricoes) +
+      ' inscrições indexadas';
+  }
+
+  function consultarStatus() {
+    fetch(statusUrl, {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin',
+    })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error('Falha ao consultar status do índice');
+        return resp.json();
+      })
+      .then(atualizarStatus)
+      .catch(function () {
+        if (!statusEl) return;
+        statusEl.classList.remove('d-none', 'alert-success');
+        statusEl.classList.add('alert-warning');
+        statusEl.textContent =
+          'Não foi possível consultar o status do índice. Tentando novamente...';
+      });
+  }
+
+  consultarStatus();
+  timerId = setInterval(consultarStatus, intervaloMs);
+})();
+</script>
+{% endif %}
 
 {% if contagem_siat_orfaos > 0 %}
 <div class="card siprac-card">

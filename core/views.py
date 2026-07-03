@@ -2956,6 +2956,10 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(_contexto_arquivo_siat())
+        context["indice_recarregando"] = self.request.session.pop(
+            "siat_indice_recarregando",
+            False,
+        )
         return context
 
     def form_valid(self, form):
@@ -2975,16 +2979,22 @@ class SiatCarregarArquivoView(RequerAdminMixin, FormView):
             )
             return self.form_invalid(form)
 
-        total = resultado.get("total_registros", 0)
-        threading.Thread(
-            target=siat_index.carregar_indice,
-            args=(SIAT_ARQUIVO_PATH,),
-            daemon=True,
-        ).start()
+        def _recarregar_indice():
+            try:
+                siat_index.carregar_indice(SIAT_ARQUIVO_PATH)
+            except Exception as e:
+                logging.getLogger(__name__).error(
+                    f"Erro ao recarregar índice SIAT: {e}"
+                )
+
+        siat_index.marcar_recarregando()
+        threading.Thread(target=_recarregar_indice, daemon=True).start()
+        self.request.session["siat_indice_recarregando"] = True
         messages.success(
             self.request,
-            f"Arquivo disponibilizado com sucesso. "
-            f"{total:,} registros disponíveis para consulta.".replace(",", "."),
+            "Arquivo SIAT carregado com sucesso. "
+            "O índice de busca está sendo atualizado em background "
+            "(pode levar 1-2 minutos para buscas por inscrição ficarem disponíveis).",
         )
         return super().form_valid(form)
 
@@ -2994,6 +3004,13 @@ class SiatStatusView(RequerLoginJSONMixin, View):
         if not getattr(request, "admin_sistema", False):
             return JsonResponse({"error": "Sem permissão."}, status=403)
         return JsonResponse(obter_status_arquivo_siat(SIAT_ARQUIVO_PATH))
+
+
+class SiatStatusIndexView(RequerLoginJSONMixin, View):
+    def get(self, request):
+        if not getattr(request, "admin_sistema", False):
+            return JsonResponse({"error": "Sem permissão."}, status=403)
+        return JsonResponse(siat_index.status_indice())
 
 
 class SiatLimparImoveisView(RequerAdminMixin, View):
