@@ -1,0 +1,467 @@
+[
+{
+  "model": "core.perfilacesso",
+  "pk": 1,
+  "fields": {
+    "nome": "Administrador",
+    "pode_criar_os": true,
+    "pode_encerrar_os": true,
+    "pode_criar_os_interna": true,
+    "pode_homologar": true,
+    "visibilidade_total": true,
+    "admin_sistema": true
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 2,
+  "fields": {
+    "nome": "Diretor",
+    "pode_criar_os": true,
+    "pode_encerrar_os": true,
+    "pode_criar_os_interna": true,
+    "pode_homologar": true,
+    "visibilidade_total": true,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 3,
+  "fields": {
+    "nome": "Aux. Téc. Direção",
+    "pode_criar_os": true,
+    "pode_encerrar_os": true,
+    "pode_criar_os_interna": true,
+    "pode_homologar": true,
+    "visibilidade_total": true,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 4,
+  "fields": {
+    "nome": "Coordenador",
+    "pode_criar_os": true,
+    "pode_encerrar_os": true,
+    "pode_criar_os_interna": true,
+    "pode_homologar": true,
+    "visibilidade_total": false,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 5,
+  "fields": {
+    "nome": "Aux. Téc. Coord.",
+    "pode_criar_os": true,
+    "pode_encerrar_os": false,
+    "pode_criar_os_interna": false,
+    "pode_homologar": true,
+    "visibilidade_total": false,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 6,
+  "fields": {
+    "nome": "Técnico",
+    "pode_criar_os": false,
+    "pode_encerrar_os": false,
+    "pode_criar_os_interna": false,
+    "pode_homologar": false,
+    "visibilidade_total": false,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 7,
+  "fields": {
+    "nome": "Aux. Adm. Gestão",
+    "pode_criar_os": true,
+    "pode_encerrar_os": false,
+    "pode_criar_os_interna": false,
+    "pode_homologar": false,
+    "visibilidade_total": false,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.perfilacesso",
+  "pk": 8,
+  "fields": {
+    "nome": "Aux. Adm. Pesquisa",
+    "pode_criar_os": false,
+    "pode_encerrar_os": false,
+    "pode_criar_os_interna": false,
+    "pode_homologar": false,
+    "visibilidade_total": false,
+    "admin_sistema": false
+  }
+},
+{
+  "model": "core.unidadeinterna",
+  "pk": 1,
+  "fields": {
+    "sigla": "DAI",
+    "nome": "Divisão de Avaliação de Imóveis"
+  }
+},
+{
+  "model": "core.unidadeinterna",
+  "pk": 2,
+  "fields": {
+    "sigla": "EAV",
+    "nome": "Equipe de Avaliações"
+  }
+},
+{
+  "model": "core.unidadeinterna",
+  "pk": 3,
+  "fields": {
+    "sigla": "ESJL",
+    "nome": "Equipe de Suporte, Judiciais e Locações"
+  }
+},
+{
+  "model": "core.unidadeinterna",
+  "pk": 4,
+  "fields": {
+    "sigla": "EPGV",
+    "nome": "Equipe Genérica da Planta de Valores"
+  }
+},
+{
+  "model": "core.unidadeexterna",
+  "pk": 1,
+  "fields": {
+    "sigla": "EXT",
+    "nome": "Unidade Externa não especificada",
+    "espera_retorno_padrao": false,
+    "ativa": true
+  }
+},
+{
+  "model": "core.unidadeexterna",
+  "pk": 2,
+  "fields": {
+    "sigla": "SCIM",
+    "nome": "Setor de Cadastro Imobiliário",
+    "espera_retorno_padrao": true,
+    "ativa": true
+  }
+},
+{
+  "model": "core.natureza",
+  "pk": 1,
+  "fields": {
+    "descricao": "Tributário – IPTU",
+    "ativa": true
+  }
+},
+{
+  "model": "core.natureza",
+  "pk": 2,
+  "fields": {
+    "descricao": "Tributário – ITBI",
+    "ativa": true
+  }
+},
+{
+  "model": "core.natureza",
+  "pk": 3,
+  "fields": {
+    "descricao": "Não tributário",
+    "ativa": true
+  }
+},
+{
+  "model": "core.tipodemanda",
+  "pk": 1,
+  "fields": {
+    "descricao": "IPTU",
+    "ativa": true
+  }
+},
+{
+  "model": "core.tipodemanda",
+  "pk": 2,
+  "fields": {
+    "descricao": "ITBI",
+    "ativa": true
+  }
+},
+{
+  "model": "core.tipodemanda",
+  "pk": 3,
+  "fields": {
+    "descricao": "Desapropriação",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 1,
+  "fields": {
+    "descricao": "Revisão do Valor Venal",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 2,
+  "fields": {
+    "descricao": "Preço por m²",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 3,
+  "fields": {
+    "descricao": "Execução Fiscal",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 4,
+  "fields": {
+    "descricao": "TART - Recurso de IPTU",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 5,
+  "fields": {
+    "descricao": "Judicial com Prazo",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 6,
+  "fields": {
+    "descricao": "Judicial sem Prazo",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 7,
+  "fields": {
+    "descricao": "TART - Recurso de ITBI",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 8,
+  "fields": {
+    "descricao": "Desapropriação Parcial",
+    "ativa": true
+  }
+},
+{
+  "model": "core.finalidade",
+  "pk": 9,
+  "fields": {
+    "descricao": "Desapropriação Total",
+    "ativa": true
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 1,
+  "fields": {
+    "natureza": 1,
+    "tipo_demanda": 1,
+    "finalidade": 1
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 2,
+  "fields": {
+    "natureza": 1,
+    "tipo_demanda": 1,
+    "finalidade": 2
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 3,
+  "fields": {
+    "natureza": 1,
+    "tipo_demanda": 1,
+    "finalidade": 3
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 4,
+  "fields": {
+    "natureza": 1,
+    "tipo_demanda": 1,
+    "finalidade": 4
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 5,
+  "fields": {
+    "natureza": 1,
+    "tipo_demanda": 1,
+    "finalidade": 5
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 6,
+  "fields": {
+    "natureza": 1,
+    "tipo_demanda": 1,
+    "finalidade": 6
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 7,
+  "fields": {
+    "natureza": 2,
+    "tipo_demanda": 2,
+    "finalidade": 7
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 8,
+  "fields": {
+    "natureza": 2,
+    "tipo_demanda": 2,
+    "finalidade": 5
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 9,
+  "fields": {
+    "natureza": 2,
+    "tipo_demanda": 2,
+    "finalidade": 6
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 10,
+  "fields": {
+    "natureza": 3,
+    "tipo_demanda": 3,
+    "finalidade": 8
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 11,
+  "fields": {
+    "natureza": 3,
+    "tipo_demanda": 3,
+    "finalidade": 9
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 12,
+  "fields": {
+    "natureza": 3,
+    "tipo_demanda": 3,
+    "finalidade": 5
+  }
+},
+{
+  "model": "core.combinacaovalida",
+  "pk": 13,
+  "fields": {
+    "natureza": 3,
+    "tipo_demanda": 3,
+    "finalidade": 6
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 1,
+  "fields": {
+    "prefixo": "LA",
+    "descricao": "Laudo de Avaliação",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 2,
+  "fields": {
+    "prefixo": "PT",
+    "descricao": "Parecer Técnico",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 3,
+  "fields": {
+    "prefixo": "PTF",
+    "descricao": "Parecer Técnico de Fiscalização",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 4,
+  "fields": {
+    "prefixo": "PF",
+    "descricao": "Planta de Fiscalização",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 5,
+  "fields": {
+    "prefixo": "PFF",
+    "descricao": "Planta de Fiscalização de Fachada",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 6,
+  "fields": {
+    "prefixo": "IT",
+    "descricao": "Informação Técnica",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 7,
+  "fields": {
+    "prefixo": "PTJ",
+    "descricao": "Parecer Técnico Judicial",
+    "ativo": true
+  }
+},
+{
+  "model": "core.tipoproducao",
+  "pk": 8,
+  "fields": {
+    "prefixo": "Despacho",
+    "descricao": "Despacho",
+    "ativo": true
+  }
+}
+]
