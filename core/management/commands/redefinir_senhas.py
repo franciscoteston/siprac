@@ -8,13 +8,17 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         senha = os.environ.get('SENHA_PADRAO', 'Siprac2026!')
+        self.stdout.write(f'SENHA_PADRAO do ambiente: {"definida" if os.environ.get("SENHA_PADRAO") else "NAO DEFINIDA - usando padrao"}')
+        self.stdout.write(f'Senha a ser usada tem {len(senha)} caracteres')
+
         usuarios = User.objects.all()
         count = 0
         for user in usuarios:
             user.set_password(senha)
             user.save()
             count += 1
-            self.stdout.write(f'Senha redefinida: {user.username}')
+            self.stdout.write(f'OK: {user.username}')
+
         self.stdout.write(
-            self.style.SUCCESS(f'Total: {count} usuários atualizados.')
+            self.style.SUCCESS(f'Total: {count} usuarios atualizados.')
         )
