@@ -44,3 +44,25 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Total: {criados} criados, {atualizados} atualizados.'
         ))
+
+        # Vincular User ao Servidor correspondente
+        from core.models import Servidor
+        vinculados = 0
+        for item in dados:
+            try:
+                user = User.objects.get(username=item['username'])
+                try:
+                    servidor = Servidor.objects.get(login=item['username'])
+                    if servidor.user != user:
+                        servidor.user = user
+                        servidor.save()
+                        vinculados += 1
+                        self.stdout.write(f'Vinculado: {user.username} -> Servidor {servidor.pk}')
+                except Servidor.DoesNotExist:
+                    self.stdout.write(
+                        self.style.WARNING(f'Servidor nao encontrado para: {user.username}')
+                    )
+            except User.DoesNotExist:
+                pass
+
+        self.stdout.write(self.style.SUCCESS(f'Vinculados: {vinculados} servidores.'))
