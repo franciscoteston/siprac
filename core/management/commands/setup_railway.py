@@ -7,18 +7,21 @@ class Command(BaseCommand):
     help = 'Configura usuarios no Railway: cria se nao existir e aplica hashes'
 
     def handle(self, *args, **options):
-        # Carregar hashes
+        from core.models import Servidor, ServidorUnidade, PerfilAcesso, UnidadeInterna
+        import json, os
+
+        # 1. Carregar e aplicar hashes de senha
         if not os.path.exists('hashes_senha.json'):
             self.stdout.write(self.style.ERROR('hashes_senha.json nao encontrado'))
             return
 
         with open('hashes_senha.json', 'r', encoding='utf-8') as f:
-            dados = json.load(f)
+            dados_users = json.load(f)
 
         criados = 0
         atualizados = 0
 
-        for item in dados:
+        for item in dados_users:
             user, created = User.objects.get_or_create(
                 username=item['username'],
                 defaults={
@@ -27,42 +30,72 @@ class Command(BaseCommand):
                     'is_superuser': item.get('is_superuser', False),
                 }
             )
-            # Aplica o hash diretamente (sem set_password)
             user.password = item['password']
             user.is_active = item.get('is_active', True)
             user.is_staff = item.get('is_staff', False)
             user.is_superuser = item.get('is_superuser', False)
             user.save()
-
             if created:
                 criados += 1
-                self.stdout.write(f'Criado: {user.username}')
             else:
                 atualizados += 1
-                self.stdout.write(f'Atualizado: {user.username}')
 
         self.stdout.write(self.style.SUCCESS(
-            f'Total: {criados} criados, {atualizados} atualizados.'
+            f'Users: {criados} criados, {atualizados} atualizados.'
         ))
 
-        # Vincular User ao Servidor correspondente
-        from core.models import Servidor
-        vinculados = 0
-        for item in dados:
-            try:
-                user = User.objects.get(username=item['username'])
-                try:
-                    servidor = Servidor.objects.get(login=item['username'])
-                    if servidor.user != user:
-                        servidor.user = user
-                        servidor.save()
-                        vinculados += 1
-                        self.stdout.write(f'Vinculado: {user.username} -> Servidor {servidor.pk}')
-                except Servidor.DoesNotExist:
-                    self.stdout.write(
-                        self.style.WARNING(f'Servidor nao encontrado para: {user.username}')
-                    )
-            except User.DoesNotExist:
-                pass
+        # 2. Carregar dados de servidores
+        if not os.path.exists('servidores_config.json'):
+            self.stdout.write(self.style.WARNING('servidores_config.json nao encontrado — pulando vinculos'))
+            return
 
-        self.stdout.write(self.style.SUCCESS(f'Vinculados: {vinculados} servidores.'))
+        with open('servidores_config.json', 'r', encoding='utf-8') as f:
+            dados_servidores = json.load(f)
+
+        srv_criados = 0
+        srv_vinculados = 0
+
+        for item in dados_servidores:
+            try:
+                user = User.objects.get(username=item['login'])
+            except User.DoesNotExist:
+                self.stdout.write(self.style.WARNING(f'User nao encontrado: {item["login"]}'))
+                continue
+
+            # Criar ou atualizar Servidor
+            servidor, created = Servidor.objects.get_or_create(
+                login=item['login'],
+                defaults={'nome': item['nome'], 'user': user}
+            )
+            if servidor.user != user:
+                servidor.user = user
+            servidor.nome = item['nome']
+            servidor.save()
+            if created:
+                srv_criados += 1
+
+            # Criar ServidorUnidade se nao existir
+            try:
+                unidade = UnidadeInterna.objects.get(sigla=item['unidade'])
+                perfil = PerfilAcesso.objects.get(nome=item['perfil'])
+                _, vu_created = ServidorUnidade.objects.get_or_create(
+                    servidor=servidor,
+                    unidade=unidade,
+                    data_fim=None,
+                    defaults={
+                        'perfil': perfil,
+                        'cargo': item.get('cargo', ''),
+                        'data_inicio': item.get('data_inicio', '2026-01-01'),
+                    }
+                )
+                if vu_created:
+                    srv_vinculados += 1
+                    self.stdout.write(f'Vinculado: {item["login"]} -> {item["unidade"]} ({item["perfil"]})')
+            except UnidadeInterna.DoesNotExist:
+                self.stdout.write(self.style.WARNING(f'Unidade nao encontrada: {item["unidade"]}'))
+            except PerfilAcesso.DoesNotExist:
+                self.stdout.write(self.style.WARNING(f'Perfil nao encontrado: {item["perfil"]}'))
+
+        self.stdout.write(self.style.SUCCESS(
+            f'Servidores: {srv_criados} criados, {srv_vinculados} vinculos criados.'
+        ))
