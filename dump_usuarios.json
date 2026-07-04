@@ -1,0 +1,1290 @@
+[
+{
+  "model": "auth.user",
+  "pk": 14,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$j96OzHsPOR16YOsRBnEAyZ$FS6wZjRhBzhetKp2lXEDG/n/nP75i3qhh7p5Kyg6Pec=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "edgar.vargas",
+    "first_name": "Edgar",
+    "last_name": "Alejandro Vargas",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:35.403Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 15,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$OiVQRKcYTkGO3FVEHpKKrO$LiUSzb9U4j/8D9+Y62rWFiIH2aW2FRBL1HuoYfSiLio=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "fernando.schwartzer",
+    "first_name": "Fernando",
+    "last_name": "Roberto Schwartzer",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:35.809Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 25,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$1VLgfe4XsOdHiWKUUcM25q$PwSoMbFFLkvuP/xFwJlveyi6eBPjH5m1bSgQ8JIma2k=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "sabrina.ibeiro",
+    "first_name": "Sabrina",
+    "last_name": "Villanova Ibeiro",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:39.912Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 26,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$nvxKEtiOCP8xIYawvCVdl7$H1koz5doMv98L3hHvvA1egQjFYskUfbZRDbf6pBbb5g=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "julio.divan",
+    "first_name": "Júlio",
+    "last_name": "César Pereira Divan",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:40.313Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 27,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$4etlFwW2Cua70azOrKYtE9$5nxtjETHVOCwsSVFPvCZu9PSNXV02ibIZ5Iu+sNNFzY=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "lisiane.rezende",
+    "first_name": "Lisiane",
+    "last_name": "Sobral de Rezende",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:40.734Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 28,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$XWemXyAYeucxvfgTreI62b$s2KbjT00Z4KawyZV3DEgEYpSbj8N/jTC9Rh7yGYxASY=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "charles.dias",
+    "first_name": "Charles",
+    "last_name": "Elissander Pinto Dias",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:41.140Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 13,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$ILsgxuHuJ1T0y6mDp9yADN$BvReM8eyzfB5iRtYdXuXLPqG7CqPH26vI9ctoqD8SKA=",
+    "last_login": "2026-06-08T00:08:27.009Z",
+    "is_superuser": false,
+    "username": "debora.alves",
+    "first_name": "Debora",
+    "last_name": "Fonseca Alves",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:34.996Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 4,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$rKmyAfc5QF0Hpt0p6zxl7p$XI3lCjnKOpIRPTEJHU7UYE9tcupwf7cugtr1P3r4eJo=",
+    "last_login": "2026-06-08T00:09:54.188Z",
+    "is_superuser": false,
+    "username": "joao.moralles",
+    "first_name": "Joao",
+    "last_name": "Marcio Lopes Moralles",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:31.327Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 11,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$MxblPHtC58ZHMJ6Gwd6V08$78vNGS/MN3K9r7WRZTd4Dgd3R8LXDCXnYFdYUDsdj7E=",
+    "last_login": "2026-06-08T00:16:50.114Z",
+    "is_superuser": false,
+    "username": "clara.marques",
+    "first_name": "Clara",
+    "last_name": "Francisca Marques",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:34.177Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 1,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$3wAtcGLGbU4HRjcqAIEwdC$yGRPndl8D4u8mreDb6lJ5PjqjAklQ1gkmXYE1KI0pbg=",
+    "last_login": "2026-06-17T12:50:16.442Z",
+    "is_superuser": true,
+    "username": "franciscoteston",
+    "first_name": "franciscoteston",
+    "last_name": "",
+    "email": "franciscoteston@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-05-31T16:25:23.643Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 16,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$EOAIEalgrEztvuxpoFFPhq$B3qlm/AQf2bocU0rs6nsmQKCUaCiI02N+Su8l9s/oIE=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "gilmara.muller",
+    "first_name": "Gilmara",
+    "last_name": "Muller",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:36.228Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 17,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$XxEh6a784Jit4T6uqJeMgk$JFBXLDU5Eyreb1ns9TTmzR3oj9F3G7g898ewmp8RL1M=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "jessica.lange",
+    "first_name": "Jessica",
+    "last_name": "Lange",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:36.642Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 2,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$wIjsU9NNMHrUMsmIc1edh3$X+gx0UFudkEPJvWkkRzBtM4yGqG72TmwcgQnAJ+V6Ys=",
+    "last_login": "2026-06-05T14:19:29.784Z",
+    "is_superuser": false,
+    "username": "tecnico_teste",
+    "first_name": "Técnico",
+    "last_name": "Teste",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-01T00:03:41Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 18,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$HCsomng8jCkcTeGmDp6fmp$L/7QdNdBOMVjBgCWwea27SFvSn0NJFnhsFPfKdl9vZ8=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "jones.rodrigues",
+    "first_name": "Jones",
+    "last_name": "Ritta Rodrigues",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:37.048Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 19,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$0lTF5riOZToCtG1P9Z3mkX$GzD/finLQmV3ZvhQ5wW+9Yksjt6aLjJWDbTLLK1qZJc=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "vanessa.staats",
+    "first_name": "Vanessa",
+    "last_name": "Staats",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:37.455Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 20,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$qBc73LhyH4zJAtpMoBbehU$04v0iKCwSKlfxf8pts0cEWuwoU5X2nM7K6S8h+8KeQg=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "fernanda.pontel",
+    "first_name": "Fernanda",
+    "last_name": "Pontel",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:37.859Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 21,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$nJ4dkCGIx4egJnZiAEcYKJ$ReOBV2JucXGQTxZFq/g7S7hE+TqCBmFjKkZxH9CaSHo=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "roberta.ayub",
+    "first_name": "Roberta",
+    "last_name": "Brenner Ayub",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:38.277Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 22,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$6YnmCCHxGKJlzg6OzMWY7u$tIYtQ7m7qe+c52ktnpeYLSwn7jiiQDoQ3421wwPp2Y8=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "isabela.meneghello",
+    "first_name": "Isabela",
+    "last_name": "Belem Meneghello",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:38.679Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 24,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$44mB6reUPAvx9bDdCj2Aqm$hNdMsVwJeT4jpvDNylT45sjxg9lJjuxygV+6QtYRAuI=",
+    "last_login": "2026-06-09T01:51:22.613Z",
+    "is_superuser": false,
+    "username": "vanessa.rocha",
+    "first_name": "Vanessa",
+    "last_name": "Costa da Rocha",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:39.512Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 3,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$8wr1dCGD7oqo26OXg1FMFG$V9sOF3BYPkTjM2yk9pXmknUWTeUJ8rGd42sgsiESX/s=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "daniela.jahnel",
+    "first_name": "Daniela",
+    "last_name": "Cristina Jahnel",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:30.918Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 23,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$A5ut4J7UnfNaHLvh6fWyS5$lSaCljMWTtUE3sxPOQZTSRxuFvXgx+/AjtOo+fEkVBY=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "fernanda.costi",
+    "first_name": "Fernanda",
+    "last_name": "Lazzari Costi",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:39.103Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 5,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$1D4MaRaaRZ4DMuvWcrclfG$9z0Lr/wjZb6utm/h3js8NgHOVbsvxVNJxJY4RzKciP0=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "lucia.takagi",
+    "first_name": "Lucia",
+    "last_name": "Yukari Takagi",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:31.744Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 6,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$fL4OdSW19RdpGQznqUVfnE$6aAeSeugPBwdnsDS89IBF3tZmTHE+j/Cma1w3vEBf7E=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "guilherme.costa",
+    "first_name": "Guilherme",
+    "last_name": "Silberfarb Costa",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:32.156Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 7,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$RYbEoMLXqhCSWcNqPDBPzq$Yf3yD9SxDsG5pza9amyU2aaV17YmCLOGvQOrm8Yo9uE=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "gabriel.fontoura",
+    "first_name": "Gabriel",
+    "last_name": "Fumagalli Fontoura",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:32.562Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 8,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$Dw8lH2jdRXWr2xrg59K3nW$REqeBahMctvMsVUbLjCeLuEo6dG1GCTHnK9hKSxiZ8w=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "jussara.santos",
+    "first_name": "Jussara",
+    "last_name": "Marel Guiraud Santos",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:32.962Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 9,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$D8WtrIGYnxMKmcP2nKdWIO$q8DALD8XRAb5VlZr2q8PKnqq39RQe9wkd39pVnWYLz4=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "adriana.bissigo",
+    "first_name": "Adriana",
+    "last_name": "Kirsch Bissigo",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:33.368Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 10,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$bjlqBRhBq8RZNU7kOlwFEt$iZEEjE/t3uDSEBfn+mP/y1NT4FJXyodqxtqeF9coEvQ=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "carla.felice",
+    "first_name": "Carla",
+    "last_name": "Alexandra Godoy Felice",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:33.770Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "pk": 12,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$ABkfbAROCSAUv1A2thfBeo$etFgxGoLKl3J04Ufu5T/+LhiRMS2QEw85UDyPA8zww0=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "david.bertoglio",
+    "first_name": "David",
+    "last_name": "Schuch Bertoglio",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-07T02:33:34.595Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 29,
+  "fields": {
+    "nome": "franciscoteston",
+    "login": "franciscoteston",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 1
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 2,
+  "fields": {
+    "nome": "Técnico Teste",
+    "login": "tecnico_teste",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 2
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 3,
+  "fields": {
+    "nome": "Daniela Cristina Jahnel",
+    "login": "daniela.jahnel",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 3
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 4,
+  "fields": {
+    "nome": "Joao Marcio Lopes Moralles",
+    "login": "joao.moralles",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 4
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 5,
+  "fields": {
+    "nome": "Lucia Yukari Takagi",
+    "login": "lucia.takagi",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 5
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 6,
+  "fields": {
+    "nome": "Guilherme Silberfarb Costa",
+    "login": "guilherme.costa",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 6
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 7,
+  "fields": {
+    "nome": "Gabriel Fumagalli Fontoura",
+    "login": "gabriel.fontoura",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 7
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 8,
+  "fields": {
+    "nome": "Jussara Marel Guiraud Santos",
+    "login": "jussara.santos",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 8
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 9,
+  "fields": {
+    "nome": "Adriana Kirsch Bissigo",
+    "login": "adriana.bissigo",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 9
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 10,
+  "fields": {
+    "nome": "Carla Alexandra Godoy Felice",
+    "login": "carla.felice",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 10
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 11,
+  "fields": {
+    "nome": "Clara Francisca Marques",
+    "login": "clara.marques",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 11
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 12,
+  "fields": {
+    "nome": "David Schuch Bertoglio",
+    "login": "david.bertoglio",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 12
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 13,
+  "fields": {
+    "nome": "Debora Fonseca Alves",
+    "login": "debora.alves",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 13
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 14,
+  "fields": {
+    "nome": "Edgar Alejandro Vargas",
+    "login": "edgar.vargas",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 14
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 15,
+  "fields": {
+    "nome": "Fernando Roberto Schwartzer",
+    "login": "fernando.schwartzer",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 15
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 16,
+  "fields": {
+    "nome": "Gilmara Muller",
+    "login": "gilmara.muller",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 16
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 17,
+  "fields": {
+    "nome": "Jessica Lange",
+    "login": "jessica.lange",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 17
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 18,
+  "fields": {
+    "nome": "Jones Ritta Rodrigues",
+    "login": "jones.rodrigues",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 18
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 19,
+  "fields": {
+    "nome": "Vanessa Staats",
+    "login": "vanessa.staats",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 19
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 20,
+  "fields": {
+    "nome": "Fernanda Pontel",
+    "login": "fernanda.pontel",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 20
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 21,
+  "fields": {
+    "nome": "Roberta Brenner Ayub",
+    "login": "roberta.ayub",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 21
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 22,
+  "fields": {
+    "nome": "Isabela Belem Meneghello",
+    "login": "isabela.meneghello",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 22
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 23,
+  "fields": {
+    "nome": "Fernanda Lazzari Costi",
+    "login": "fernanda.costi",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 23
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 24,
+  "fields": {
+    "nome": "Vanessa Costa da Rocha",
+    "login": "vanessa.rocha",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 24
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 25,
+  "fields": {
+    "nome": "Sabrina Villanova Ibeiro",
+    "login": "sabrina.ibeiro",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 25
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 26,
+  "fields": {
+    "nome": "Júlio César Pereira Divan",
+    "login": "julio.divan",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 26
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 27,
+  "fields": {
+    "nome": "Lisiane Sobral de Rezende",
+    "login": "lisiane.rezende",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 27
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 28,
+  "fields": {
+    "nome": "Charles Elissander Pinto Dias",
+    "login": "charles.dias",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 28
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 38,
+  "fields": {
+    "servidor": 2,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 29,
+  "fields": {
+    "servidor": 3,
+    "unidade": 1,
+    "perfil": 3,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 30,
+  "fields": {
+    "servidor": 4,
+    "unidade": 4,
+    "perfil": 4,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 34,
+  "fields": {
+    "servidor": 5,
+    "unidade": 4,
+    "perfil": 6,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 39,
+  "fields": {
+    "servidor": 6,
+    "unidade": 4,
+    "perfil": 2,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 40,
+  "fields": {
+    "servidor": 7,
+    "unidade": 4,
+    "perfil": 6,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 41,
+  "fields": {
+    "servidor": 8,
+    "unidade": 4,
+    "perfil": 6,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 32,
+  "fields": {
+    "servidor": 9,
+    "unidade": 3,
+    "perfil": 5,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 42,
+  "fields": {
+    "servidor": 10,
+    "unidade": 1,
+    "perfil": 3,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 33,
+  "fields": {
+    "servidor": 11,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 43,
+  "fields": {
+    "servidor": 12,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 31,
+  "fields": {
+    "servidor": 13,
+    "unidade": 2,
+    "perfil": 5,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 44,
+  "fields": {
+    "servidor": 14,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 45,
+  "fields": {
+    "servidor": 15,
+    "unidade": 1,
+    "perfil": 3,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 46,
+  "fields": {
+    "servidor": 16,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 47,
+  "fields": {
+    "servidor": 17,
+    "unidade": 2,
+    "perfil": 5,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 48,
+  "fields": {
+    "servidor": 18,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 49,
+  "fields": {
+    "servidor": 19,
+    "unidade": 2,
+    "perfil": 5,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 35,
+  "fields": {
+    "servidor": 20,
+    "unidade": 3,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 50,
+  "fields": {
+    "servidor": 21,
+    "unidade": 3,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 51,
+  "fields": {
+    "servidor": 22,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 52,
+  "fields": {
+    "servidor": 23,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 36,
+  "fields": {
+    "servidor": 24,
+    "unidade": 3,
+    "perfil": 7,
+    "cargo": "Administrador",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 53,
+  "fields": {
+    "servidor": 25,
+    "unidade": 3,
+    "perfil": 7,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 54,
+  "fields": {
+    "servidor": 26,
+    "unidade": 3,
+    "perfil": 8,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 55,
+  "fields": {
+    "servidor": 27,
+    "unidade": 3,
+    "perfil": 8,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 56,
+  "fields": {
+    "servidor": 28,
+    "unidade": 3,
+    "perfil": 8,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 37,
+  "fields": {
+    "servidor": 29,
+    "unidade": 1,
+    "perfil": 1,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+}
+]
