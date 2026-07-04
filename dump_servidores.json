@@ -1,0 +1,786 @@
+[
+{
+  "model": "core.servidor",
+  "pk": 29,
+  "fields": {
+    "nome": "franciscoteston",
+    "login": "franciscoteston",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 1
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 2,
+  "fields": {
+    "nome": "Técnico Teste",
+    "login": "tecnico_teste",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 2
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 3,
+  "fields": {
+    "nome": "Daniela Cristina Jahnel",
+    "login": "daniela.jahnel",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 3
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 4,
+  "fields": {
+    "nome": "Joao Marcio Lopes Moralles",
+    "login": "joao.moralles",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 4
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 5,
+  "fields": {
+    "nome": "Lucia Yukari Takagi",
+    "login": "lucia.takagi",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 5
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 6,
+  "fields": {
+    "nome": "Guilherme Silberfarb Costa",
+    "login": "guilherme.costa",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 6
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 7,
+  "fields": {
+    "nome": "Gabriel Fumagalli Fontoura",
+    "login": "gabriel.fontoura",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 7
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 8,
+  "fields": {
+    "nome": "Jussara Marel Guiraud Santos",
+    "login": "jussara.santos",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 8
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 9,
+  "fields": {
+    "nome": "Adriana Kirsch Bissigo",
+    "login": "adriana.bissigo",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 9
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 10,
+  "fields": {
+    "nome": "Carla Alexandra Godoy Felice",
+    "login": "carla.felice",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 10
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 11,
+  "fields": {
+    "nome": "Clara Francisca Marques",
+    "login": "clara.marques",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 11
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 12,
+  "fields": {
+    "nome": "David Schuch Bertoglio",
+    "login": "david.bertoglio",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 12
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 13,
+  "fields": {
+    "nome": "Debora Fonseca Alves",
+    "login": "debora.alves",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 13
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 14,
+  "fields": {
+    "nome": "Edgar Alejandro Vargas",
+    "login": "edgar.vargas",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 14
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 15,
+  "fields": {
+    "nome": "Fernando Roberto Schwartzer",
+    "login": "fernando.schwartzer",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 15
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 16,
+  "fields": {
+    "nome": "Gilmara Muller",
+    "login": "gilmara.muller",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 16
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 17,
+  "fields": {
+    "nome": "Jessica Lange",
+    "login": "jessica.lange",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 17
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 18,
+  "fields": {
+    "nome": "Jones Ritta Rodrigues",
+    "login": "jones.rodrigues",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 18
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 19,
+  "fields": {
+    "nome": "Vanessa Staats",
+    "login": "vanessa.staats",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 19
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 20,
+  "fields": {
+    "nome": "Fernanda Pontel",
+    "login": "fernanda.pontel",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 20
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 21,
+  "fields": {
+    "nome": "Roberta Brenner Ayub",
+    "login": "roberta.ayub",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 21
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 22,
+  "fields": {
+    "nome": "Isabela Belem Meneghello",
+    "login": "isabela.meneghello",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 22
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 23,
+  "fields": {
+    "nome": "Fernanda Lazzari Costi",
+    "login": "fernanda.costi",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 23
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 24,
+  "fields": {
+    "nome": "Vanessa Costa da Rocha",
+    "login": "vanessa.rocha",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 24
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 25,
+  "fields": {
+    "nome": "Sabrina Villanova Ibeiro",
+    "login": "sabrina.ibeiro",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 25
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 26,
+  "fields": {
+    "nome": "Júlio César Pereira Divan",
+    "login": "julio.divan",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 26
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 27,
+  "fields": {
+    "nome": "Lisiane Sobral de Rezende",
+    "login": "lisiane.rezende",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 27
+  }
+},
+{
+  "model": "core.servidor",
+  "pk": 28,
+  "fields": {
+    "nome": "Charles Elissander Pinto Dias",
+    "login": "charles.dias",
+    "senha_hash": "",
+    "salt": "",
+    "data_ultimo_acesso": null,
+    "tentativas_falhas": 0,
+    "bloqueado": false,
+    "token_reset_senha": null,
+    "user": 28
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 38,
+  "fields": {
+    "servidor": 2,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 29,
+  "fields": {
+    "servidor": 3,
+    "unidade": 1,
+    "perfil": 3,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 30,
+  "fields": {
+    "servidor": 4,
+    "unidade": 4,
+    "perfil": 4,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 34,
+  "fields": {
+    "servidor": 5,
+    "unidade": 4,
+    "perfil": 6,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 39,
+  "fields": {
+    "servidor": 6,
+    "unidade": 4,
+    "perfil": 2,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 40,
+  "fields": {
+    "servidor": 7,
+    "unidade": 4,
+    "perfil": 6,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 41,
+  "fields": {
+    "servidor": 8,
+    "unidade": 4,
+    "perfil": 6,
+    "cargo": "Auditor Fiscal",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 32,
+  "fields": {
+    "servidor": 9,
+    "unidade": 3,
+    "perfil": 5,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 42,
+  "fields": {
+    "servidor": 10,
+    "unidade": 1,
+    "perfil": 3,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 33,
+  "fields": {
+    "servidor": 11,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 43,
+  "fields": {
+    "servidor": 12,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 31,
+  "fields": {
+    "servidor": 13,
+    "unidade": 2,
+    "perfil": 5,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 44,
+  "fields": {
+    "servidor": 14,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 45,
+  "fields": {
+    "servidor": 15,
+    "unidade": 1,
+    "perfil": 3,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 46,
+  "fields": {
+    "servidor": 16,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 47,
+  "fields": {
+    "servidor": 17,
+    "unidade": 2,
+    "perfil": 5,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 48,
+  "fields": {
+    "servidor": 18,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 49,
+  "fields": {
+    "servidor": 19,
+    "unidade": 2,
+    "perfil": 5,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 35,
+  "fields": {
+    "servidor": 20,
+    "unidade": 3,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 50,
+  "fields": {
+    "servidor": 21,
+    "unidade": 3,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 51,
+  "fields": {
+    "servidor": 22,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 52,
+  "fields": {
+    "servidor": 23,
+    "unidade": 2,
+    "perfil": 6,
+    "cargo": "Arquiteto",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 36,
+  "fields": {
+    "servidor": 24,
+    "unidade": 3,
+    "perfil": 7,
+    "cargo": "Administrador",
+    "substituto": false,
+    "data_inicio": "2026-01-01",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 53,
+  "fields": {
+    "servidor": 25,
+    "unidade": 3,
+    "perfil": 7,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 54,
+  "fields": {
+    "servidor": 26,
+    "unidade": 3,
+    "perfil": 8,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 55,
+  "fields": {
+    "servidor": 27,
+    "unidade": 3,
+    "perfil": 8,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 56,
+  "fields": {
+    "servidor": 28,
+    "unidade": 3,
+    "perfil": 8,
+    "cargo": "Auxiliar Administrativo",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+},
+{
+  "model": "core.servidorunidade",
+  "pk": 37,
+  "fields": {
+    "servidor": 29,
+    "unidade": 1,
+    "perfil": 1,
+    "cargo": "Engenheiro",
+    "substituto": false,
+    "data_inicio": "2026-05-31",
+    "data_fim": null
+  }
+}
+]
