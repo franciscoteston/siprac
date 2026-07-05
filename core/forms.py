@@ -206,17 +206,20 @@ class EncaminhamentoForm(forms.Form):
             ("HOMOLOGACAO", "Homologação"),
             ("CONCLUSAO", "Conclusão"),
         ],
+        initial="TRIAGEM",
+        required=False,
     )
     tipo_acao = forms.ChoiceField(
         label="Tipo de ação",
         choices=[
-            ("ATRIBUICAO", "Atribuição"),
+            ("ENTRADA", "Entrada"),
             ("DEVOLUCAO", "Devolução"),
             ("SOLICITACAO_AJUSTE", "Solicitação de ajuste"),
-            ("ENCAMINHAMENTO_EXTERNO", "Encaminhamento externo"),
+            ("EXTERNO", "Externo"),
             ("HOMOLOGACAO", "Homologação"),
             ("CONCLUSAO", "Conclusão"),
         ],
+        initial="ENTRADA",
     )
     aguarda_retorno = forms.BooleanField(
         label="Aguarda retorno",
@@ -251,6 +254,11 @@ class EncaminhamentoForm(forms.Form):
                     "unidade_interna_destino",
                     "Obrigatório para encaminhamento interno.",
                 )
+            if not cleaned_data.get("etapa_interna"):
+                self.add_error(
+                    "etapa_interna",
+                    "Obrigatório para encaminhamento interno.",
+                )
             cleaned_data["unidade_externa_destino"] = None
         elif tipo_destino == "EXTERNO":
             if not unidade_externa:
@@ -260,6 +268,8 @@ class EncaminhamentoForm(forms.Form):
                 )
             cleaned_data["unidade_interna_destino"] = None
             cleaned_data["servidor_destino"] = None
+            cleaned_data["tipo_acao"] = "EXTERNO"
+            cleaned_data["etapa_interna"] = None
 
         return cleaned_data
 

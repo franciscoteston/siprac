@@ -512,6 +512,22 @@ class MacroetapaLog(models.Model):
 class Encaminhamento(models.Model):
     """Tramitação da OS entre unidades, servidores ou destinos externos."""
 
+    TIPO_ACAO_ENTRADA = "ENTRADA"
+    TIPO_ACAO_DEVOLUCAO = "DEVOLUCAO"
+    TIPO_ACAO_SOLICITACAO_AJUSTE = "SOLICITACAO_AJUSTE"
+    TIPO_ACAO_EXTERNO = "EXTERNO"
+    TIPO_ACAO_HOMOLOGACAO = "HOMOLOGACAO"
+    TIPO_ACAO_CONCLUSAO = "CONCLUSAO"
+
+    TIPO_ACAO_CHOICES = [
+        (TIPO_ACAO_ENTRADA, "Entrada"),
+        (TIPO_ACAO_DEVOLUCAO, "Devolução"),
+        (TIPO_ACAO_SOLICITACAO_AJUSTE, "Solicitação de ajuste"),
+        (TIPO_ACAO_EXTERNO, "Externo"),
+        (TIPO_ACAO_HOMOLOGACAO, "Homologação"),
+        (TIPO_ACAO_CONCLUSAO, "Conclusão"),
+    ]
+
     os = models.ForeignKey(
         OS,
         on_delete=models.PROTECT,
@@ -549,7 +565,7 @@ class Encaminhamento(models.Model):
         related_name="encaminhamentos",
     )
     etapa_interna = models.CharField(max_length=255, null=True, blank=True)
-    tipo_acao = models.CharField(max_length=255)
+    tipo_acao = models.CharField(max_length=255, choices=TIPO_ACAO_CHOICES)
     aguarda_retorno = models.BooleanField(default=False)
     data_retorno_prevista = models.DateField(null=True, blank=True)
     data_retorno_efetiva = models.DateField(null=True, blank=True)

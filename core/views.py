@@ -2430,6 +2430,12 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         context["os"] = self.os_obj
         return context
 
+    def get_initial(self):
+        initial = super().get_initial()
+        initial.setdefault("etapa_interna", "TRIAGEM")
+        initial.setdefault("tipo_acao", "ENTRADA")
+        return initial
+
     def form_valid(self, form):
         servidor = _obter_servidor(self.request.user)
         if servidor is None:
@@ -2444,6 +2450,14 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         agora = timezone.now()
         dados = form.cleaned_data
         tipo_destino = dados["tipo_destino"]
+        if tipo_destino == "EXTERNO":
+            tipo_acao = "EXTERNO"
+            etapa_interna = None
+            etapa_tarefa = "TRIAGEM"
+        else:
+            tipo_acao = dados["tipo_acao"]
+            etapa_interna = dados["etapa_interna"]
+            etapa_tarefa = etapa_interna
 
         with transaction.atomic():
             encaminhamento = Encaminhamento.objects.create(
@@ -2453,8 +2467,8 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 unidade_interna_destino=dados.get("unidade_interna_destino"),
                 servidor_destino=dados.get("servidor_destino"),
                 unidade_externa_destino=dados.get("unidade_externa_destino"),
-                etapa_interna=dados["etapa_interna"],
-                tipo_acao=dados["tipo_acao"],
+                etapa_interna=etapa_interna,
+                tipo_acao=tipo_acao,
                 aguarda_retorno=dados.get("aguarda_retorno") or False,
                 data_retorno_prevista=dados.get("data_retorno_prevista"),
                 observacao=dados.get("observacao") or None,
@@ -2472,7 +2486,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 encaminhamento=encaminhamento,
                 unidade=unidade_tarefa,
                 servidor=servidor_tarefa,
-                etapa_interna=dados["etapa_interna"],
+                etapa_interna=etapa_tarefa,
                 status="PENDENTE",
                 data_inicio=agora,
             )
