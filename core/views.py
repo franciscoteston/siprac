@@ -56,12 +56,17 @@ from core.mixins import (
     RequerLoginMixin,
 )
 from core.os_service import (
+    ativar_atendimento_interno_se_necessario,
     contar_producoes_por_os_ids,
     contar_producoes_por_status_unidades,
     data_entrada_unidade,
-    derivar_macroetapa_os,
+    macroetapa_atual_os,
     os_ativas_por_unidade,
     os_da_unidade_atual,
+    queryset_os_com_macroetapa,
+    registrar_encaminhamento_automatico,
+    timeline_os,
+    unidade_atual_da_os,
     _queryset_os_nao_encerradas,
 )
 from core import siat_index
@@ -84,7 +89,6 @@ from core.models import (
     Encaminhamento,
     Finalidade,
     Imovel,
-    MacroetapaLog,
     Natureza,
     OS,
     OsImovel,
@@ -239,7 +243,7 @@ def _contar_os_abertas():
 
 
 def _contar_os_ativas(os_ids=None):
-    qs = _queryset_os_anotado().exclude(macroetapa_atual="ENCERRADO")
+    qs = OS.objects.filter(encerrada=False)
     if os_ids is not None:
         if not os_ids:
             return 0
@@ -279,12 +283,8 @@ def _montar_fila_os(unidades_ids):
     }
 
     macroetapas_por_os = {}
-    for log in MacroetapaLog.objects.filter(os_id__in=os_ids).order_by(
-        "-data_hora",
-        "-id",
-    ):
-        if log.os_id not in macroetapas_por_os:
-            macroetapas_por_os[log.os_id] = log.macroetapa
+    for os_obj in OS.objects.filter(pk__in=os_ids):
+        macroetapas_por_os[os_obj.pk] = macroetapa_atual_os(os_obj)
 
     fila_os = []
     for os_obj in ordens:
@@ -321,7 +321,7 @@ def _obter_os_prazo_proximo(os_ids=None):
         _queryset_os_anotado()
         .filter(prazo__lt=corte)
         .exclude(prazo__isnull=True)
-        .exclude(macroetapa_atual="ENCERRADO")
+        .filter(encerrada=False)
         .order_by("prazo")
     )
     if os_ids is not None:
@@ -436,11 +436,7 @@ def _contar_producao_homologada_mes(os_ids=None):
 
 
 def _obter_os_por_macroetapa(os_ids=None):
-    qs = (
-        _queryset_os_anotado()
-        .exclude(macroetapa_atual="ENCERRADO")
-        .exclude(macroetapa_atual__isnull=True)
-    )
+    qs = queryset_os_com_macroetapa().filter(encerrada=False)
     if os_ids is not None:
         if not os_ids:
             return []
@@ -458,7 +454,7 @@ def _obter_os_por_macroetapa(os_ids=None):
 
 
 def _obter_os_por_natureza(os_ids=None):
-    qs = _queryset_os_anotado().exclude(macroetapa_atual="ENCERRADO")
+    qs = queryset_os_com_macroetapa().filter(encerrada=False)
     if os_ids is not None:
         if not os_ids:
             return []
@@ -1033,9 +1029,6 @@ def _ordenar_queryset_os_fila(queryset):
 
 
 def _queryset_os_anotado():
-    ultima_macroetapa = MacroetapaLog.objects.filter(
-        os_id=OuterRef("pk"),
-    ).order_by("-data_hora", "-id")
     processo_principal = OsProcesso.objects.filter(
         os_id=OuterRef("pk"),
         tipo_vinculo="PRINCIPAL",
@@ -1047,8 +1040,8 @@ def _queryset_os_anotado():
         status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
     ).order_by("-data_criacao")
 
-    return OS.objects.select_related("natureza").annotate(
-        macroetapa_atual=Subquery(ultima_macroetapa.values("macroetapa")[:1]),
+    base = OS.objects.select_related("natureza")
+    return queryset_os_com_macroetapa(base).annotate(
         processo_sei_numero=Subquery(
             processo_principal.values("processo_sei__numero_processo")[:1],
         ),
@@ -1082,7 +1075,9 @@ def _aplicar_filtros_os(queryset, request):
     busca_processo = request.GET.get("q", "").strip()
 
     if macroetapa == "ativas":
-        queryset = queryset.exclude(macroetapa_atual="ENCERRADO")
+        queryset = queryset.filter(encerrada=False)
+    elif macroetapa == "ENCERRADO":
+        queryset = queryset.filter(encerrada=True)
     elif macroetapa:
         queryset = queryset.filter(macroetapa_atual=macroetapa)
     if natureza_id:
@@ -1111,7 +1106,7 @@ def _aplicar_filtros_os(queryset, request):
         queryset = (
             queryset.filter(prazo__lt=corte)
             .exclude(prazo__isnull=True)
-            .exclude(macroetapa_atual="ENCERRADO")
+            .filter(encerrada=False)
         )
 
     unidade_sigla = request.GET.get("unidade", "").strip()
@@ -1442,13 +1437,6 @@ class OSCreateView(RequerLoginMixin, FormView):
                 processo_sei=processo_sei,
                 tipo_vinculo="PRINCIPAL",
                 data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada_divisao"],
-            )
-
-            MacroetapaLog.objects.create(
-                os=os_obj,
-                macroetapa="ENTRADA_DIVISAO",
-                servidor=servidor,
-                automatico=True,
             )
 
         messages.success(
@@ -2213,11 +2201,10 @@ class OSListView(RequerLoginMixin, ListView):
         context["filtro_unidade"] = self.request.GET.get("unidade", "")
         context["naturezas"] = Natureza.objects.filter(ativa=True).order_by("descricao")
         context["status_producao_opcoes"] = Producao.STATUS_CHOICES
-        context["macroetapas"] = (
-            MacroetapaLog.objects.values_list("macroetapa", flat=True)
-            .distinct()
-            .order_by("macroetapa")
-        )
+        context["macroetapas"] = [
+            choice[0]
+            for choice in Encaminhamento.TIPO_MACROETAPA_CHOICES
+        ] + ["ENCERRADO"]
         context["prioridades"] = ["NORMAL", "PRIORITARIO", "URGENTE"]
         context["query_string_lista"] = _query_string_os_list(
             self.request,
@@ -2360,20 +2347,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context["imoveis_sem_producao"] = {
             oi.pk for oi in os_imoveis if oi.pk not in imoveis_em_producao
         }
-        context["macroetapas"] = MacroetapaLog.objects.filter(os=os_obj).order_by(
-            "-data_hora",
-        )
-        context["encaminhamentos"] = (
-            Encaminhamento.objects.filter(os=os_obj)
-            .select_related(
-                "unidade_interna_origem",
-                "servidor_origem",
-                "unidade_interna_destino",
-                "servidor_destino",
-                "unidade_externa_destino",
-            )
-            .order_by("-data_hora")
-        )
+        context["timeline"] = timeline_os(os_obj)
         imoveis_vinculados = OsImovel.objects.filter(os=os_obj).select_related(
             "imovel",
             "vinculado_por",
@@ -2393,11 +2367,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
             .select_related("tipo_producao")
             .order_by("-data_criacao")
         )
-        context["macroetapa_atual"] = (
-            MacroetapaLog.objects.filter(os=os_obj)
-            .order_by("-data_hora", "-id")
-            .first()
-        )
+        context["macroetapa_atual"] = macroetapa_atual_os(os_obj)
         context["os_encerrada"] = _os_esta_encerrada(os_obj)
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
         context["producoes_pendentes"] = _producoes_pendentes_os(os_obj)
@@ -2469,6 +2439,15 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 unidade_externa_destino=dados.get("unidade_externa_destino"),
                 etapa_interna=etapa_interna,
                 tipo_acao=tipo_acao,
+                tipo_macroetapa=(
+                    Encaminhamento.TIPO_MACROETAPA_ATENDIMENTO_INTERNO
+                    if tipo_destino == "INTERNO"
+                    else (
+                        Encaminhamento.TIPO_MACROETAPA_ATENDIMENTO_EXTERNO
+                        if dados.get("aguarda_retorno")
+                        else None
+                    )
+                ),
                 aguarda_retorno=dados.get("aguarda_retorno") or False,
                 data_retorno_prevista=dados.get("data_retorno_prevista"),
                 observacao=dados.get("observacao") or None,
@@ -2490,21 +2469,6 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 status="PENDENTE",
                 data_inicio=agora,
             )
-
-            if tipo_destino == "INTERNO":
-                MacroetapaLog.objects.create(
-                    os=self.os_obj,
-                    macroetapa="ATENDIMENTO_INTERNO",
-                    servidor=servidor,
-                    automatico=True,
-                )
-            elif dados.get("aguarda_retorno"):
-                MacroetapaLog.objects.create(
-                    os=self.os_obj,
-                    macroetapa="ATENDIMENTO_EXTERNO",
-                    servidor=servidor,
-                    automatico=True,
-                )
 
         messages.success(self.request, "Encaminhamento registrado.")
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
@@ -2553,18 +2517,13 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
             observacao=dados.get("observacao") or None,
         )
 
-        derivar_macroetapa_os(producao.os, servidor=servidor)
+        ativar_atendimento_interno_se_necessario(producao.os, servidor=servidor)
         messages.success(self.request, "Produção registrada.")
         return redirect(reverse("producao_detail", kwargs={"pk": producao.pk}))
 
 
 def _os_esta_encerrada(os_obj):
-    ultimo_log = (
-        MacroetapaLog.objects.filter(os=os_obj)
-        .order_by("-data_hora", "-id")
-        .first()
-    )
-    return ultimo_log is not None and ultimo_log.macroetapa == "ENCERRADO"
+    return os_obj.encerrada
 
 
 def _verificar_encerramento_automatico_os(os_obj, servidor):
@@ -2575,21 +2534,10 @@ def _verificar_encerramento_automatico_os(os_obj, servidor):
     if processos_abertos.exists():
         return False
 
-    ultimo_log = (
-        MacroetapaLog.objects.filter(os=os_obj)
-        .order_by("-data_hora", "-id")
-        .first()
-    )
-    if ultimo_log and ultimo_log.macroetapa != "ENCERRADO":
-        MacroetapaLog.objects.create(
-            os=os_obj,
-            macroetapa="ENCERRADO",
-            servidor=servidor,
-            automatico=True,
-            observacao=(
-                "Encerrado automaticamente: todos os processos encerrados na Divisão."
-            ),
-        )
+    if not os_obj.encerrada:
+        os_obj.encerrada = True
+        os_obj.data_encerramento = timezone.now()
+        os_obj.save(update_fields=["encerrada", "data_encerramento"])
         return True
     return False
 
@@ -2636,12 +2584,9 @@ class OSEncerramentoView(RequerLoginMixin, FormView):
         motivo = form.cleaned_data["motivo_encerramento"]
 
         with transaction.atomic():
-            MacroetapaLog.objects.create(
-                os=self.os_obj,
-                macroetapa="ENCERRADO",
-                servidor=servidor,
-                observacao=motivo,
-            )
+            self.os_obj.encerrada = True
+            self.os_obj.data_encerramento = timezone.now()
+            self.os_obj.save(update_fields=["encerrada", "data_encerramento"])
             OsProcesso.objects.filter(
                 os=self.os_obj,
                 data_encerramento__isnull=True,
@@ -2708,22 +2653,125 @@ class OSVincularProcessoView(RequerLoginMixin, FormView):
             return self.form_invalid(form)
 
         with transaction.atomic():
-            OsProcesso.objects.create(
+            os_processo = OsProcesso.objects.create(
                 os=self.os_obj,
                 processo_sei=processo_sei,
                 tipo_vinculo="RELACIONADO",
                 data_entrada_divisao=data_entrada_divisao,
             )
-            MacroetapaLog.objects.create(
-                os=self.os_obj,
-                macroetapa="INCLUSAO_PROCESSO_RELACIONADO",
+            registrar_encaminhamento_automatico(
+                self.os_obj,
+                Encaminhamento.TIPO_MACROETAPA_INCLUSAO_PROCESSO,
                 servidor=servidor,
                 observacao=f"Processo {numero} incluído como relacionado.",
             )
 
+            unidade_atual = unidade_atual_da_os(self.os_obj)
+            if unidade_atual:
+                os_processo.aguardando_redistribuicao = True
+                os_processo.observacao_bloqueio = (
+                    f"Processo incluído enquanto OS estava em atendimento "
+                    f"na unidade {unidade_atual.sigla}. "
+                    f"Aguardando redistribuição para esta equipe."
+                )
+                os_processo.save(
+                    update_fields=[
+                        "aguardando_redistribuicao",
+                        "observacao_bloqueio",
+                    ]
+                )
+
+        if os_processo.aguardando_redistribuicao:
+            messages.warning(
+                self.request,
+                f"Processo incluído com bloqueio temporário. "
+                f"A OS está atualmente na unidade {unidade_atual.sigla}. "
+                f"O novo processo ficará bloqueado até ser redistribuído "
+                f"para a equipe que está atendendo a OS.",
+            )
+        else:
+            messages.success(
+                self.request,
+                f"Processo {numero} vinculado à OS com sucesso.",
+            )
+        return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class OSLiberarProcessoView(RequerLoginMixin, View):
+    template_name = "os_liberar_processo.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        perfil = getattr(request, "perfil_acesso", None)
+        if not perfil or not perfil.pode_homologar:
+            raise PermissionDenied
+
+        self.os_obj = get_object_or_404(OS, pk=kwargs["os_pk"])
+        self.os_processo = get_object_or_404(
+            OsProcesso,
+            pk=kwargs["proc_pk"],
+            os=self.os_obj,
+            aguardando_redistribuicao=True,
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, os_pk, proc_pk):
+        return render(
+            request,
+            self.template_name,
+            {
+                "os": self.os_obj,
+                "os_processo": self.os_processo,
+            },
+        )
+
+    def post(self, request, os_pk, proc_pk):
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+        vinculo = obter_vinculo_unidade_ativo(servidor)
+        if vinculo is None:
+            messages.error(request, "Servidor sem vínculo ativo em unidade.")
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+        agora = timezone.now()
+        unidade_atual = unidade_atual_da_os(self.os_obj)
+        numero_processo = self.os_processo.processo_sei.numero_processo
+
+        with transaction.atomic():
+            self.os_processo.aguardando_redistribuicao = False
+            self.os_processo.observacao_bloqueio = None
+            self.os_processo.save(
+                update_fields=["aguardando_redistribuicao", "observacao_bloqueio"]
+            )
+
+            if unidade_atual:
+                encaminhamento = Encaminhamento.objects.create(
+                    os=self.os_obj,
+                    unidade_interna_origem=vinculo.unidade,
+                    servidor_origem=servidor,
+                    unidade_interna_destino=unidade_atual,
+                    etapa_interna="TRIAGEM",
+                    tipo_acao=Encaminhamento.TIPO_ACAO_ENTRADA,
+                    observacao=(
+                        f"Liberação do processo {numero_processo} "
+                        f"para atendimento na unidade {unidade_atual.sigla}."
+                    ),
+                )
+                TarefaInterna.objects.create(
+                    os=self.os_obj,
+                    encaminhamento=encaminhamento,
+                    unidade=unidade_atual,
+                    servidor=servidor,
+                    etapa_interna="TRIAGEM",
+                    status="PENDENTE",
+                    data_inicio=agora,
+                )
+
         messages.success(
-            self.request,
-            f"Processo {numero} vinculado à OS com sucesso.",
+            request,
+            f"Processo {numero_processo} liberado para atendimento.",
         )
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
 
@@ -3830,7 +3878,7 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             justificativa=justificativa or None,
         )
 
-        derivar_macroetapa_os(self.producao_obj.os, servidor=servidor)
+        ativar_atendimento_interno_se_necessario(self.producao_obj.os, servidor=servidor)
         if _request_wants_json(request):
             return self._resposta_status_json(request)
 

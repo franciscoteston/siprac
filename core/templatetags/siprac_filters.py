@@ -15,6 +15,7 @@ MACROETAPA_LABELS = {
     "ATENDIMENTO_EXTERNO": "Atendimento Externo",
     "RETORNO_EXTERNO": "Retorno Externo",
     "INCLUSAO_PROCESSO_RELACIONADO": "Inclusão de Processo Relacionado",
+    "INCLUSAO_PROCESSO": "Inclusão de Processo Relacionado",
     "REABERTURA": "Reabertura",
     "ENCERRADO": "Encerrado na Divisão",
 }

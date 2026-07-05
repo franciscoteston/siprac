@@ -65,7 +65,7 @@
         <a class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}"
            href="{% url 'dashboard' %}">Dashboard</a>
         <a class="nav-link{% if request.resolver_match.url_name == 'os_list' %} active{% endif %}"
-           href="{% if request.perfil_acesso and request.perfil_acesso.pode_homologar or request.perfil_acesso and request.perfil_acesso.visibilidade_total %}{% url 'os_list' %}?view=gerencial{% else %}{% url 'os_list' %}{% endif %}">Ordens de serviço</a>
+           href="{% if request.perfil_acesso and request.perfil_acesso.pode_homologar or request.perfil_acesso and request.perfil_acesso.visibilidade_total %}{% url 'os_list' %}?view=gerencial{% else %}{% url 'os_list' %}{% endif %}">Ordens de serviço{% if pendencias.os_novas > 0 %}<span class="badge bg-danger rounded-pill ms-1">{{ pendencias.os_novas }}</span>{% endif %}</a>
         <div class="dropdown">
           <a class="nav-link dropdown-toggle{% if request.resolver_match.url_name == 'imovel_list' or request.resolver_match.url_name == 'imovel_mapa' or request.resolver_match.url_name == 'imovel_novo' or request.resolver_match.url_name == 'imovel_detalhe' or request.resolver_match.url_name == 'imovel_editar' %} active{% endif %}"
              href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -78,7 +78,7 @@
           </ul>
         </div>
         <a class="nav-link{% if request.resolver_match.url_name == 'producao_list' or request.resolver_match.url_name == 'producao_detail' %} active{% endif %}"
-           href="{% url 'producao_list' %}">Produções</a>
+           href="{% url 'producao_list' %}">Produções{% if pendencias.producoes_pendentes > 0 or pendencias.revisoes_pendentes > 0 %}<span class="badge bg-warning rounded-pill ms-1">{{ pendencias.producoes_pendentes|add:pendencias.revisoes_pendentes }}</span>{% endif %}</a>
         <a class="nav-link{% if request.resolver_match.url_name == 'relatorio_list' or request.resolver_match.url_name == 'relatorio_producao' or request.resolver_match.url_name == 'relatorio_tempo_registro' %} active{% endif %}"
            href="{% url 'relatorio_list' %}">Relatórios</a>
         {% if request.admin_sistema %}

@@ -21,7 +21,7 @@
       <span class="badge bg-secondary">{{ os.prioridade|prioridade_display }}</span>
       {% endif %}
       {% if macroetapa_atual %}
-      <span class="badge text-bg-dark">{{ macroetapa_atual.macroetapa|macroetapa_display }}</span>
+      <span class="badge text-bg-dark">{{ macroetapa_atual|macroetapa_display }}</span>
       {% else %}
       <span class="badge text-bg-secondary">Sem macroetapa</span>
       {% endif %}
@@ -121,6 +121,7 @@
                 <th>Registro SIPRAC</th>
                 <th>Tempo de registro</th>
                 <th>Encerramento</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -130,6 +131,14 @@
                   <a href="{% url 'processo_detail' vinculo.processo_sei.pk %}" class="text-decoration-none">
                     {{ vinculo.processo_sei.numero_processo }}
                   </a>
+                  {% if vinculo.aguardando_redistribuicao %}
+                  <span class="badge bg-warning text-dark ms-1"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top"
+                        title="{{ vinculo.observacao_bloqueio }}">
+                    Aguardando redistribuição
+                  </span>
+                  {% endif %}
                 </td>
                 <td>
                   {% if vinculo.tipo_vinculo == 'PRINCIPAL' %}
@@ -153,10 +162,18 @@
                   {% endwith %}
                 </td>
                 <td>{% if vinculo.data_encerramento %}{{ vinculo.data_encerramento|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                <td class="text-end">
+                  {% if vinculo.aguardando_redistribuicao and request.perfil_acesso and request.perfil_acesso.pode_homologar %}
+                  <a href="{% url 'os_liberar_processo' os.pk vinculo.pk %}"
+                     class="btn btn-outline-warning btn-sm">
+                    Liberar processo
+                  </a>
+                  {% endif %}
+                </td>
               </tr>
               {% empty %}
               <tr>
-                <td colspan="7" class="text-muted text-center py-3">Nenhum processo vinculado.</td>
+                <td colspan="8" class="text-muted text-center py-3">Nenhum processo vinculado.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -311,64 +328,56 @@
 </div>
 
 <div class="card siprac-card mb-4">
-  <div class="card-header bg-white fw-semibold">Histórico de encaminhamentos</div>
+  <div class="card-header bg-white fw-semibold">Histórico</div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-sm siprac-table mb-0 align-middle">
-        <thead>
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light">
           <tr>
             <th>Data/hora</th>
+            <th>Evento</th>
             <th>Origem</th>
             <th>Destino</th>
-            <th>Etapa</th>
-            <th>Ação</th>
+            <th>Responsável</th>
+            <th>Observação</th>
           </tr>
         </thead>
         <tbody>
-          {% for enc in encaminhamentos %}
+          {% for evento in timeline %}
           <tr>
-            <td>{{ enc.data_hora|date:"d/m/Y H:i" }}</td>
-            <td>{{ enc.unidade_interna_origem.sigla }} — {{ enc.servidor_origem.nome }}</td>
+            <td>{{ evento.data_hora|date:"d/m/Y H:i" }}</td>
             <td>
-              {% if enc.unidade_interna_destino %}
-                {{ enc.unidade_interna_destino.sigla }}{% if enc.servidor_destino %} — {{ enc.servidor_destino.nome }}{% endif %}
-              {% elif enc.unidade_externa_destino %}
-                {{ enc.unidade_externa_destino.nome }}
-              {% elif enc.servidor_destino %}
-                {{ enc.servidor_destino.nome }}
-              {% else %}
-                —
+              <i class="bi {{ evento.icone }}"></i>
+              <span class="badge bg-{{ evento.cor }}">{{ evento.label }}</span>
+              {% if evento.automatico %}
+              <small class="text-muted">(automático)</small>
               {% endif %}
             </td>
-            <td>{% if enc.etapa_interna %}{{ enc.etapa_interna }}{% else %}—{% endif %}</td>
-            <td>{{ enc.tipo_acao }}</td>
+            <td>
+              {% if evento.encaminhamento and evento.encaminhamento.unidade_interna_origem %}
+              {{ evento.encaminhamento.unidade_interna_origem.sigla }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if evento.encaminhamento %}
+                {% if evento.encaminhamento.unidade_interna_destino %}
+                {{ evento.encaminhamento.unidade_interna_destino.sigla }}
+                {% endif %}
+                {% if evento.encaminhamento.unidade_externa_destino %}
+                {{ evento.encaminhamento.unidade_externa_destino.nome }}
+                {% endif %}
+                {% if not evento.encaminhamento.unidade_interna_destino and not evento.encaminhamento.unidade_externa_destino %}—{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>{% if evento.servidor %}{{ evento.servidor.nome }}{% else %}Sistema{% endif %}</td>
+            <td>{{ evento.observacao|default:"—" }}</td>
           </tr>
           {% empty %}
-          <tr>
-            <td colspan="5" class="text-muted text-center py-3">Nenhum encaminhamento registrado.</td>
-          </tr>
+          <tr><td colspan="6" class="text-muted text-center py-3">Nenhum evento registrado.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  </div>
-</div>
-
-<div class="card siprac-card mb-4">
-  <div class="card-header bg-white fw-semibold">Histórico de macroetapas</div>
-  <div class="card-body">
-    {% if macroetapas %}
-    <ul class="list-group list-group-flush">
-      {% for log in macroetapas %}
-      <li class="list-group-item px-0 d-flex justify-content-between align-items-start">
-        <span>{{ log.macroetapa|macroetapa_display }}</span>
-        <span class="text-muted small">{{ log.data_hora|date:"d/m/Y H:i" }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-muted mb-0">Nenhuma macroetapa registrada.</p>
-    {% endif %}
   </div>
 </div>
 
@@ -415,6 +424,11 @@
 
 {% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+  new bootstrap.Tooltip(el);
+});
+</script>
 <script>
 (function () {
   var mapaInicializado = false;

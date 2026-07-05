@@ -66,7 +66,7 @@ Cada processo vinculado tem data de entrada na Divisão e data de encerramento p
 
 ## 4. Macroetapas
 
-As macroetapas representam o estado atual da OS no seu ciclo de vida. Cada transição é registrada como um evento no `MACROETAPA_LOG`, formando um histórico completo de tramitação. O estado atual é sempre derivado do último registro.
+As macroetapas representam o estado atual da OS no seu ciclo de vida. Cada transição é registrada como um encaminhamento (`ENCAMINHAMENTO`) com `tipo_macroetapa` preenchido, ou como flag `OS.encerrada` para o encerramento. O histórico completo é derivado desses registros (timeline unificada). A tabela `MACROETAPA_LOG` está **DEPRECATED** — mantida apenas para compatibilidade com dados legados.
 
 | # | Macroetapa | Regra de transição |
 |---|---|---|
@@ -298,7 +298,9 @@ Campos livres como observações e anotações internas não são auditados.
 `IMOVEL` · `OS_IMOVEL` · `PRODUCAO_IMOVEL`
 
 ### OS e ciclo de vida
-`OS` · `PROCESSO_SEI` · `OS_PROCESSO` · `MACROETAPA_LOG` · `ENCAMINHAMENTO` · `TAREFA_INTERNA` · `COMENTARIO`
+`OS` · `PROCESSO_SEI` · `OS_PROCESSO` · `MACROETAPA_LOG` *(DEPRECATED — usar `Encaminhamento` e `OS.encerrada`)* · `ENCAMINHAMENTO` · `TAREFA_INTERNA` · `COMENTARIO`
+
+A macroetapa atual e o histórico da OS são derivados dos registros de `ENCAMINHAMENTO` (campo `tipo_macroetapa`) e do flag `OS.encerrada`, formando uma timeline unificada — sem consulta ao `MACROETAPA_LOG`.
 
 ### Produção
 `PRODUCAO` · `PRODUCAO_ATRIBUTO` · `PRODUCAO_STATUS_LOG` · `TIPO_PRODUCAO` · `TIPO_PRODUCAO_UNIDADE`

@@ -393,6 +393,15 @@ class OS(models.Model):
         blank=True,
         verbose_name="Data do prazo",
     )
+    data_encerramento = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Data de encerramento",
+    )
+    encerrada = models.BooleanField(
+        default=False,
+        verbose_name="Encerrada",
+    )
 
     class Meta:
         db_table = "OS"
@@ -471,6 +480,15 @@ class OsProcesso(models.Model):
         blank=True,
         related_name="processos_encerrados",
     )
+    aguardando_redistribuicao = models.BooleanField(
+        default=False,
+        verbose_name="Aguardando redistribuição",
+    )
+    observacao_bloqueio = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Observação do bloqueio",
+    )
 
     class Meta:
         db_table = "OS_PROCESSO"
@@ -482,6 +500,7 @@ class OsProcesso(models.Model):
 
 
 class MacroetapaLog(models.Model):
+    # DEPRECATED — usar Encaminhamento e OS.encerrada
     """Histórico de transições de macroetapa da OS."""
 
     os = models.ForeignKey(
@@ -518,6 +537,7 @@ class Encaminhamento(models.Model):
     TIPO_ACAO_EXTERNO = "EXTERNO"
     TIPO_ACAO_HOMOLOGACAO = "HOMOLOGACAO"
     TIPO_ACAO_CONCLUSAO = "CONCLUSAO"
+    TIPO_ACAO_AUTOMATICO = "AUTOMATICO"
 
     TIPO_ACAO_CHOICES = [
         (TIPO_ACAO_ENTRADA, "Entrada"),
@@ -526,6 +546,23 @@ class Encaminhamento(models.Model):
         (TIPO_ACAO_EXTERNO, "Externo"),
         (TIPO_ACAO_HOMOLOGACAO, "Homologação"),
         (TIPO_ACAO_CONCLUSAO, "Conclusão"),
+        (TIPO_ACAO_AUTOMATICO, "Automático"),
+    ]
+
+    TIPO_MACROETAPA_ENTRADA_DIVISAO = "ENTRADA_DIVISAO"
+    TIPO_MACROETAPA_ATENDIMENTO_INTERNO = "ATENDIMENTO_INTERNO"
+    TIPO_MACROETAPA_ATENDIMENTO_EXTERNO = "ATENDIMENTO_EXTERNO"
+    TIPO_MACROETAPA_RETORNO_EXTERNO = "RETORNO_EXTERNO"
+    TIPO_MACROETAPA_INCLUSAO_PROCESSO = "INCLUSAO_PROCESSO"
+    TIPO_MACROETAPA_ENCERRAMENTO = "ENCERRAMENTO"
+
+    TIPO_MACROETAPA_CHOICES = [
+        (TIPO_MACROETAPA_ENTRADA_DIVISAO, "Entrada na Divisão"),
+        (TIPO_MACROETAPA_ATENDIMENTO_INTERNO, "Atendimento Interno"),
+        (TIPO_MACROETAPA_ATENDIMENTO_EXTERNO, "Atendimento Externo"),
+        (TIPO_MACROETAPA_RETORNO_EXTERNO, "Retorno Externo"),
+        (TIPO_MACROETAPA_INCLUSAO_PROCESSO, "Inclusão de Processo"),
+        (TIPO_MACROETAPA_ENCERRAMENTO, "Encerramento"),
     ]
 
     os = models.ForeignKey(
@@ -536,11 +573,15 @@ class Encaminhamento(models.Model):
     unidade_interna_origem = models.ForeignKey(
         UnidadeInterna,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="encaminhamentos_origem",
     )
     servidor_origem = models.ForeignKey(
         Servidor,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="encaminhamentos_enviados",
     )
     unidade_interna_destino = models.ForeignKey(
@@ -566,6 +607,14 @@ class Encaminhamento(models.Model):
     )
     etapa_interna = models.CharField(max_length=255, null=True, blank=True)
     tipo_acao = models.CharField(max_length=255, choices=TIPO_ACAO_CHOICES)
+    tipo_macroetapa = models.CharField(
+        max_length=30,
+        null=True,
+        blank=True,
+        choices=TIPO_MACROETAPA_CHOICES,
+        verbose_name="Tipo de macroetapa",
+    )
+    automatico = models.BooleanField(default=False)
     aguarda_retorno = models.BooleanField(default=False)
     data_retorno_prevista = models.DateField(null=True, blank=True)
     data_retorno_efetiva = models.DateField(null=True, blank=True)

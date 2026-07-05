@@ -1,7 +1,7 @@
-from django.db.models import Count, OuterRef, Subquery
+from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.utils import timezone
 
-from core.models import Encaminhamento, MacroetapaLog, OS, Producao, TarefaInterna
+from core.models import Encaminhamento, OS, Producao, TarefaInterna
 
 CHAVE_ENTRADA_DIVISAO = "Entrada na Divisão"
 
@@ -14,37 +14,197 @@ STATUS_ATIVOS = [
 ]
 
 
-def derivar_macroetapa_os(os, servidor=None):
+def registrar_encaminhamento_automatico(os, tipo_macroetapa, servidor=None, observacao=None):
     """
-    Avalia o estado das produções da OS e registra nova macroetapa
-    automaticamente se necessário.
-    Retorna True se houve mudança, False caso contrário.
+    Registra um encaminhamento automático no lugar de MacroetapaLog.
+    Usado para transições automáticas de macroetapa.
     """
-    producoes_ativas = Producao.objects.filter(os=os, status__in=STATUS_ATIVOS)
-
-    if not producoes_ativas.exists():
-        return False
-
-    macroetapa_atual = (
-        MacroetapaLog.objects.filter(os=os).order_by("-data_hora", "-id").first()
+    Encaminhamento.objects.create(
+        os=os,
+        unidade_interna_origem=None,
+        servidor_origem=servidor,
+        unidade_interna_destino=None,
+        servidor_destino=None,
+        etapa_interna="SISTEMA",
+        tipo_acao=Encaminhamento.TIPO_ACAO_AUTOMATICO,
+        tipo_macroetapa=tipo_macroetapa,
+        data_hora=timezone.now(),
+        aguarda_retorno=False,
+        automatico=True,
+        observacao=observacao or "",
     )
 
-    status_atual = macroetapa_atual.macroetapa if macroetapa_atual else None
 
-    if status_atual == "ATENDIMENTO_INTERNO":
+def macroetapa_atual_os(os):
+    """
+    Deriva a macroetapa atual da OS a partir dos encaminhamentos.
+    """
+    if os.encerrada:
+        return "ENCERRADO"
+
+    ultimo = Encaminhamento.objects.filter(os=os).order_by("-data_hora", "-id").first()
+
+    if not ultimo:
+        return "ENTRADA_DIVISAO"
+
+    if ultimo.tipo_macroetapa:
+        return ultimo.tipo_macroetapa
+
+    if ultimo.unidade_externa_destino_id:
+        return "ATENDIMENTO_EXTERNO"
+
+    if ultimo.unidade_interna_destino_id:
+        return "ATENDIMENTO_INTERNO"
+
+    return "ENTRADA_DIVISAO"
+
+
+def _icone_macroetapa(tipo):
+    return {
+        "ENTRADA_DIVISAO": "bi-box-arrow-in-right",
+        "ATENDIMENTO_INTERNO": "bi-arrow-right-circle",
+        "ATENDIMENTO_EXTERNO": "bi-send",
+        "RETORNO_EXTERNO": "bi-arrow-return-left",
+        "INCLUSAO_PROCESSO": "bi-plus-circle",
+        "INCLUSAO_PROCESSO_RELACIONADO": "bi-plus-circle",
+        "ENCERRADO": "bi-check-circle",
+        "ENCERRAMENTO": "bi-check-circle",
+    }.get(tipo, "bi-circle")
+
+
+def _cor_macroetapa(tipo):
+    return {
+        "ENTRADA_DIVISAO": "secondary",
+        "ATENDIMENTO_INTERNO": "primary",
+        "ATENDIMENTO_EXTERNO": "warning",
+        "RETORNO_EXTERNO": "info",
+        "INCLUSAO_PROCESSO": "success",
+        "INCLUSAO_PROCESSO_RELACIONADO": "success",
+        "ENCERRADO": "success",
+        "ENCERRAMENTO": "success",
+    }.get(tipo, "secondary")
+
+
+def timeline_os(os):
+    """
+    Retorna timeline unificada da OS: encaminhamentos + encerramento.
+    Substitui MacroetapaLog + Encaminhamento separados.
+    """
+    eventos = []
+
+    eventos.append({
+        "tipo": "ENTRADA_DIVISAO",
+        "label": "Entrada na Divisão",
+        "data_hora": os.data_criacao_sgbd,
+        "servidor": os.criado_por,
+        "automatico": True,
+        "observacao": "",
+        "icone": "bi-box-arrow-in-right",
+        "cor": "secondary",
+        "encaminhamento": None,
+    })
+
+    encaminhamentos = Encaminhamento.objects.filter(os=os).select_related(
+        "unidade_interna_origem",
+        "unidade_interna_destino",
+        "unidade_externa_destino",
+        "servidor_origem",
+    ).order_by("data_hora")
+
+    label_map = {
+        "ENTRADA_DIVISAO": "Entrada na Divisão",
+        "ATENDIMENTO_INTERNO": "Atendimento Interno",
+        "ATENDIMENTO_EXTERNO": "Atendimento Externo",
+        "RETORNO_EXTERNO": "Retorno de encaminhamento externo",
+        "INCLUSAO_PROCESSO": "Inclusão de processo relacionado",
+        "INCLUSAO_PROCESSO_RELACIONADO": "Inclusão de processo relacionado",
+        "ENCERRAMENTO": "Encerrado na Divisão",
+    }
+
+    for enc in encaminhamentos:
+        if enc.tipo_macroetapa:
+            tipo = enc.tipo_macroetapa
+        elif enc.unidade_externa_destino_id:
+            tipo = "ATENDIMENTO_EXTERNO"
+        else:
+            tipo = "ATENDIMENTO_INTERNO"
+
+        if tipo == "ATENDIMENTO_INTERNO" and enc.unidade_interna_destino:
+            label = f"Encaminhado para {enc.unidade_interna_destino.sigla}"
+        elif tipo == "ATENDIMENTO_EXTERNO" and enc.unidade_externa_destino:
+            label = f"Encaminhado para {enc.unidade_externa_destino.nome}"
+        else:
+            label = label_map.get(tipo, tipo)
+
+        eventos.append({
+            "tipo": tipo,
+            "label": label,
+            "data_hora": enc.data_hora,
+            "servidor": enc.servidor_origem,
+            "automatico": enc.automatico,
+            "observacao": enc.observacao or "",
+            "icone": _icone_macroetapa(tipo),
+            "cor": _cor_macroetapa(tipo),
+            "encaminhamento": enc,
+        })
+
+    if os.encerrada and os.data_encerramento:
+        eventos.append({
+            "tipo": "ENCERRADO",
+            "label": "Encerrado na Divisão",
+            "data_hora": os.data_encerramento,
+            "servidor": None,
+            "automatico": False,
+            "observacao": "",
+            "icone": "bi-check-circle",
+            "cor": "success",
+            "encaminhamento": None,
+        })
+
+    return sorted(eventos, key=lambda x: x["data_hora"], reverse=True)
+
+
+def ativar_atendimento_interno_se_necessario(os, servidor=None):
+    """Registra ATENDIMENTO_INTERNO quando há produção ativa e ainda não está nesse estado."""
+    producoes_ativas = Producao.objects.filter(os=os, status__in=STATUS_ATIVOS)
+    if not producoes_ativas.exists():
         return False
-
+    if macroetapa_atual_os(os) == "ATENDIMENTO_INTERNO":
+        return False
     if servidor is None:
         return False
-
-    MacroetapaLog.objects.create(
-        os=os,
-        macroetapa="ATENDIMENTO_INTERNO",
+    registrar_encaminhamento_automatico(
+        os,
+        Encaminhamento.TIPO_MACROETAPA_ATENDIMENTO_INTERNO,
         servidor=servidor,
-        automatico=True,
         observacao="Derivado automaticamente: nova produção ativa registrada.",
     )
     return True
+
+
+def queryset_os_com_macroetapa(queryset=None):
+    """Anota queryset de OS com macroetapa_atual derivada de encaminhamentos."""
+    if queryset is None:
+        queryset = OS.objects.all()
+
+    ultimo_enc = Encaminhamento.objects.filter(
+        os_id=OuterRef("pk"),
+    ).order_by("-data_hora", "-id")
+
+    return queryset.annotate(
+        _enc_tipo=Subquery(ultimo_enc.values("tipo_macroetapa")[:1]),
+        _enc_ext=Subquery(ultimo_enc.values("unidade_externa_destino_id")[:1]),
+        _enc_int=Subquery(ultimo_enc.values("unidade_interna_destino_id")[:1]),
+    ).annotate(
+        macroetapa_atual=Case(
+            When(encerrada=True, then=Value("ENCERRADO")),
+            When(_enc_tipo__isnull=False, then=F("_enc_tipo")),
+            When(_enc_ext__isnull=False, then=Value("ATENDIMENTO_EXTERNO")),
+            When(_enc_int__isnull=False, then=Value("ATENDIMENTO_INTERNO")),
+            default=Value("ENTRADA_DIVISAO"),
+            output_field=CharField(),
+        ),
+    )
 
 
 def contar_producoes_por_status_unidades(unidades_ids):
@@ -96,12 +256,7 @@ def contar_producoes_por_status_unidades(unidades_ids):
 
 
 def _queryset_os_nao_encerradas():
-    ultima_macroetapa = MacroetapaLog.objects.filter(
-        os_id=OuterRef("pk"),
-    ).order_by("-data_hora", "-id")
-    return OS.objects.annotate(
-        macroetapa_atual=Subquery(ultima_macroetapa.values("macroetapa")[:1]),
-    ).exclude(macroetapa_atual="ENCERRADO")
+    return OS.objects.filter(encerrada=False)
 
 
 def _mapa_unidade_atual_por_os(os_ids):
@@ -273,3 +428,54 @@ def historico_entradas_unidade(os, unidade):
         os=os,
         unidade_interna_destino=unidade,
     ).order_by("-data_hora")
+
+
+def itens_pendentes_usuario(servidor):
+    """
+    Retorna contagem de itens pendentes para o servidor logado.
+    - os_novas: OSs encaminhadas para a unidade do servidor após seu último login
+    - producoes_pendentes: produções onde servidor_responsavel=servidor
+      com status em EM_ELABORACAO, PARA_REVISAO ou PARA_AJUSTES
+    - revisoes_pendentes: produções em PARA_REVISAO na unidade do servidor
+      (apenas para perfis com pode_homologar=True)
+    """
+    from django.utils import timezone
+
+    ultimo_login = servidor.user.last_login or timezone.now()
+
+    vinculos_ativos = servidor.vinculos_unidade.filter(
+        data_fim__isnull=True
+    ).values_list("unidade_id", flat=True)
+
+    os_novas = TarefaInterna.objects.filter(
+        unidade_id__in=vinculos_ativos,
+        status="PENDENTE",
+        data_inicio__gt=ultimo_login,
+    ).count()
+
+    producoes_pendentes = Producao.objects.filter(
+        servidor_responsavel=servidor,
+        status__in=["EM_ELABORACAO", "PARA_AJUSTES"],
+    ).count()
+
+    revisoes_pendentes = 0
+    perfil = servidor.vinculos_unidade.filter(
+        data_fim__isnull=True
+    ).select_related("perfil").first()
+
+    if perfil and perfil.perfil.pode_homologar:
+        revisoes_pendentes = Producao.objects.filter(
+            os__os_imoveis__isnull=False,
+            status="PARA_REVISAO",
+        ).filter(
+            os__encaminhamentos__unidade_interna_destino_id__in=vinculos_ativos
+        ).distinct().count()
+
+    total = os_novas + producoes_pendentes + revisoes_pendentes
+
+    return {
+        "total": total,
+        "os_novas": os_novas,
+        "producoes_pendentes": producoes_pendentes,
+        "revisoes_pendentes": revisoes_pendentes,
+    }

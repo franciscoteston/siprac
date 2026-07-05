@@ -1,8 +1,18 @@
 from core.models import Servidor
 
+PENDENCIAS_VAZIAS = {
+    "total": 0,
+    "os_novas": 0,
+    "producoes_pendentes": 0,
+    "revisoes_pendentes": 0,
+}
+
 
 def siprac_navbar(request):
-    context = {"vinculo_navbar": None}
+    context = {
+        "vinculo_navbar": None,
+        "pendencias": PENDENCIAS_VAZIAS,
+    }
     if not request.user.is_authenticated:
         return context
 
@@ -19,4 +29,13 @@ def siprac_navbar(request):
     )
     if vinculo:
         context["vinculo_navbar"] = vinculo
+
+    try:
+        from core.os_service import itens_pendentes_usuario
+
+        if servidor:
+            context["pendencias"] = itens_pendentes_usuario(servidor)
+    except Exception:
+        context["pendencias"] = PENDENCIAS_VAZIAS
+
     return context

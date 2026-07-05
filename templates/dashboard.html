@@ -4,6 +4,22 @@
 {% block title %}Dashboard — SIPRAC{% endblock %}
 
 {% block content %}
+{% if pendencias.total > 0 %}
+<div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+  <strong>Você tem itens aguardando sua ação:</strong>
+  {% if pendencias.os_novas > 0 %}
+  {{ pendencias.os_novas }} nova(s) OS recebida(s).
+  {% endif %}
+  {% if pendencias.producoes_pendentes > 0 %}
+  {{ pendencias.producoes_pendentes }} produção(ões) em andamento.
+  {% endif %}
+  {% if pendencias.revisoes_pendentes > 0 %}
+  {{ pendencias.revisoes_pendentes }} produção(ões) aguardando revisão.
+  {% endif %}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <div class="d-flex justify-content-between align-items-start mb-4">
   <div>
     <h1 class="h3 mb-1 text-dark">Dashboard</h1>
