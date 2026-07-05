@@ -336,9 +336,13 @@
           <tr>
             <th>Data/hora</th>
             <th>Evento</th>
+            <th>Etapa interna</th>
+            <th>Tipo de ação</th>
             <th>Origem</th>
             <th>Destino</th>
+            <th>Servidor destino</th>
             <th>Responsável</th>
+            <th>Aguarda retorno</th>
             <th>Observação</th>
           </tr>
         </thead>
@@ -353,9 +357,19 @@
               <small class="text-muted">(automático)</small>
               {% endif %}
             </td>
+            <td>{{ evento.etapa_interna|default:"—" }}</td>
             <td>
-              {% if evento.encaminhamento and evento.encaminhamento.unidade_interna_origem %}
-              {{ evento.encaminhamento.unidade_interna_origem.sigla }}
+              {% if evento.tipo_acao and evento.tipo_acao != 'EXTERNO' and evento.tipo_acao != 'AUTOMATICO' %}
+              {{ evento.tipo_acao_label }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if evento.encaminhamento %}
+                {% if evento.encaminhamento.unidade_interna_origem %}
+                {{ evento.encaminhamento.unidade_interna_origem.sigla }}
+                {% elif evento.unidade_externa_origem %}
+                {{ evento.unidade_externa_origem.nome }}
+                {% else %}—{% endif %}
               {% else %}—{% endif %}
             </td>
             <td>
@@ -369,11 +383,24 @@
                 {% if not evento.encaminhamento.unidade_interna_destino and not evento.encaminhamento.unidade_externa_destino %}—{% endif %}
               {% else %}—{% endif %}
             </td>
+            <td>
+              {% if evento.encaminhamento and evento.encaminhamento.unidade_interna_destino and evento.servidor_destino %}
+              {{ evento.servidor_destino.nome }}
+              {% else %}—{% endif %}
+            </td>
             <td>{% if evento.servidor %}{{ evento.servidor.nome }}{% else %}Sistema{% endif %}</td>
+            <td>
+              {% if evento.aguarda_retorno %}
+              <span class="badge bg-success">Sim</span>
+              {% if evento.data_retorno_prevista %}
+              <div class="small text-muted">{{ evento.data_retorno_prevista|date:"d/m/Y" }}</div>
+              {% endif %}
+              {% else %}—{% endif %}
+            </td>
             <td>{{ evento.observacao|default:"—" }}</td>
           </tr>
           {% empty %}
-          <tr><td colspan="6" class="text-muted text-center py-3">Nenhum evento registrado.</td></tr>
+          <tr><td colspan="10" class="text-muted text-center py-3">Nenhum evento registrado.</td></tr>
           {% endfor %}
         </tbody>
       </table>

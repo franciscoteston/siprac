@@ -109,6 +109,7 @@ def timeline_os(os):
         "unidade_interna_destino",
         "unidade_externa_destino",
         "servidor_origem",
+        "servidor_destino",
     ).order_by("data_hora")
 
     label_map = {
@@ -146,6 +147,16 @@ def timeline_os(os):
             "icone": _icone_macroetapa(tipo),
             "cor": _cor_macroetapa(tipo),
             "encaminhamento": enc,
+            "etapa_interna": (
+                "" if enc.automatico
+                else ETAPAS_INTERNAS_LABELS.get(enc.etapa_interna or "", enc.etapa_interna or "")
+            ),
+            "tipo_acao": enc.tipo_acao,
+            "tipo_acao_label": TIPO_ACAO_LABELS.get(enc.tipo_acao, enc.tipo_acao),
+            "servidor_destino": enc.servidor_destino,
+            "aguarda_retorno": enc.aguarda_retorno,
+            "data_retorno_prevista": enc.data_retorno_prevista,
+            "unidade_externa_origem": getattr(enc, "unidade_externa_origem", None),
         })
 
     if os.encerrada and os.data_encerramento:
@@ -294,6 +305,41 @@ def unidade_atual_da_os(os):
         .first()
     )
     return ultimo.unidade_interna_destino if ultimo else None
+
+
+def origem_encaminhamento(os):
+    """
+    Retorna a unidade de origem para o próximo encaminhamento.
+    Se o último evento for ENTRADA_DIVISAO ou INCLUSAO_PROCESSO,
+    retorna None (origem vazia).
+    Caso contrário, retorna a unidade atual da OS.
+    """
+    ultimo = Encaminhamento.objects.filter(
+        os=os,
+    ).order_by("-data_hora", "-id").first()
+
+    if not ultimo:
+        return None
+
+    if ultimo.tipo_macroetapa in (
+        Encaminhamento.TIPO_MACROETAPA_ENTRADA_DIVISAO,
+        Encaminhamento.TIPO_MACROETAPA_INCLUSAO_PROCESSO,
+    ):
+        return None
+
+    return unidade_atual_da_os(os)
+
+
+ETAPAS_INTERNAS_LABELS = {
+    "TRIAGEM": "Triagem",
+    "ANALISE": "Análise",
+    "REVISAO": "Revisão",
+    "HOMOLOGACAO": "Homologação",
+    "CONCLUSAO": "Conclusão",
+    "SISTEMA": "Sistema",
+}
+
+TIPO_ACAO_LABELS = dict(Encaminhamento.TIPO_ACAO_CHOICES)
 
 
 def os_ativas_por_unidade():

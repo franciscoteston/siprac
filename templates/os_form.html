@@ -40,7 +40,7 @@
     <div class="col-md-4">
       {{ form.prazo_tipo|as_crispy_field }}
     </div>
-    <div class="col-md-4">
+    <div class="col-md-4" id="campo-prazo-data">
       {{ form.prazo_data|as_crispy_field }}
     </div>
     <div class="col-12">
@@ -188,6 +188,26 @@ document.addEventListener('DOMContentLoaded', function () {
       tipoSelect.value,
       finalidadeSelect.value
     );
+  }
+
+  const prazoTipoSelect = document.getElementById('id_prazo_tipo');
+  const prazoDataField = document.getElementById('campo-prazo-data');
+  const prazoDataInput = document.getElementById('id_prazo_data');
+
+  function atualizarCampoPrazoData() {
+    if (!prazoTipoSelect || !prazoDataField) {
+      return;
+    }
+    const semPrioridade = prazoTipoSelect.value === 'SEM_PRIORIDADE';
+    prazoDataField.classList.toggle('d-none', semPrioridade);
+    if (semPrioridade && prazoDataInput) {
+      prazoDataInput.value = '';
+    }
+  }
+
+  if (prazoTipoSelect) {
+    prazoTipoSelect.addEventListener('change', atualizarCampoPrazoData);
+    atualizarCampoPrazoData();
   }
 });
 </script>

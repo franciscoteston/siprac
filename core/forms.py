@@ -126,6 +126,9 @@ class OSForm(forms.Form):
             ).exists():
                 raise ValidationError("Combinação inválida para esta natureza.")
 
+        if cleaned_data.get("prazo_tipo") == "SEM_PRIORIDADE":
+            cleaned_data["prazo_data"] = None
+
         return cleaned_data
 
     def clean_processo_sei_numero(self):

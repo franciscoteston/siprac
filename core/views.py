@@ -61,6 +61,7 @@ from core.os_service import (
     contar_producoes_por_status_unidades,
     data_entrada_unidade,
     macroetapa_atual_os,
+    origem_encaminhamento,
     os_ativas_por_unidade,
     os_da_unidade_atual,
     queryset_os_com_macroetapa,
@@ -2398,6 +2399,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["os"] = self.os_obj
+        context["unidade_origem"] = origem_encaminhamento(self.os_obj)
         return context
 
     def get_initial(self):
@@ -2420,6 +2422,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         agora = timezone.now()
         dados = form.cleaned_data
         tipo_destino = dados["tipo_destino"]
+        unidade_origem = origem_encaminhamento(self.os_obj)
         if tipo_destino == "EXTERNO":
             tipo_acao = "EXTERNO"
             etapa_interna = None
@@ -2432,7 +2435,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         with transaction.atomic():
             encaminhamento = Encaminhamento.objects.create(
                 os=self.os_obj,
-                unidade_interna_origem=vinculo.unidade,
+                unidade_interna_origem=unidade_origem,
                 servidor_origem=servidor,
                 unidade_interna_destino=dados.get("unidade_interna_destino"),
                 servidor_destino=dados.get("servidor_destino"),
