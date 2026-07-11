@@ -1716,41 +1716,6 @@ def _formatar_decimal_br(valor):
         return str(valor) if valor else "—"
 
 
-def _carregar_mapas_gerencial(os_ids):
-    producoes = {}
-    for producao in (
-        Producao.objects.filter(os_id__in=os_ids)
-        .exclude(status=Producao.STATUS_CANCELADO)
-        .select_related(
-            "tipo_producao",
-            "servidor_responsavel",
-            "revisor",
-        )
-        .order_by("os_id", "-data_criacao", "-id")
-    ):
-        if producao.os_id not in producoes:
-            producoes[producao.os_id] = producao
-
-    processos = {
-        vinculo.os_id: vinculo
-        for vinculo in OsProcesso.objects.filter(
-            os_id__in=os_ids,
-            tipo_vinculo="PRINCIPAL",
-        ).select_related("processo_sei")
-    }
-
-    imoveis = {}
-    for os_imovel in (
-        OsImovel.objects.filter(os_id__in=os_ids)
-        .select_related("imovel")
-        .order_by("os_id", "pk")
-    ):
-        if os_imovel.os_id not in imoveis:
-            imoveis[os_imovel.os_id] = os_imovel
-
-    return producoes, processos, imoveis
-
-
 def _destino_pos_homologacao(os_obj, producao):
     if not producao or not producao.data_homologacao:
         return "—"
@@ -1772,49 +1737,200 @@ def _destino_pos_homologacao(os_obj, producao):
     return "—"
 
 
-def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, unidade):
-    hoje = timezone.localdate()
-    entrada_unidade = data_entrada_unidade(os_obj, unidade) if unidade else None
-    if processo_vinculo and processo_vinculo.data_entrada_divisao:
-        entrada_dai = processo_vinculo.data_entrada_divisao
+def _label_macroetapa_gerencial(macroetapa):
+    return {
+        "ENTRADA_DIVISAO": "Entrada na Divisão",
+        "ATENDIMENTO_INTERNO": "Atend. Interno",
+        "ATENDIMENTO_EXTERNO": "Atend. Externo",
+        "RETORNO_EXTERNO": "Retorno Externo",
+        "INCLUSAO_PROCESSO": "Inclusão de Processo",
+        "ENCERRADO": "Encerrado",
+        "ENCERRAMENTO": "Encerrado",
+    }.get(macroetapa, macroetapa or "—")
+
+
+def _label_status_producao_gerencial(status):
+    return dict(Producao.STATUS_CHOICES).get(status, status or "—")
+
+
+def _cor_status_producao_gerencial(status):
+    return {
+        "ENTRADA": "secondary",
+        "DISTRIBUIDO": "info",
+        "EM_ELABORACAO": "primary",
+        "PARA_REVISAO": "warning",
+        "PARA_AJUSTES": "warning",
+        "HOMOLOGADO": "success",
+        "CANCELADO": "danger",
+    }.get(status, "secondary")
+
+
+def _calcular_dias_sei_gerencial(os_obj):
+    if not os_obj.prazo_data:
+        return None
+    return (os_obj.prazo_data - timezone.localdate()).days
+
+
+def _formatar_numero_imovel_gerencial(oi):
+    if not oi or not oi.imovel:
+        return "—"
+    if oi.imovel.inscricao_cadastral:
+        return str(oi.imovel.inscricao_cadastral)
+    return oi.imovel.codigo_isic or "—"
+
+
+def _campos_imovel_vazios_gerencial():
+    return {
+        "ctm": "—",
+        "logradouro": "—",
+        "num_endereco": "—",
+        "num_unidade": "—",
+        "num_bloco": "—",
+        "numero_imovel": "—",
+        "numero_imovel_extra": 0,
+        "numero_imovel_tooltip": "",
+        "finalidade_imovel": "—",
+        "area_territorial": "—",
+        "area_construida": "—",
+        "bairro": "—",
+        "rh_valor": "—",
+    }
+
+
+def _campos_vazios_gerencial():
+    return {
+        "modelo_sugerido": "—",
+        "prioridade": "—",
+        "prazo_eav": "—",
+        "dias_sei": None,
+        "mes_cronograma": "—",
+        "avaliador": "—",
+        "revisor": "—",
+        "prazo_aval": "—",
+        "entrega_aval": "—",
+        "entrega_rev": "—",
+        "entrega_aju": "—",
+        "envio_sei": "—",
+        "la_pt_ptf": "—",
+        "tipo_trabalho": "—",
+        "doc_sei": "—",
+        "destino": "—",
+        "prazo_recompra_itbi": "—",
+        "ajustes_ok": "—",
+        "producao_pk": None,
+        "tem_producao": False,
+    }
+
+
+def _dados_imovel_gerencial(os_obj):
+    """Dados do primeiro imóvel vinculado à OS."""
+    oi = os_obj.os_imoveis.select_related("imovel").first()
+    if not oi:
+        return _campos_imovel_vazios_gerencial()
+    return {
+        "ctm": str(oi.cod_logradouro) if oi.cod_logradouro else "—",
+        "logradouro": oi.nom_logradouro or "—",
+        "num_endereco": oi.num_endereco or "—",
+        "num_unidade": oi.num_unidade or "—",
+        "num_bloco": oi.num_bloco or "—",
+        "numero_imovel": _formatar_numero_imovel_gerencial(oi),
+        "numero_imovel_extra": 0,
+        "numero_imovel_tooltip": "",
+        "finalidade_imovel": oi.des_finalidade or "—",
+        "area_territorial": _formatar_decimal_br(oi.area_territorial),
+        "area_construida": _formatar_decimal_br(oi.area_construida),
+        "bairro": oi.bairro or "—",
+        "rh_valor": str(oi.rh_valor) if oi.rh_valor else "—",
+    }
+
+
+def _dados_imoveis_producao_gerencial(producao):
+    """Dados de imóveis da produção (primeiro completo + contador)."""
+    imoveis = list(
+        producao.producao_imoveis.select_related("os_imovel__imovel").all(),
+    )
+    total = len(imoveis)
+    if total == 0:
+        return _campos_imovel_vazios_gerencial()
+
+    primeiro_oi = imoveis[0].os_imovel
+    dados = {
+        "ctm": str(primeiro_oi.cod_logradouro) if primeiro_oi.cod_logradouro else "—",
+        "logradouro": primeiro_oi.nom_logradouro or "—",
+        "num_endereco": primeiro_oi.num_endereco or "—",
+        "num_unidade": primeiro_oi.num_unidade or "—",
+        "num_bloco": primeiro_oi.num_bloco or "—",
+        "finalidade_imovel": primeiro_oi.des_finalidade or "—",
+        "area_territorial": _formatar_decimal_br(primeiro_oi.area_territorial),
+        "area_construida": _formatar_decimal_br(primeiro_oi.area_construida),
+        "bairro": primeiro_oi.bairro or "—",
+        "rh_valor": str(primeiro_oi.rh_valor) if primeiro_oi.rh_valor else "—",
+    }
+    num_principal = _formatar_numero_imovel_gerencial(primeiro_oi)
+    if total > 1:
+        todos = [_formatar_numero_imovel_gerencial(pi.os_imovel) for pi in imoveis]
+        dados["numero_imovel"] = num_principal
+        dados["numero_imovel_extra"] = total - 1
+        dados["numero_imovel_tooltip"] = ", ".join(todos)
     else:
-        entrada_dai = os_obj.data_entrada_divisao
+        dados["numero_imovel"] = num_principal
+        dados["numero_imovel_extra"] = 0
+        dados["numero_imovel_tooltip"] = ""
+    return dados
 
-    dias_sei = None
-    if os_obj.prazo_data:
-        dias_sei = (os_obj.prazo_data - hoje).days
 
-    processo_sei = None
+def _montar_cells_gerencial(linha):
+    """Monta dict cells a partir dos campos flat da linha."""
+    return {
+        "entrada_dai": linha.get("entrada_dai", "—"),
+        "entrada_eav": linha.get("entrada_eav", "—"),
+        "requerimento": linha.get("requerimento", "—"),
+        "finalidade": linha.get("finalidade", "—"),
+        "ctm": linha.get("ctm", "—"),
+        "logradouro": linha.get("logradouro", "—"),
+        "num_endereco": linha.get("num_endereco", "—"),
+        "num_unidade": linha.get("num_unidade", "—"),
+        "num_bloco": linha.get("num_bloco", "—"),
+        "numero_imovel": linha.get("numero_imovel", "—"),
+        "finalidade_imovel": linha.get("finalidade_imovel", "—"),
+        "area_territorial": linha.get("area_territorial", "—"),
+        "area_construida": linha.get("area_construida", "—"),
+        "bairro": linha.get("bairro", "—"),
+        "rh_valor": linha.get("rh_valor", "—"),
+        "apelido": linha.get("apelido") or "—",
+        "modelo_sugerido": linha.get("modelo_sugerido", "—"),
+        "prioridade": linha.get("prioridade", "—"),
+        "prazo_eav": linha.get("prazo_eav", "—"),
+        "dias_sei": linha.get("dias_sei"),
+        "prazo_recompra_itbi": linha.get("prazo_recompra_itbi", "—"),
+        "mes_cronograma": linha.get("mes_cronograma", "—"),
+        "avaliador": linha.get("avaliador", "—"),
+        "prazo_aval": linha.get("prazo_aval", "—"),
+        "entrega_aval": linha.get("entrega_aval", "—"),
+        "revisor": linha.get("revisor", "—"),
+        "entrega_rev": linha.get("entrega_rev", "—"),
+        "entrega_aju": linha.get("entrega_aju", "—"),
+        "ajustes_ok": linha.get("ajustes_ok", "—"),
+        "envio_sei": linha.get("envio_sei", "—"),
+        "la_pt_ptf": linha.get("la_pt_ptf", "—"),
+        "tipo_trabalho": linha.get("tipo_trabalho", "—"),
+        "doc_sei": linha.get("doc_sei", "—"),
+        "destino": linha.get("destino", "—"),
+    }
+
+
+def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai, entrada_eav):
+    dias_sei = _calcular_dias_sei_gerencial(os_obj)
+    processo_principal = (
+        os_obj.processos_vinculados.filter(tipo_vinculo="PRINCIPAL")
+        .select_related("processo_sei")
+        .first()
+    )
+    processo_sei = "—"
     processo_pk = None
-    if processo_vinculo and processo_vinculo.processo_sei:
-        processo_sei = processo_vinculo.processo_sei.numero_processo
-        processo_pk = processo_vinculo.processo_sei_id
-
-    identificacao_imovel = "—"
-    if os_imovel and os_imovel.imovel:
-        if os_imovel.imovel.inscricao_cadastral:
-            identificacao_imovel = str(os_imovel.imovel.inscricao_cadastral)
-        elif os_imovel.imovel.codigo_isic:
-            identificacao_imovel = os_imovel.imovel.codigo_isic
-
-    area_territorial = (
-        _formatar_decimal_br(os_imovel.area_territorial)
-        if os_imovel and os_imovel.area_territorial is not None
-        else "—"
-    )
-    area_construida = (
-        _formatar_decimal_br(os_imovel.area_construida)
-        if os_imovel and os_imovel.area_construida is not None
-        else "—"
-    )
-    rh_valor = (
-        (str(os_imovel.rh_valor) if os_imovel.rh_valor else "—")
-        if os_imovel
-        else "—"
-    )
-    la_pt_ptf = (
-        producao.numero_producao if producao and producao.numero_producao else "—"
-    )
+    if processo_principal and processo_principal.processo_sei:
+        processo_sei = processo_principal.processo_sei.numero_processo
+        processo_pk = processo_principal.processo_sei_id
 
     prazo_interno_iso = (
         producao.prazo_interno.isoformat()
@@ -1826,100 +1942,11 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         if producao and producao.prazo_interno
         else "—"
     )
-    mes_cronograma_iso = (
-        producao.mes_cronograma.strftime("%Y-%m")
-        if producao and producao.mes_cronograma
-        else ""
-    )
-    mes_cronograma_display = (
-        _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
-    )
-    entrada_eav = (
-        timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
-        if entrada_unidade
-        else "—"
-    )
-
-    status_producao_label = (
-        dict(Producao.STATUS_CHOICES).get(producao.status, "—")
-        if producao
-        else "—"
-    )
-
-    cells = {
-        "entrada_dai": _formatar_data_br(entrada_dai),
-        "entrada_eav": entrada_eav,
-        "requerimento": os_obj.tipo_demanda.descricao,
-        "finalidade": os_obj.finalidade.descricao,
-        "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
-        "logradouro": (os_imovel.nom_logradouro or "—") if os_imovel else "—",
-        "num_endereco": (os_imovel.num_endereco or "—") if os_imovel else "—",
-        "num_unidade": (os_imovel.num_unidade or "—") if os_imovel else "—",
-        "num_bloco": (os_imovel.num_bloco or "—") if os_imovel else "—",
-        "numero_imovel": identificacao_imovel,
-        "finalidade_imovel": (os_imovel.des_finalidade or "—") if os_imovel else "—",
-        "area_territorial": area_territorial,
-        "area_construida": area_construida,
-        "bairro": (os_imovel.bairro or "—") if os_imovel else "—",
-        "rh_valor": rh_valor,
-        "apelido": os_obj.apelido or "—",
-        "modelo_sugerido": (producao.modelo_sugerido or "—") if producao else "—",
-        "prioridade": PRIORIDADE_OS_LABELS.get(os_obj.prioridade, os_obj.prioridade or "—"),
-        "prazo_eav": prazo_interno_display,
-        "dias_sei": dias_sei,
-        "prazo_recompra_itbi": "—",
-        "mes_cronograma": (
-            producao.mes_cronograma.strftime("%m/%Y")
-            if producao and producao.mes_cronograma
-            else "—"
-        ),
-        "avaliador": (
-            producao.servidor_responsavel.nome
-            if producao and producao.servidor_responsavel
-            else "—"
-        ),
-        "prazo_aval": (
-            producao.prazo_interno.strftime("%d/%m/%Y")
-            if producao and producao.prazo_interno
-            else "—"
-        ),
-        "entrega_aval": (
-            producao.data_entrega_avaliacao.strftime("%d/%m/%Y")
-            if producao and producao.data_entrega_avaliacao
-            else "—"
-        ),
-        "revisor": (producao.revisor.nome if producao and producao.revisor else "—"),
-        "entrega_rev": (
-            producao.data_entrega_revisao.strftime("%d/%m/%Y")
-            if producao and producao.data_entrega_revisao
-            else "—"
-        ),
-        "entrega_aju": (
-            producao.data_entrega_ajustes.strftime("%d/%m/%Y")
-            if producao and producao.data_entrega_ajustes
-            else "—"
-        ),
-        "ajustes_ok": "—",
-        "envio_sei": (
-            producao.data_homologacao.strftime("%d/%m/%Y")
-            if producao and producao.data_homologacao
-            else "—"
-        ),
-        "la_pt_ptf": la_pt_ptf,
-        "tipo_trabalho": (
-            producao.tipo_producao.prefixo
-            if producao and producao.tipo_producao
-            else "—"
-        ),
-        "doc_sei": (producao.numero_sei or "—") if producao else "—",
-        "destino": _destino_pos_homologacao(os_obj, producao) or "—",
-    }
-
-    panel_data = {
+    return {
         "os_pk": os_obj.pk,
         "producao_pk": producao.pk if producao else None,
         "numero_os": os_obj.numero_os,
-        "processo_sei": processo_sei or "—",
+        "processo_sei": processo_sei,
         "processo_pk": processo_pk,
         "entrada_dai": _formatar_data_br(entrada_dai),
         "entrada_dai_iso": entrada_dai.isoformat() if entrada_dai else "",
@@ -1927,25 +1954,33 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "origem": "—",
         "requerimento": os_obj.tipo_demanda.descricao,
         "finalidade": os_obj.finalidade.descricao,
-        "ctm": str(os_imovel.cod_logradouro) if os_imovel and os_imovel.cod_logradouro else "—",
-        "logradouro": (os_imovel.nom_logradouro if os_imovel and os_imovel.nom_logradouro else "—"),
-        "num_endereco": (os_imovel.num_endereco if os_imovel and os_imovel.num_endereco else "—"),
-        "num_unidade": (os_imovel.num_unidade if os_imovel and os_imovel.num_unidade else "—"),
-        "num_bloco": (os_imovel.num_bloco if os_imovel and os_imovel.num_bloco else "—"),
-        "numero_imovel": identificacao_imovel,
-        "finalidade_imovel": (os_imovel.des_finalidade if os_imovel and os_imovel.des_finalidade else "—"),
-        "area_territorial": area_territorial,
-        "area_construida": area_construida,
-        "bairro": (os_imovel.bairro if os_imovel and os_imovel.bairro else "—"),
-        "rh_valor": rh_valor,
+        "ctm": dados_imovel.get("ctm", "—"),
+        "logradouro": dados_imovel.get("logradouro", "—"),
+        "num_endereco": dados_imovel.get("num_endereco", "—"),
+        "num_unidade": dados_imovel.get("num_unidade", "—"),
+        "num_bloco": dados_imovel.get("num_bloco", "—"),
+        "numero_imovel": dados_imovel.get("numero_imovel", "—"),
+        "finalidade_imovel": dados_imovel.get("finalidade_imovel", "—"),
+        "area_territorial": dados_imovel.get("area_territorial", "—"),
+        "area_construida": dados_imovel.get("area_construida", "—"),
+        "bairro": dados_imovel.get("bairro", "—"),
+        "rh_valor": dados_imovel.get("rh_valor", "—"),
         "apelido": os_obj.apelido or "",
-        "modelo_sugerido": (producao.modelo_sugerido if producao and producao.modelo_sugerido else ""),
+        "modelo_sugerido": (
+            producao.modelo_sugerido if producao and producao.modelo_sugerido else ""
+        ),
         "prioridade": os_obj.prioridade or "NORMAL",
         "prazo_eav": prazo_interno_display,
         "prazo_eav_iso": prazo_interno_iso,
         "dias_sei": dias_sei,
-        "mes_cronograma": mes_cronograma_display,
-        "mes_cronograma_iso": mes_cronograma_iso,
+        "mes_cronograma": (
+            _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
+        ),
+        "mes_cronograma_iso": (
+            producao.mes_cronograma.strftime("%Y-%m")
+            if producao and producao.mes_cronograma
+            else ""
+        ),
         "avaliador_nome": (
             producao.servidor_responsavel.nome
             if producao and producao.servidor_responsavel
@@ -1995,11 +2030,11 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         ),
         "status": producao.status if producao else "",
         "status_label": (
-            dict(Producao.STATUS_CHOICES).get(producao.status, "—")
-            if producao
-            else "—"
+            _label_status_producao_gerencial(producao.status) if producao else "—"
         ),
-        "la_pt_ptf": la_pt_ptf,
+        "la_pt_ptf": (
+            producao.numero_producao if producao and producao.numero_producao else "—"
+        ),
         "tipo_trabalho": (
             producao.tipo_producao.descricao
             if producao and producao.tipo_producao
@@ -2009,45 +2044,217 @@ def _serializar_linha_gerencial(os_obj, producao, processo_vinculo, os_imovel, u
         "destino": _destino_pos_homologacao(os_obj, producao),
     }
 
-    return {
+
+def _serializar_linhas_gerencial(os_obj, unidade_logada=None):
+    """Retorna lista de linhas gerenciais (uma por produção, ou sem produção)."""
+    processos = os_obj.processos_vinculados.select_related(
+        "processo_sei",
+    ).order_by("tipo_vinculo", "data_entrada_divisao")
+
+    numeros_processos = [
+        {
+            "numero": op.processo_sei.numero_processo,
+            "tipo_vinculo": op.tipo_vinculo,
+            "data_entrada_divisao": (
+                op.data_entrada_divisao.strftime("%d/%m/%Y")
+                if op.data_entrada_divisao
+                else "—"
+            ),
+        }
+        for op in processos
+        if op.processo_sei_id
+    ]
+
+    macroetapa = macroetapa_atual_os(os_obj)
+    etapa_interna = "—"
+    if unidade_logada:
+        tarefa = (
+            TarefaInterna.objects.filter(
+                os=os_obj,
+                unidade=unidade_logada,
+                status="PENDENTE",
+            )
+            .order_by("-data_inicio")
+            .first()
+        )
+        if tarefa:
+            etapa_interna = tarefa.etapa_interna
+
+    processo_principal = next(
+        (p for p in processos if p.tipo_vinculo == "PRINCIPAL"),
+        None,
+    )
+    if processo_principal and processo_principal.data_entrada_divisao:
+        entrada_dai = processo_principal.data_entrada_divisao
+    else:
+        entrada_dai = os_obj.data_entrada_divisao
+    entrada_unidade = (
+        data_entrada_unidade(os_obj, unidade_logada) if unidade_logada else None
+    )
+    entrada_eav = (
+        timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
+        if entrada_unidade
+        else "—"
+    )
+    dias_sei = _calcular_dias_sei_gerencial(os_obj)
+    prioridade_label = PRIORIDADE_OS_LABELS.get(
+        os_obj.prioridade,
+        os_obj.prioridade or "—",
+    )
+
+    dados_fixos = {
         "os_pk": os_obj.pk,
-        "producao_pk": producao.pk if producao else None,
         "numero_os": os_obj.numero_os,
         "apelido": os_obj.apelido or "",
-        "processo_sei": processo_sei or "—",
-        "processo_pk": processo_pk,
-        "status_producao": producao.status if producao else "",
-        "status_producao_label": (
-            dict(Producao.STATUS_CHOICES).get(producao.status, "—")
-            if producao
-            else "—"
-        ),
-        "cells": cells,
-        "panel": panel_data,
-        "panel_json": json.dumps(panel_data, default=str),
+        "processos": numeros_processos,
+        "macroetapa": macroetapa,
+        "macroetapa_label": _label_macroetapa_gerencial(macroetapa),
+        "etapa_interna": etapa_interna,
+        "entrada_dai": _formatar_data_br(entrada_dai),
+        "entrada_eav": entrada_eav,
+        "requerimento": os_obj.tipo_demanda.descricao,
+        "finalidade": os_obj.finalidade.descricao,
+        "prioridade": prioridade_label,
+        "dias_sei": dias_sei,
+        "prazo_recompra_itbi": "—",
+        "ajustes_ok": "—",
     }
+
+    producoes_qs = (
+        os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
+        .select_related(
+            "tipo_producao",
+            "servidor_responsavel",
+            "revisor",
+            "autor_trabalho",
+        )
+        .order_by("-data_criacao")
+    )
+
+    outra_equipe = False
+    if unidade_logada:
+        producoes_unidade = producoes_qs.filter(
+            Q(
+                servidor_responsavel__vinculos_unidade__unidade=unidade_logada,
+                servidor_responsavel__vinculos_unidade__data_fim__isnull=True,
+            )
+            | Q(servidor_responsavel__isnull=True),
+        ).distinct()
+        if producoes_unidade.exists():
+            producoes = list(producoes_unidade)
+        elif producoes_qs.exists():
+            producoes = []
+            outra_equipe = True
+        else:
+            producoes = []
+    else:
+        producoes = list(producoes_qs)
+
+    linhas = []
+
+    def finalizar_linha(linha, producao=None, dados_imovel=None):
+        imovel = dados_imovel or _campos_imovel_vazios_gerencial()
+        linha["cells"] = _montar_cells_gerencial(linha)
+        linha["panel"] = _montar_panel_gerencial(
+            os_obj,
+            producao,
+            unidade_logada,
+            imovel,
+            entrada_dai,
+            entrada_eav,
+        )
+        linha["panel_json"] = json.dumps(linha["panel"], default=str)
+        return linha
+
+    if outra_equipe:
+        dados_imovel = _dados_imovel_gerencial(os_obj)
+        linha = {**dados_fixos, **_campos_vazios_gerencial(), **dados_imovel}
+        linha.update(
+            {
+                "tem_producao": False,
+                "status_producao": "",
+                "status_producao_label": "Outra equipe",
+                "status_producao_cor": "secondary",
+                "apelido": os_obj.apelido or "",
+                "prioridade": prioridade_label,
+                "dias_sei": dias_sei,
+            },
+        )
+        linhas.append(finalizar_linha(linha, None, dados_imovel))
+        return linhas
+
+    if not producoes:
+        dados_imovel = _dados_imovel_gerencial(os_obj)
+        linha = {**dados_fixos, **_campos_vazios_gerencial(), **dados_imovel}
+        linha.update(
+            {
+                "tem_producao": False,
+                "status_producao": "",
+                "status_producao_label": "Sem produção",
+                "status_producao_cor": "secondary",
+                "apelido": os_obj.apelido or "",
+                "prioridade": prioridade_label,
+                "dias_sei": dias_sei,
+            },
+        )
+        linhas.append(finalizar_linha(linha, None, dados_imovel))
+        return linhas
+
+    for producao in producoes:
+        dados_imovel = _dados_imoveis_producao_gerencial(producao)
+        linha = {**dados_fixos}
+        linha.update(
+            {
+                "tem_producao": True,
+                "producao_pk": producao.pk,
+                "status_producao": producao.status,
+                "status_producao_label": _label_status_producao_gerencial(
+                    producao.status,
+                ),
+                "status_producao_cor": _cor_status_producao_gerencial(producao.status),
+                **dados_imovel,
+                "apelido": os_obj.apelido or "",
+                "modelo_sugerido": producao.modelo_sugerido or "—",
+                "prioridade": prioridade_label,
+                "prazo_eav": _formatar_data_br(producao.prazo_interno),
+                "dias_sei": dias_sei,
+                "mes_cronograma": _formatar_mes_cronograma(producao.mes_cronograma),
+                "avaliador": (
+                    producao.servidor_responsavel.nome
+                    if producao.servidor_responsavel
+                    else "—"
+                ),
+                "revisor": producao.revisor.nome if producao.revisor else "—",
+                "prazo_aval": _formatar_data_br(producao.prazo_interno),
+                "entrega_aval": _formatar_data_br(producao.data_entrega_avaliacao),
+                "entrega_rev": _formatar_data_br(producao.data_entrega_revisao),
+                "entrega_aju": _formatar_data_br(producao.data_entrega_ajustes),
+                "envio_sei": _formatar_data_br(producao.data_homologacao),
+                "la_pt_ptf": producao.numero_producao or "—",
+                "tipo_trabalho": (
+                    producao.tipo_producao.prefixo if producao.tipo_producao else "—"
+                ),
+                "doc_sei": producao.numero_sei or "—",
+                "destino": _destino_pos_homologacao(os_obj, producao),
+                "prazo_recompra_itbi": "—",
+                "ajustes_ok": "—",
+            },
+        )
+        linhas.append(finalizar_linha(linha, producao, dados_imovel))
+
+    return linhas
 
 
 def _montar_linhas_gerencial(os_queryset, unidade):
     os_list = list(
         os_queryset.select_related("natureza", "tipo_demanda", "finalidade"),
     )
-    os_ids = [os_obj.pk for os_obj in os_list]
-    if not os_ids:
+    if not os_list:
         return []
 
-    producoes, processos, imoveis = _carregar_mapas_gerencial(os_ids)
     linhas = []
     for os_obj in os_list:
-        linhas.append(
-            _serializar_linha_gerencial(
-                os_obj,
-                producoes.get(os_obj.pk),
-                processos.get(os_obj.pk),
-                imoveis.get(os_obj.pk),
-                unidade,
-            ),
-        )
+        linhas.extend(_serializar_linhas_gerencial(os_obj, unidade))
     return linhas
 
 
@@ -2140,7 +2347,14 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
             for status in STATUS_GERENCIAL_CARDS
         },
         "gerencial_panels_json": json.dumps(
-            {str(linha["os_pk"]): linha["panel"] for linha in linhas_pagina},
+            {
+                (
+                    str(linha["producao_pk"])
+                    if linha.get("producao_pk")
+                    else f"os-{linha['os_pk']}"
+                ): linha["panel"]
+                for linha in linhas_pagina
+            },
             default=str,
             ensure_ascii=False,
         ),

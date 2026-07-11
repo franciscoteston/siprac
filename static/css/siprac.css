@@ -159,9 +159,15 @@ body {
   background-color: #f8f9fa;
 }
 
+body.gerencial-mode {
+  overflow-x: hidden !important;
+}
+
 body.gerencial-mode .siprac-content {
   padding: 0 !important;
   overflow: hidden;
+  overflow-x: hidden !important;
+  max-width: 100% !important;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 56px);
@@ -254,22 +260,34 @@ body.gerencial-mode .siprac-content {
   background: #0d2137;
 }
 
-/* Processo SEI — sticky horizontal */
+/* OS / Processos — sticky horizontal */
 .gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1) {
   position: sticky;
   left: 0;
   top: 29px;
   z-index: 15;
   background: #1a3a5c;
+  min-width: 200px;
 }
 
-/* Status — sticky horizontal */
+/* Macroetapa / Etapa — sticky horizontal */
 .gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
   position: sticky;
-  left: 160px;
+  left: 200px;
   top: 29px;
   z-index: 15;
   background: #1a3a5c;
+  min-width: 140px;
+}
+
+/* Status / Produção — sticky horizontal */
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3) {
+  position: sticky;
+  left: 340px;
+  top: 29px;
+  z-index: 15;
+  background: #1a3a5c;
+  min-width: 130px;
 }
 
 .gerencial-tabela-wrap td {
@@ -285,28 +303,34 @@ body.gerencial-mode .siprac-content {
   left: 0;
   z-index: 4;
   background: white;
+  min-width: 200px;
 }
 
 .gerencial-tabela-wrap td:nth-child(2) {
   position: sticky;
-  left: 160px;
+  left: 200px;
   z-index: 4;
   background: white;
+  min-width: 140px;
 }
 
-.gerencial-tabela-wrap tr:hover td:nth-child(1) {
+.gerencial-tabela-wrap td:nth-child(3) {
+  position: sticky;
+  left: 340px;
+  z-index: 4;
+  background: white;
+  min-width: 130px;
+}
+
+.gerencial-tabela-wrap tr:hover td:nth-child(1),
+.gerencial-tabela-wrap tr:hover td:nth-child(2),
+.gerencial-tabela-wrap tr:hover td:nth-child(3) {
   background: #f0f4f8;
 }
 
-.gerencial-tabela-wrap tr:hover td:nth-child(2) {
-  background: #f0f4f8;
-}
-
-.gerencial-tabela-wrap tr.table-active td:nth-child(1) {
-  background: #dbeafe;
-}
-
-.gerencial-tabela-wrap tr.table-active td:nth-child(2) {
+.gerencial-tabela-wrap tr.table-active td:nth-child(1),
+.gerencial-tabela-wrap tr.table-active td:nth-child(2),
+.gerencial-tabela-wrap tr.table-active td:nth-child(3) {
   background: #dbeafe;
 }
 

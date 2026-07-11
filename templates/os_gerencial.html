@@ -51,19 +51,21 @@
   <div class="gerencial-tabela-wrap" id="gerencialTabelaWrap">
       <table class="table table-sm table-hover siprac-table align-middle mb-0" id="tabela-gerencial">
         <colgroup>
-          <col style="width: 160px; min-width: 160px;">
-          <col style="width: 110px; min-width: 110px;">
+          <col style="width: 200px; min-width: 200px;">
+          <col style="width: 140px; min-width: 140px;">
+          <col style="width: 130px; min-width: 130px;">
         </colgroup>
         <thead>
           <tr>
-            <th colspan="2" class="grupo-header">FIXO</th>
+            <th colspan="3" class="grupo-header">FIXO</th>
             {% for grupo in grupos_colunas_gerencial %}
             <th colspan="{{ grupo.colspan }}" class="grupo-header">{{ grupo.titulo }}</th>
             {% endfor %}
           </tr>
           <tr>
-            <th class="gerencial-col-fixa">Processo SEI</th>
-            <th class="gerencial-col-fixa">Status</th>
+            <th class="gerencial-col-fixa">OS / Processos SEI</th>
+            <th class="gerencial-col-fixa">Macroetapa / Etapa</th>
+            <th class="gerencial-col-fixa">Status / Produção</th>
             {% for col_id in colunas_gerencial_visiveis %}
             <th class="gerencial-col-config" data-col="{{ col_id }}">
               <div class="d-flex align-items-center gap-1 justify-content-center">
@@ -92,21 +94,53 @@
         </thead>
         <tbody>
           {% for linha in linhas_gerencial %}
-          <tr data-os-pk="{{ linha.os_pk }}">
+          <tr data-os-pk="{{ linha.os_pk }}"
+              data-producao-pk="{{ linha.producao_pk|default:'' }}">
             <td class="gerencial-col-fixa">
-              {% if linha.processo_pk %}
-              <a href="{% url 'processo_detail' linha.processo_pk %}" class="text-decoration-none"
-                 onclick="event.stopPropagation();">{{ linha.processo_sei }}</a>
-              {% else %}{{ linha.processo_sei }}{% endif %}
+              <div class="fw-bold">
+                <a href="{% url 'os_detalhe' linha.os_pk %}" class="text-decoration-none"
+                   onclick="event.stopPropagation();">{{ linha.numero_os }}</a>
+                {% if linha.apelido %}
+                <small class="text-muted d-block">{{ linha.apelido }}</small>
+                {% endif %}
+              </div>
+              {% for proc in linha.processos %}
+              <div class="ms-2 small text-muted">
+                {{ proc.numero }}
+                {% if proc.tipo_vinculo == 'RELACIONADO' %}
+                <span class="badge bg-info" style="font-size:9px;">Rel.</span>
+                {% endif %}
+              </div>
+              {% endfor %}
             </td>
             <td class="gerencial-col-fixa">
-              {% if linha.status_producao %}
-              <span class="badge bg-{{ linha.status_producao|status_producao_cor }}">{{ linha.status_producao_label }}</span>
-              {% else %}—{% endif %}
+              <div>{{ linha.macroetapa_label }}</div>
+              {% if linha.etapa_interna and linha.etapa_interna != '—' %}
+              <div class="ms-2 small text-muted">{{ linha.etapa_interna }}</div>
+              {% endif %}
+            </td>
+            <td class="gerencial-col-fixa">
+              {% if linha.tem_producao %}
+              <span class="badge bg-{{ linha.status_producao_cor }}">
+                {{ linha.status_producao_label }}
+              </span>
+              {% else %}
+              <span class="text-muted small">{{ linha.status_producao_label }}</span>
+              {% endif %}
             </td>
             {% for col_id in colunas_gerencial_visiveis %}
-            <td class="gerencial-col-config gerencial-cell" data-col="{{ col_id }}" data-os-pk="{{ linha.os_pk }}">
-              {% if col_id == 'dias_sei' %}
+            <td class="gerencial-col-config gerencial-cell"
+                data-col="{{ col_id }}"
+                data-os-pk="{{ linha.os_pk }}"
+                data-producao-pk="{{ linha.producao_pk|default:'' }}">
+              {% if col_id == 'numero_imovel' and linha.numero_imovel_extra > 0 %}
+                {{ linha.numero_imovel }}
+                <span class="badge bg-secondary ms-1"
+                      data-bs-toggle="tooltip"
+                      title="{{ linha.numero_imovel_tooltip }}">
+                  +{{ linha.numero_imovel_extra }}
+                </span>
+              {% elif col_id == 'dias_sei' %}
                 {% with dias=linha.cells.dias_sei %}
                   {% if dias != None %}
                   <span class="{{ dias|cor_prazo }}">{{ dias|label_prazo }}</span>
@@ -172,6 +206,10 @@
   const configEl = document.getElementById('gerencial-config');
   if (!configEl) return;
 
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+    new bootstrap.Tooltip(el);
+  });
+
   let painelDados = {};
   const panelsDataEl = document.getElementById('gerencial-panels-data');
   if (panelsDataEl) {
@@ -217,8 +255,12 @@
     });
   }
 
-  function atualizarCelula(osPk, colId, html) {
-    document.querySelectorAll('.gerencial-cell[data-os-pk="' + osPk + '"][data-col="' + colId + '"]').forEach(function (td) {
+  function atualizarCelula(osPk, colId, html, producaoPk) {
+    var seletor = '.gerencial-cell[data-os-pk="' + osPk + '"][data-col="' + colId + '"]';
+    if (producaoPk) {
+      seletor += '[data-producao-pk="' + producaoPk + '"]';
+    }
+    document.querySelectorAll(seletor).forEach(function (td) {
       td.innerHTML = html;
     });
   }
@@ -256,15 +298,15 @@
         postCampo('/os/' + osPk + '/editar-campo/', campo, valor).then(function (data) {
           if (campo === 'apelido') {
             panelData.apelido = data.valor || '';
-            atualizarCelula(osPk, 'apelido', escapeHtml(data.valor || '—'));
+            atualizarCelula(osPk, 'apelido', escapeHtml(data.valor || '—'), prodPk);
           }
           if (campo === 'data_entrada_divisao') {
             panelData.entrada_dai = data.valor_display || '—';
-            atualizarCelula(osPk, 'entrada_dai', escapeHtml(data.valor_display || '—'));
+            atualizarCelula(osPk, 'entrada_dai', escapeHtml(data.valor_display || '—'), prodPk);
           }
             if (campo === 'prioridade') {
             panelData.prioridade = valor;
-            atualizarCelula(osPk, 'prioridade', escapeHtml(valor));
+            atualizarCelula(osPk, 'prioridade', escapeHtml(valor), prodPk);
           }
         }).catch(function (e) { alert(e.message); });
       });
@@ -279,38 +321,38 @@
           postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor).then(function (data) {
             if (campo === 'modelo_sugerido') {
               panelData.modelo_sugerido = data.valor || '';
-              atualizarCelula(osPk, 'modelo_sugerido', escapeHtml(data.valor || '—'));
+              atualizarCelula(osPk, 'modelo_sugerido', escapeHtml(data.valor || '—'), prodPk);
             }
             if (campo === 'servidor_responsavel') {
               panelData.avaliador_nome = data.valor || '—';
-              atualizarCelula(osPk, 'avaliador', escapeHtml(data.valor || '—'));
+              atualizarCelula(osPk, 'avaliador', escapeHtml(data.valor || '—'), prodPk);
             }
             if (campo === 'revisor') {
               panelData.revisor_nome = data.valor || '—';
-              atualizarCelula(osPk, 'revisor', escapeHtml(data.valor || '—'));
+              atualizarCelula(osPk, 'revisor', escapeHtml(data.valor || '—'), prodPk);
             }
             if (campo === 'mes_cronograma') {
               panelData.mes_cronograma = data.valor_display || '—';
-              atualizarCelula(osPk, 'mes_cronograma', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'mes_cronograma', escapeHtml(data.valor_display || '—'), prodPk);
             }
             if (campo === 'prazo_interno') {
               const display = data.valor_display || '—';
               panelData.prazo_eav = display;
               panelData.prazo_aval = display;
-              atualizarCelula(osPk, 'prazo_eav', escapeHtml(display));
-              atualizarCelula(osPk, 'prazo_aval', escapeHtml(display));
+              atualizarCelula(osPk, 'prazo_eav', escapeHtml(display), prodPk);
+              atualizarCelula(osPk, 'prazo_aval', escapeHtml(display), prodPk);
             }
             if (campo === 'data_entrega_avaliacao') {
               panelData.entrega_aval = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_aval', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'entrega_aval', escapeHtml(data.valor_display || '—'), prodPk);
             }
             if (campo === 'data_entrega_revisao') {
               panelData.entrega_rev = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_rev', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'entrega_rev', escapeHtml(data.valor_display || '—'), prodPk);
             }
             if (campo === 'data_entrega_ajustes') {
               panelData.entrega_aju = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_aju', escapeHtml(data.valor_display || '—'));
+              atualizarCelula(osPk, 'entrega_aju', escapeHtml(data.valor_display || '—'), prodPk);
             }
           }).catch(function (e) { alert(e.message); });
         });
@@ -528,7 +570,10 @@
     if (e.target.closest('a')) return;
     const tr = e.target.closest('tr[data-os-pk]');
     if (!tr) return;
-    const dados = painelDados[tr.dataset.osPk];
+    const key = tr.dataset.producaoPk
+      ? tr.dataset.producaoPk
+      : ('os-' + tr.dataset.osPk);
+    const dados = painelDados[key];
     if (dados) abrirPainel(dados, tr);
   });
 
