@@ -1,4 +1,155 @@
 {% load siprac_filters %}
+{% block extra_css %}
+<style>
+/* Gerencial - estilos críticos inline */
+body { overflow-x: hidden !important; }
+
+.gerencial-view {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 200px);
+    overflow: hidden;
+}
+
+.gerencial-wrap {
+    display: grid;
+    grid-template-columns: 1fr 0px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    transition: grid-template-columns 0.25s ease;
+}
+
+.gerencial-wrap.painel-aberto {
+    grid-template-columns: 1fr 390px;
+}
+
+.gerencial-tabela-wrap {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    min-width: 0;
+    min-height: 0;
+}
+
+.gerencial-tabela-wrap table {
+    min-width: max-content;
+    border-collapse: collapse;
+}
+
+.gerencial-tabela-wrap thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #1a3a5c;
+    color: white;
+    padding: 6px 10px;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.gerencial-tabela-wrap thead tr:nth-child(2) th {
+    top: 28px;
+}
+
+.gerencial-tabela-wrap thead tr:nth-child(1) th:first-child {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 20;
+    background: #0d2137;
+}
+
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1) {
+    position: sticky;
+    left: 0;
+    top: 28px;
+    z-index: 19;
+    background: #1a3a5c;
+    min-width: 200px;
+    width: 200px;
+}
+
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
+    position: sticky;
+    left: 200px;
+    top: 28px;
+    z-index: 18;
+    background: #1a3a5c;
+    min-width: 140px;
+    width: 140px;
+}
+
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3) {
+    position: sticky;
+    left: 340px;
+    top: 28px;
+    z-index: 17;
+    background: #1a3a5c;
+    min-width: 130px;
+    width: 130px;
+}
+
+.gerencial-tabela-wrap tbody td {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid #e9ecef;
+    background: white;
+}
+
+.gerencial-tabela-wrap tbody td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: white;
+    min-width: 200px;
+    width: 200px;
+}
+
+.gerencial-tabela-wrap tbody td:nth-child(2) {
+    position: sticky;
+    left: 200px;
+    z-index: 4;
+    background: white;
+    min-width: 140px;
+    width: 140px;
+}
+
+.gerencial-tabela-wrap tbody td:nth-child(3) {
+    position: sticky;
+    left: 340px;
+    z-index: 3;
+    background: white;
+    min-width: 130px;
+    width: 130px;
+}
+
+.gerencial-tabela-wrap tbody tr:hover td {
+    background: #f0f4f8 !important;
+    cursor: pointer;
+}
+
+.gerencial-tabela-wrap tbody tr.table-active td {
+    background: #dbeafe !important;
+}
+
+.gerencial-painel {
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: white;
+    border-left: 2px solid #1a3a5c;
+    min-width: 0;
+    min-height: 0;
+}
+
+#gerencialPainel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+</style>
+{% endblock %}
 <form class="d-none" id="gerencial-csrf">{% csrf_token %}</form>
 
 <div class="gerencial-view">
