@@ -101,6 +101,7 @@ from core.models import (
     ProducaoImovel,
     ProducaoStatusLog,
     Servidor,
+    ServidorUnidade,
     TarefaInterna,
     TipoDemanda,
     TipoProducao,
@@ -2045,7 +2046,12 @@ def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai
     }
 
 
-def _serializar_linhas_gerencial(os_obj, unidade_logada=None):
+def _serializar_linhas_gerencial(
+    os_obj,
+    unidade_logada=None,
+    servidor_logado=None,
+    perfil_pode_homologar=False,
+):
     """Retorna lista de linhas gerenciais (uma por produção, ou sem produção)."""
     processos = os_obj.processos_vinculados.select_related(
         "processo_sei",
@@ -2120,35 +2126,45 @@ def _serializar_linhas_gerencial(os_obj, unidade_logada=None):
         "ajustes_ok": "—",
     }
 
-    producoes_qs = (
-        os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
-        .select_related(
-            "tipo_producao",
-            "servidor_responsavel",
-            "revisor",
-            "autor_trabalho",
-        )
-        .order_by("-data_criacao")
-    )
-
     outra_equipe = False
     if unidade_logada:
-        producoes_unidade = producoes_qs.filter(
-            Q(
-                servidor_responsavel__vinculos_unidade__unidade=unidade_logada,
-                servidor_responsavel__vinculos_unidade__data_fim__isnull=True,
+        servidores_unidade = ServidorUnidade.objects.filter(
+            unidade=unidade_logada,
+            data_fim__isnull=True,
+        ).values_list("servidor_id", flat=True)
+
+        producoes = (
+            os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
+            .filter(
+                Q(servidor_responsavel_id__in=servidores_unidade)
+                | Q(criado_por_id__in=servidores_unidade),
             )
-            | Q(servidor_responsavel__isnull=True),
-        ).distinct()
-        if producoes_unidade.exists():
-            producoes = list(producoes_unidade)
-        elif producoes_qs.exists():
-            producoes = []
+            .select_related(
+                "tipo_producao",
+                "servidor_responsavel",
+                "revisor",
+            )
+            .order_by("-data_criacao")
+        )
+
+        if servidor_logado and not perfil_pode_homologar:
+            producoes = producoes.filter(servidor_responsavel=servidor_logado)
+
+        producoes = list(producoes)
+        if not producoes and os_obj.producoes.exclude(
+            status=Producao.STATUS_CANCELADO,
+        ).exists():
             outra_equipe = True
-        else:
-            producoes = []
     else:
-        producoes = list(producoes_qs)
+        producoes = list(
+            os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
+            .select_related(
+                "tipo_producao",
+                "servidor_responsavel",
+                "revisor",
+            )
+            .order_by("-data_criacao")
+        )
 
     linhas = []
 
@@ -2245,7 +2261,12 @@ def _serializar_linhas_gerencial(os_obj, unidade_logada=None):
     return linhas
 
 
-def _montar_linhas_gerencial(os_queryset, unidade):
+def _montar_linhas_gerencial(
+    os_queryset,
+    unidade,
+    servidor_logado=None,
+    perfil_pode_homologar=False,
+):
     os_list = list(
         os_queryset.select_related("natureza", "tipo_demanda", "finalidade"),
     )
@@ -2254,7 +2275,14 @@ def _montar_linhas_gerencial(os_queryset, unidade):
 
     linhas = []
     for os_obj in os_list:
-        linhas.extend(_serializar_linhas_gerencial(os_obj, unidade))
+        linhas.extend(
+            _serializar_linhas_gerencial(
+                os_obj,
+                unidade,
+                servidor_logado=servidor_logado,
+                perfil_pode_homologar=perfil_pode_homologar,
+            ),
+        )
     return linhas
 
 
@@ -2312,8 +2340,15 @@ def _contagens_status_gerencial(os_ids):
 def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
     servidor = _obter_servidor(request.user)
     unidade = _obter_unidade_principal_servidor(servidor)
+    perfil = getattr(request, "perfil_acesso", None)
+    pode_homologar = perfil is not None and perfil.pode_homologar
     os_ids = list(queryset_completo.values_list("pk", flat=True))
-    linhas_base = _montar_linhas_gerencial(queryset_completo, unidade)
+    linhas_base = _montar_linhas_gerencial(
+        queryset_completo,
+        unidade,
+        servidor_logado=servidor,
+        perfil_pode_homologar=pode_homologar,
+    )
     linhas_filtradas = _filtrar_linhas_coluna_gerencial(linhas_base, request)
     os_ids_filtrados = {linha["os_pk"] for linha in linhas_filtradas}
 
@@ -2323,8 +2358,6 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
         if request.GET.get(f"fg_{coluna}", "").strip()
     }
 
-    perfil = getattr(request, "perfil_acesso", None)
-    pode_homologar = perfil is not None and perfil.pode_homologar
     colunas_visiveis = _colunas_visiveis_gerencial(servidor)
 
     return {
@@ -2392,7 +2425,14 @@ class OSListView(RequerLoginMixin, ListView):
         if self.request.GET.get("view") == "gerencial":
             servidor = _obter_servidor(self.request.user)
             unidade = _obter_unidade_principal_servidor(servidor)
-            linhas = _montar_linhas_gerencial(queryset, unidade)
+            perfil = getattr(self.request, "perfil_acesso", None)
+            pode_homologar = perfil is not None and perfil.pode_homologar
+            linhas = _montar_linhas_gerencial(
+                queryset,
+                unidade,
+                servidor_logado=servidor,
+                perfil_pode_homologar=pode_homologar,
+            )
             linhas = _filtrar_linhas_coluna_gerencial(linhas, self.request)
             os_ids = [linha["os_pk"] for linha in linhas]
             if os_ids:
@@ -2434,7 +2474,14 @@ class OSListView(RequerLoginMixin, ListView):
         if view_mode == "gerencial":
             servidor = _obter_servidor(self.request.user)
             unidade = _obter_unidade_principal_servidor(servidor)
-            linhas_pagina = _montar_linhas_gerencial(context["ordens"], unidade)
+            perfil = getattr(self.request, "perfil_acesso", None)
+            pode_homologar = perfil is not None and perfil.pode_homologar
+            linhas_pagina = _montar_linhas_gerencial(
+                context["ordens"],
+                unidade,
+                servidor_logado=servidor,
+                perfil_pode_homologar=pode_homologar,
+            )
             context.update(
                 _contexto_gerencial_os_list(
                     self.request,

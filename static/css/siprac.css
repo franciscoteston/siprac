@@ -159,204 +159,193 @@ body {
   background-color: #f8f9fa;
 }
 
-body.gerencial-mode {
-  overflow-x: hidden !important;
-}
-
 body.gerencial-mode .siprac-content {
-  padding: 0 !important;
-  overflow: hidden;
-  overflow-x: hidden !important;
-  max-width: 100% !important;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 56px);
+    padding: 0 !important;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 56px);
+    max-width: 100% !important;
+    overflow-x: hidden !important;
 }
 
 .gerencial-view {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    max-width: 100%;
 }
 
 .gerencial-toolbar {
-  padding: 8px 16px;
-  flex-shrink: 0;
+    padding: 8px 16px;
+    flex-shrink: 0;
 }
 
 .gerencial-cards-status {
-  padding: 0 16px 8px;
-  flex-shrink: 0;
+    padding: 0 16px 8px;
+    flex-shrink: 0;
 }
 
 .gerencial-wrap {
-  display: grid;
-  grid-template-columns: 1fr 0px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  transition: grid-template-columns 0.25s ease;
+    display: grid;
+    grid-template-columns: 1fr 0px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    transition: grid-template-columns 0.25s ease;
+    max-width: 100%;
 }
 
 .gerencial-wrap.painel-aberto {
-  grid-template-columns: 1fr 390px;
+    grid-template-columns: 1fr 390px;
 }
 
 .gerencial-tabela-wrap {
-  overflow-x: auto;
-  overflow-y: auto;
-  min-width: 0;
-  min-height: 0;
-  background: white;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    min-width: 0;
+    min-height: 0;
+    background: white;
+    max-width: 100%;
+    position: relative;
 }
 
 .gerencial-tabela-wrap table {
-  min-width: max-content;
-  border-collapse: collapse;
-  width: auto;
+    min-width: max-content;
+    border-collapse: collapse;
+    width: auto;
+    table-layout: fixed;
 }
 
+/* Cabeçalho sticky vertical */
 .gerencial-tabela-wrap thead th {
-  color: white;
-  padding: 6px 10px;
-  white-space: nowrap;
-  font-size: 12px;
-  text-align: center;
-  border-right: 1px solid #2a4a6c;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #1a3a5c;
+    color: white;
+    padding: 6px 10px;
+    white-space: nowrap;
+    font-size: 12px;
+    text-align: left;
+    border-right: 1px solid #2a4a6c;
 }
 
-.gerencial-tabela-wrap thead th.grupo-header {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-right: 2px solid #1a3a5c;
-}
-
-/* Linha 1 do thead — grupos */
-.gerencial-tabela-wrap thead tr:nth-child(1) th {
-  position: sticky;
-  top: 0;
-  z-index: 12;
-  background: #0d2137;
-}
-
-/* Linha 2 do thead — colunas */
+/* Linha 2 do thead abaixo da linha 1 */
 .gerencial-tabela-wrap thead tr:nth-child(2) th {
-  position: sticky;
-  top: 29px;
-  z-index: 10;
-  background: #1a3a5c;
+    top: 28px;
+    z-index: 10;
 }
 
-/* Célula FIXO da linha 1 — sticky horizontal E vertical */
+/* Grupo FIXO no thead linha 1 - sticky horizontal E vertical */
 .gerencial-tabela-wrap thead tr:nth-child(1) th:first-child {
-  position: sticky;
-  left: 0;
-  top: 0;
-  z-index: 20;
-  background: #0d2137;
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 20;
+    background: #0d2137;
 }
 
-/* OS / Processos — sticky horizontal */
+/* Coluna 1 sticky - OS/Processos */
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1),
+.gerencial-tabela-wrap tbody td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 9;
+    background: white;
+    min-width: 200px;
+    max-width: 200px;
+    width: 200px;
+}
+
 .gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1) {
-  position: sticky;
-  left: 0;
-  top: 29px;
-  z-index: 15;
-  background: #1a3a5c;
-  min-width: 200px;
+    background: #1a3a5c;
+    z-index: 19;
+    top: 28px;
 }
 
-/* Macroetapa / Etapa — sticky horizontal */
+/* Coluna 2 sticky - Macroetapa */
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2),
+.gerencial-tabela-wrap tbody td:nth-child(2) {
+    position: sticky;
+    left: 200px;
+    z-index: 8;
+    background: white;
+    min-width: 140px;
+    max-width: 140px;
+    width: 140px;
+}
+
 .gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
-  position: sticky;
-  left: 200px;
-  top: 29px;
-  z-index: 15;
-  background: #1a3a5c;
-  min-width: 140px;
+    background: #1a3a5c;
+    z-index: 18;
+    top: 28px;
 }
 
-/* Status / Produção — sticky horizontal */
+/* Coluna 3 sticky - Status */
+.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3),
+.gerencial-tabela-wrap tbody td:nth-child(3) {
+    position: sticky;
+    left: 340px;
+    z-index: 7;
+    background: white;
+    min-width: 130px;
+    max-width: 130px;
+    width: 130px;
+}
+
 .gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3) {
-  position: sticky;
-  left: 340px;
-  top: 29px;
-  z-index: 15;
-  background: #1a3a5c;
-  min-width: 130px;
+    background: #1a3a5c;
+    z-index: 17;
+    top: 28px;
 }
 
-.gerencial-tabela-wrap td {
-  padding: 6px 10px;
-  font-size: 12px;
-  white-space: nowrap;
-  border-bottom: 1px solid #e9ecef;
-  border-right: 1px solid #f0f0f0;
+/* Células de dados */
+.gerencial-tabela-wrap tbody td {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid #e9ecef;
+    border-right: 1px solid #f0f0f0;
+    background: white;
 }
 
-.gerencial-tabela-wrap td:nth-child(1) {
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  background: white;
-  min-width: 200px;
+/* Hover e seleção */
+.gerencial-tabela-wrap tbody tr:hover td {
+    background: #f0f4f8 !important;
+    cursor: pointer;
 }
 
-.gerencial-tabela-wrap td:nth-child(2) {
-  position: sticky;
-  left: 200px;
-  z-index: 4;
-  background: white;
-  min-width: 140px;
+.gerencial-tabela-wrap tbody tr.table-active td {
+    background: #dbeafe !important;
 }
 
-.gerencial-tabela-wrap td:nth-child(3) {
-  position: sticky;
-  left: 340px;
-  z-index: 4;
-  background: white;
-  min-width: 130px;
-}
-
-.gerencial-tabela-wrap tr:hover td:nth-child(1),
-.gerencial-tabela-wrap tr:hover td:nth-child(2),
-.gerencial-tabela-wrap tr:hover td:nth-child(3) {
-  background: #f0f4f8;
-}
-
-.gerencial-tabela-wrap tr.table-active td:nth-child(1),
-.gerencial-tabela-wrap tr.table-active td:nth-child(2),
-.gerencial-tabela-wrap tr.table-active td:nth-child(3) {
-  background: #dbeafe;
-}
-
+/* Painel lateral */
 .gerencial-painel {
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: white;
-  border-left: 2px solid #1a3a5c;
-  min-width: 0;
-  min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: white;
+    border-left: 2px solid #1a3a5c;
+    min-width: 0;
+    min-height: 0;
 }
 
 #gerencialPainel {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
 }
 
 .gerencial-status-card {
-  cursor: pointer;
-  transition: box-shadow 0.15s;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
 }
 
 .gerencial-status-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .filtro-coluna-btn {
