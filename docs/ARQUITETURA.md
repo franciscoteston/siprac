@@ -559,3 +559,16 @@ encoding Latin-1/Windows-1252).
 Ação necessária: verificar o encoding dos dados de domínio (Natureza,
 TipoDemanda, Finalidade, CombinacaoValida) no banco do Railway e
 regenerar o dump em UTF-8 correto antes da próxima carga de dados.
+
+### 15.17 Acesso a OSs que nunca passaram pela unidade
+Servidores só podem acessar OSs que estejam ou já estiveram em sua unidade
+(OsUnidadeStatus existente). OSs que nunca passaram pela unidade ficam
+invisíveis, exceto para perfis com visibilidade_total=True (DAI/Direção).
+Pendente definir: onde e como exibir essas OSs para perfis com
+visibilidade_total, sem misturar com a fila operacional da unidade.
+
+### 15.18 Reabertura global da OS
+Atualmente a reabertura é apenas na unidade (OsUnidadeStatus).
+Não há reabertura global da OS (OS.encerrada → False).
+Avaliar futuramente se é necessário reabrir uma OS encerrada na Divisão
+e qual perfil teria essa permissão (provável: apenas Direção/Administrador).
