@@ -160,7 +160,7 @@ body {
 }
 
 body.gerencial-mode .siprac-content {
-    padding: 0 !important;
+    padding: 8px 16px 0 16px !important;
     overflow: hidden;
     display: flex;
     flex-direction: column;
