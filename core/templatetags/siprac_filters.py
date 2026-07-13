@@ -46,23 +46,27 @@ def macroetapa_display(value):
 
 
 STATUS_PRODUCAO_LABELS = {
-    "ENTRADA": "Entrada",
+    "ENTRADA": "Não distribuído",
     "DISTRIBUIDO": "Distribuído",
-    "EM_ELABORACAO": "Em elaboração",
     "PARA_REVISAO": "Para revisão",
     "PARA_AJUSTES": "Para ajustes",
+    "HOMOLOGAR": "Homologar",
     "HOMOLOGADO": "Homologado",
+    "ENVIADO": "Enviado",
     "CANCELADO": "Cancelado",
+    "EM_ELABORACAO": "Em elaboração",
 }
 
 STATUS_PRODUCAO_CORES = {
     "ENTRADA": "secondary",
     "DISTRIBUIDO": "info",
-    "EM_ELABORACAO": "primary",
     "PARA_REVISAO": "warning",
     "PARA_AJUSTES": "warning",
+    "HOMOLOGAR": "primary",
     "HOMOLOGADO": "success",
+    "ENVIADO": "success",
     "CANCELADO": "danger",
+    "EM_ELABORACAO": "primary",
 }
 
 GRUPO_BADGE_CLASSES = (

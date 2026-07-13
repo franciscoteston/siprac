@@ -56,6 +56,7 @@ from core.mixins import (
     RequerLoginMixin,
 )
 from core.os_service import (
+    _atualizar_status_unidade_encaminhamento,
     ativar_atendimento_interno_se_necessario,
     contar_producoes_por_os_ids,
     contar_producoes_por_status_unidades,
@@ -94,6 +95,7 @@ from core.models import (
     OS,
     OsImovel,
     OsProcesso,
+    OsUnidadeStatus,
     PreferenciaGerencial,
     ProcessoSei,
     LogAuditoria,
@@ -129,6 +131,7 @@ PRIORIDADE_OS_LABELS = {
 
 STATUS_PRODUCAO_FINAL = [
     Producao.STATUS_HOMOLOGADO,
+    Producao.STATUS_ENVIADO,
     Producao.STATUS_CANCELADO,
 ]
 
@@ -177,9 +180,9 @@ def _contexto_dashboard_vazio():
         "producoes_minha_por_status": {
             "ENTRADA": 0,
             "DISTRIBUIDO": 0,
-            "EM_ELABORACAO": 0,
             "PARA_REVISAO": 0,
             "PARA_AJUSTES": 0,
+            "HOMOLOGAR": 0,
             "HOMOLOGADO_MES": 0,
         },
         "fila_unidade": [],
@@ -198,7 +201,11 @@ def _producoes_pendentes_os(os):
     return (
         Producao.objects.filter(os=os)
         .exclude(
-            status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
+            status__in=[
+                Producao.STATUS_HOMOLOGADO,
+                Producao.STATUS_ENVIADO,
+                Producao.STATUS_CANCELADO,
+            ],
         )
         .select_related("tipo_producao")
     )
@@ -643,9 +650,9 @@ def _contar_producoes_minhas_por_status(servidor):
     resultado = {
         "ENTRADA": 0,
         "DISTRIBUIDO": 0,
-        "EM_ELABORACAO": 0,
         "PARA_REVISAO": 0,
         "PARA_AJUSTES": 0,
+        "HOMOLOGAR": 0,
         "HOMOLOGADO_MES": 0,
     }
     queryset = Producao.objects.filter(servidor_responsavel=servidor).exclude(
@@ -716,7 +723,7 @@ def _contexto_dashboard_unidade(servidor, unidades_ids, perfil):
             [],
             [],
         ),
-        "card_em_elaboracao": producoes_unidade.get("EM_ELABORACAO", 0),
+        "card_em_elaboracao": producoes_unidade.get("DISTRIBUIDO", 0),
         "card_para_revisao_ajustes": (
             producoes_unidade.get("PARA_REVISAO", 0)
             + producoes_unidade.get("PARA_AJUSTES", 0)
@@ -1605,10 +1612,11 @@ COLUNAS_GERENCIAL_PADRAO = [
 STATUS_GERENCIAL_CARDS = [
     Producao.STATUS_ENTRADA,
     Producao.STATUS_DISTRIBUIDO,
-    Producao.STATUS_EM_ELABORACAO,
     Producao.STATUS_PARA_REVISAO,
     Producao.STATUS_PARA_AJUSTES,
+    Producao.STATUS_HOMOLOGAR,
     Producao.STATUS_HOMOLOGADO,
+    Producao.STATUS_ENVIADO,
 ]
 
 
@@ -1758,10 +1766,11 @@ def _cor_status_producao_gerencial(status):
     return {
         "ENTRADA": "secondary",
         "DISTRIBUIDO": "info",
-        "EM_ELABORACAO": "primary",
         "PARA_REVISAO": "warning",
         "PARA_AJUSTES": "warning",
+        "HOMOLOGAR": "primary",
         "HOMOLOGADO": "success",
+        "ENVIADO": "success",
         "CANCELADO": "danger",
     }.get(status, "secondary")
 
@@ -2124,6 +2133,14 @@ def _serializar_linhas_gerencial(
         "dias_sei": dias_sei,
         "prazo_recompra_itbi": "—",
         "ajustes_ok": "—",
+        "status_unidade": (
+            OsUnidadeStatus.objects.filter(
+                os=os_obj,
+                unidade=unidade_logada,
+            ).values_list("status", flat=True).first()
+            if unidade_logada
+            else None
+        ),
     }
 
     outra_equipe = False
@@ -2643,6 +2660,20 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context["data_entrada_unidade_atual"] = (
             data_entrada_unidade(os_obj, unidade) if unidade else None
         )
+        status_unidade = None
+        if unidade:
+            status_unidade = OsUnidadeStatus.objects.filter(
+                os=os_obj,
+                unidade=unidade,
+            ).first()
+        context["status_unidade_atual"] = status_unidade
+        perfil = getattr(self.request, "perfil_acesso", None)
+        context["pode_reabrir_na_unidade"] = (
+            perfil is not None
+            and perfil.pode_homologar
+            and status_unidade is not None
+            and status_unidade.status == "CONCLUIDA"
+        )
         return context
 
 
@@ -2661,6 +2692,16 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         context = super().get_context_data(**kwargs)
         context["os"] = self.os_obj
         context["unidade_origem"] = origem_encaminhamento(self.os_obj)
+        servidor = _obter_servidor(self.request.user)
+        unidade = _obter_unidade_principal_servidor(servidor) if servidor else None
+        context["mostrar_manter_aberta"] = bool(
+            unidade
+            and OsUnidadeStatus.objects.filter(
+                os=self.os_obj,
+                unidade=unidade,
+                status="ABERTA",
+            ).exists()
+        )
         return context
 
     def get_initial(self):
@@ -2684,6 +2725,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         dados = form.cleaned_data
         tipo_destino = dados["tipo_destino"]
         unidade_origem = origem_encaminhamento(self.os_obj)
+        manter_aberta = bool(dados.get("manter_aberta_na_unidade"))
         if tipo_destino == "EXTERNO":
             tipo_acao = "EXTERNO"
             etapa_interna = None
@@ -2715,6 +2757,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 aguarda_retorno=dados.get("aguarda_retorno") or False,
                 data_retorno_prevista=dados.get("data_retorno_prevista"),
                 observacao=dados.get("observacao") or None,
+                manter_aberta_na_unidade=manter_aberta,
             )
 
             if tipo_destino == "INTERNO":
@@ -2734,8 +2777,52 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 data_inicio=agora,
             )
 
+            _atualizar_status_unidade_encaminhamento(
+                self.os_obj,
+                unidade_origem,
+                servidor,
+                manter_aberta,
+                unidade_destino=dados.get("unidade_interna_destino"),
+            )
+
         messages.success(self.request, "Encaminhamento registrado.")
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+
+
+class OSReabrirNaUnidadeView(RequerLoginMixin, View):
+    def post(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        perfil = getattr(request, "perfil_acesso", None)
+        if perfil is None or not perfil.pode_homologar:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
+
+        servidor = _obter_servidor(request.user)
+        unidade = _obter_unidade_principal_servidor(servidor) if servidor else None
+        if servidor is None or unidade is None:
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
+
+        status_unidade = OsUnidadeStatus.objects.filter(
+            os=os_obj,
+            unidade=unidade,
+            status="CONCLUIDA",
+        ).first()
+        if status_unidade is None:
+            messages.error(
+                request,
+                "A OS não está concluída nesta unidade para reabertura.",
+            )
+            return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
+
+        status_unidade.status = "REABERTA"
+        status_unidade.data_conclusao = None
+        status_unidade.aberta_por = servidor
+        status_unidade.save(
+            update_fields=["status", "data_conclusao", "aberta_por"],
+        )
+        messages.success(request, "OS reaberta nesta unidade.")
+        return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
 
 
 class ProducaoCreateView(RequerLoginMixin, FormView):
@@ -3574,35 +3661,42 @@ TRANSICOES_PERMITIDAS_PRODUCAO = {
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_DISTRIBUIDO: [
-        (Producao.STATUS_EM_ELABORACAO, False),
-        (Producao.STATUS_ENTRADA, True),
-        (Producao.STATUS_CANCELADO, True),
-    ],
-    Producao.STATUS_EM_ELABORACAO: [
         (Producao.STATUS_PARA_REVISAO, False),
+        (Producao.STATUS_ENTRADA, True),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_PARA_REVISAO: [
         (Producao.STATUS_PARA_AJUSTES, True),
+        (Producao.STATUS_HOMOLOGAR, True),
         (Producao.STATUS_HOMOLOGADO, True),
-        (Producao.STATUS_EM_ELABORACAO, True),
+        (Producao.STATUS_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_PARA_AJUSTES: [
         (Producao.STATUS_PARA_REVISAO, False),
+        (Producao.STATUS_HOMOLOGAR, True),
         (Producao.STATUS_HOMOLOGADO, True),
-        (Producao.STATUS_EM_ELABORACAO, True),
+        (Producao.STATUS_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_HOMOLOGAR: [
+        (Producao.STATUS_HOMOLOGADO, True),
+        (Producao.STATUS_PARA_AJUSTES, True),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_HOMOLOGADO: [
+        (Producao.STATUS_ENVIADO, True),
     ],
 }
 
 STATUS_PRODUCAO_BOTAO_CLASSES = {
     Producao.STATUS_ENTRADA: "btn-secondary",
     Producao.STATUS_DISTRIBUIDO: "btn-primary",
-    Producao.STATUS_EM_ELABORACAO: "btn-primary",
     Producao.STATUS_PARA_REVISAO: "btn-warning",
     Producao.STATUS_PARA_AJUSTES: "btn-warning btn-ajustes",
+    Producao.STATUS_HOMOLOGAR: "btn-primary",
     Producao.STATUS_HOMOLOGADO: "btn-success",
+    Producao.STATUS_ENVIADO: "btn-success",
     Producao.STATUS_CANCELADO: "btn-danger",
 }
 
@@ -3610,7 +3704,7 @@ STATUS_PRODUCAO_BOTAO_CLASSES = {
 def _justificativa_obrigatoria_status(status_atual, status_novo):
     if status_novo == Producao.STATUS_CANCELADO:
         return True
-    if status_novo == Producao.STATUS_EM_ELABORACAO and status_atual in (
+    if status_novo == Producao.STATUS_DISTRIBUIDO and status_atual in (
         Producao.STATUS_PARA_REVISAO,
         Producao.STATUS_PARA_AJUSTES,
     ):
@@ -4099,6 +4193,12 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             campos_atualizar.append("revisor")
 
         self.producao_obj.status = status_novo
+        if status_novo == Producao.STATUS_PARA_REVISAO:
+            self.producao_obj.numero_revisao += 1
+            campos_atualizar.append("numero_revisao")
+        if status_novo == Producao.STATUS_PARA_AJUSTES:
+            self.producao_obj.numero_ajustes += 1
+            campos_atualizar.append("numero_ajustes")
         self.producao_obj.save(update_fields=campos_atualizar)
 
         hoje = timezone.localdate()

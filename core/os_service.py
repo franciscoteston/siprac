@@ -1,17 +1,70 @@
 from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.utils import timezone
 
-from core.models import Encaminhamento, OS, Producao, TarefaInterna
+from core.models import Encaminhamento, OS, OsUnidadeStatus, Producao, TarefaInterna
 
 CHAVE_ENTRADA_DIVISAO = "Entrada na Divisão"
 
 STATUS_ATIVOS = [
     Producao.STATUS_ENTRADA,
     Producao.STATUS_DISTRIBUIDO,
-    Producao.STATUS_EM_ELABORACAO,
     Producao.STATUS_PARA_REVISAO,
     Producao.STATUS_PARA_AJUSTES,
+    Producao.STATUS_HOMOLOGAR,
 ]
+
+
+def _atualizar_status_unidade_encaminhamento(
+    os,
+    unidade_origem,
+    servidor,
+    manter_aberta,
+    unidade_destino=None,
+):
+    """
+    Ao encaminhar:
+    - Se manter_aberta=False: conclui a OS na unidade de origem
+    - Se manter_aberta=True: mantém aberta
+    - Cria/atualiza OsUnidadeStatus da unidade destino como ABERTA
+    """
+    if unidade_origem and not manter_aberta:
+        status_origem, _ = OsUnidadeStatus.objects.get_or_create(
+            os=os,
+            unidade=unidade_origem,
+            defaults={"aberta_por": servidor},
+        )
+        if status_origem.status in ("ABERTA", "REABERTA"):
+            status_origem.status = "CONCLUIDA"
+            status_origem.data_conclusao = timezone.now()
+            status_origem.concluida_por = servidor
+            status_origem.manter_aberta = False
+            status_origem.save()
+    elif unidade_origem and manter_aberta:
+        status_origem, _ = OsUnidadeStatus.objects.get_or_create(
+            os=os,
+            unidade=unidade_origem,
+            defaults={"aberta_por": servidor, "status": "ABERTA"},
+        )
+        status_origem.manter_aberta = True
+        if status_origem.status not in ("ABERTA", "REABERTA"):
+            status_origem.status = "ABERTA"
+            status_origem.data_conclusao = None
+            status_origem.aberta_por = servidor
+        status_origem.save()
+
+    if unidade_destino:
+        status_destino, criado = OsUnidadeStatus.objects.get_or_create(
+            os=os,
+            unidade=unidade_destino,
+            defaults={"aberta_por": servidor, "status": "ABERTA"},
+        )
+        if not criado and status_destino.status != "ABERTA":
+            status_destino.status = "ABERTA"
+            status_destino.data_conclusao = None
+            status_destino.aberta_por = servidor
+            status_destino.save(
+                update_fields=["status", "data_conclusao", "aberta_por"],
+            )
 
 
 def registrar_encaminhamento_automatico(os, tipo_macroetapa, servidor=None, observacao=None):
@@ -224,9 +277,11 @@ def contar_producoes_por_status_unidades(unidades_ids):
     resultado = {
         "ENTRADA": 0,
         "DISTRIBUIDO": 0,
-        "EM_ELABORACAO": 0,
         "PARA_REVISAO": 0,
         "PARA_AJUSTES": 0,
+        "HOMOLOGAR": 0,
+        "HOMOLOGADO": 0,
+        "ENVIADO": 0,
         "HOMOLOGADO_MES": 0,
     }
 
@@ -382,7 +437,7 @@ def os_ativas_por_unidade():
         os_ids_grupo = dados.pop("_os_ids")
         producoes = Producao.objects.filter(os_id__in=os_ids_grupo)
         dados["em_elaboracao"] = producoes.filter(
-            status=Producao.STATUS_EM_ELABORACAO,
+            status=Producao.STATUS_DISTRIBUIDO,
         ).count()
         dados["para_revisao"] = producoes.filter(
             status=Producao.STATUS_PARA_REVISAO,
@@ -425,9 +480,11 @@ def contar_producoes_por_os_ids(os_ids):
     resultado = {
         "ENTRADA": 0,
         "DISTRIBUIDO": 0,
-        "EM_ELABORACAO": 0,
         "PARA_REVISAO": 0,
         "PARA_AJUSTES": 0,
+        "HOMOLOGAR": 0,
+        "HOMOLOGADO": 0,
+        "ENVIADO": 0,
         "HOMOLOGADO_MES": 0,
     }
 
@@ -481,7 +538,7 @@ def itens_pendentes_usuario(servidor):
     Retorna contagem de itens pendentes para o servidor logado.
     - os_novas: OSs encaminhadas para a unidade do servidor após seu último login
     - producoes_pendentes: produções onde servidor_responsavel=servidor
-      com status em EM_ELABORACAO, PARA_REVISAO ou PARA_AJUSTES
+      com status em DISTRIBUIDO, PARA_REVISAO ou PARA_AJUSTES
     - revisoes_pendentes: produções em PARA_REVISAO na unidade do servidor
       (apenas para perfis com pode_homologar=True)
     """
@@ -501,7 +558,11 @@ def itens_pendentes_usuario(servidor):
 
     producoes_pendentes = Producao.objects.filter(
         servidor_responsavel=servidor,
-        status__in=["EM_ELABORACAO", "PARA_AJUSTES"],
+        status__in=[
+            Producao.STATUS_DISTRIBUIDO,
+            Producao.STATUS_PARA_AJUSTES,
+            Producao.STATUS_PARA_REVISAO,
+        ],
     ).count()
 
     revisoes_pendentes = 0

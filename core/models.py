@@ -620,6 +620,10 @@ class Encaminhamento(models.Model):
     data_retorno_efetiva = models.DateField(null=True, blank=True)
     data_hora = models.DateTimeField(auto_now_add=True)
     observacao = models.TextField(null=True, blank=True)
+    manter_aberta_na_unidade = models.BooleanField(
+        default=False,
+        verbose_name="Manter aberta na unidade de origem",
+    )
 
     class Meta:
         db_table = "ENCAMINHAMENTO"
@@ -666,6 +670,63 @@ class TarefaInterna(models.Model):
 
     def __str__(self):
         return f"{self.os} — {self.etapa_interna} ({self.status})"
+
+
+class OsUnidadeStatus(models.Model):
+    STATUS_CHOICES = [
+        ("ABERTA", "Aberta"),
+        ("CONCLUIDA", "Concluída na unidade"),
+        ("REABERTA", "Reaberta"),
+        ("SOMENTE_LEITURA", "Somente leitura"),
+    ]
+    os = models.ForeignKey(
+        "OS",
+        on_delete=models.CASCADE,
+        related_name="status_unidades",
+        verbose_name="OS",
+    )
+    unidade = models.ForeignKey(
+        "UnidadeInterna",
+        on_delete=models.PROTECT,
+        related_name="status_os",
+        verbose_name="Unidade",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="ABERTA",
+        verbose_name="Status",
+    )
+    data_abertura = models.DateTimeField(auto_now_add=True)
+    data_conclusao = models.DateTimeField(null=True, blank=True)
+    aberta_por = models.ForeignKey(
+        "Servidor",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="os_abertas_unidade",
+    )
+    concluida_por = models.ForeignKey(
+        "Servidor",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="os_concluidas_unidade",
+    )
+    manter_aberta = models.BooleanField(
+        default=False,
+        verbose_name="Manter aberta ao encaminhar",
+    )
+    observacao = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "os_unidade_status"
+        unique_together = [("os", "unidade")]
+        verbose_name = "Status da OS na unidade"
+        verbose_name_plural = "Status das OSs nas unidades"
+
+    def __str__(self):
+        return f"{self.os} — {self.unidade} ({self.get_status_display()})"
 
 
 class OsImovel(models.Model):
@@ -771,19 +832,21 @@ class Producao(models.Model):
 
     STATUS_ENTRADA = "ENTRADA"
     STATUS_DISTRIBUIDO = "DISTRIBUIDO"
-    STATUS_EM_ELABORACAO = "EM_ELABORACAO"
     STATUS_PARA_REVISAO = "PARA_REVISAO"
     STATUS_PARA_AJUSTES = "PARA_AJUSTES"
+    STATUS_HOMOLOGAR = "HOMOLOGAR"
     STATUS_HOMOLOGADO = "HOMOLOGADO"
+    STATUS_ENVIADO = "ENVIADO"
     STATUS_CANCELADO = "CANCELADO"
 
     STATUS_CHOICES = [
-        (STATUS_ENTRADA, "Entrada"),
+        (STATUS_ENTRADA, "Não distribuído"),
         (STATUS_DISTRIBUIDO, "Distribuído"),
-        (STATUS_EM_ELABORACAO, "Em elaboração"),
         (STATUS_PARA_REVISAO, "Para revisão"),
         (STATUS_PARA_AJUSTES, "Para ajustes"),
+        (STATUS_HOMOLOGAR, "Homologar"),
         (STATUS_HOMOLOGADO, "Homologado"),
+        (STATUS_ENVIADO, "Enviado"),
         (STATUS_CANCELADO, "Cancelado"),
     ]
 
@@ -804,6 +867,14 @@ class Producao(models.Model):
         max_length=20,
         choices=STATUS_CHOICES,
         default=STATUS_ENTRADA,
+    )
+    numero_revisao = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Nº de revisões",
+    )
+    numero_ajustes = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Nº de ajustes",
     )
     servidor_responsavel = models.ForeignKey(
         Servidor,

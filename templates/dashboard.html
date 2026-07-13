@@ -182,7 +182,7 @@
     </a>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <a href="{% url 'producao_list' %}?status=EM_ELABORACAO" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body">
           <p class="card-text text-muted mb-1">Em elaboração</p>
@@ -291,11 +291,11 @@
     </a>
   </div>
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=EM_ELABORACAO&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO&responsavel=eu" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
           <p class="card-text text-muted small mb-1">Em elaboração</p>
-          <p class="mb-0"><span class="badge bg-primary fs-6">{{ producoes_minha_por_status.EM_ELABORACAO }}</span></p>
+          <p class="mb-0"><span class="badge bg-primary fs-6">{{ producoes_minha_por_status.DISTRIBUIDO }}</span></p>
         </div>
       </div>
     </a>

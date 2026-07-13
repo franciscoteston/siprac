@@ -64,6 +64,9 @@
           </div>
         </div>
         <div class="col-12">{{ form.observacao|as_crispy_field }}</div>
+        {% if mostrar_manter_aberta %}
+        <div class="col-12">{{ form.manter_aberta_na_unidade|as_crispy_field }}</div>
+        {% endif %}
       </div>
     </div>
   </div>

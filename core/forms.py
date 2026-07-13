@@ -239,6 +239,11 @@ class EncaminhamentoForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+    manter_aberta_na_unidade = forms.BooleanField(
+        label="Manter aberta nesta unidade ao encaminhar",
+        required=False,
+        initial=False,
+    )
 
     def clean(self):
         cleaned_data = super().clean()
