@@ -90,7 +90,7 @@
               {% if producao.autor_trabalho %}{{ producao.autor_trabalho.nome }}{% else %}—{% endif %}
             </td>
             <td class="small">
-              {% if producao.data_homologacao %}{{ producao.data_homologacao|date:"d/m/Y" }}{% else %}—{% endif %}
+              {% if producao.data_enviado %}{{ producao.data_enviado|date:"d/m/Y" }}{% else %}—{% endif %}
             </td>
           </tr>
           {% empty %}

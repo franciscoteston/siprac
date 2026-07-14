@@ -21,9 +21,9 @@
         {{ producao.status|status_producao_display }}
       </span>
       <span class="text-muted small">{{ producao.data_criacao|date:"d/m/Y H:i" }}</span>
-      {% if producao.status == 'HOMOLOGADO' and producao.data_homologacao %}
+      {% if producao.status == 'ENVIADO' and producao.data_enviado %}
       <span class="text-muted small">
-        · Homologado em {{ producao.data_homologacao|date:"d/m/Y" }}
+        · Enviado em {{ producao.data_enviado|date:"d/m/Y" }}
         {% if producao.homologado_por %} por {{ producao.homologado_por.nome }}{% endif %}
       </span>
       {% endif %}
@@ -102,15 +102,15 @@
       {% endif %}
       <dt class="col-sm-3">Autor do trabalho</dt>
       <dd class="col-sm-9">
-        {% if producao.status == 'HOMOLOGADO' and producao.autor_trabalho %}
+        {% if producao.status == 'ENVIADO' and producao.autor_trabalho %}
           {{ producao.autor_trabalho.nome }}
         {% else %}—{% endif %}
       </dd>
       <dt class="col-sm-3">Homologado por</dt>
       <dd class="col-sm-9">
-        {% if producao.status == 'HOMOLOGADO' and producao.homologado_por %}
+        {% if producao.status == 'ENVIADO' and producao.homologado_por %}
           {{ producao.homologado_por.nome }}
-          {% if producao.data_homologacao %} · {{ producao.data_homologacao|date:"d/m/Y" }}{% endif %}
+          {% if producao.data_enviado %} · {{ producao.data_enviado|date:"d/m/Y" }}{% endif %}
         {% else %}—{% endif %}
       </dd>
       <dt class="col-sm-3">Prazo interno</dt>
@@ -237,14 +237,94 @@
       </dd>
       {% endif %}
 
-      {% if pode_homologar or producao.data_homologacao %}
-      <dt class="col-sm-4">Data de homologação</dt>
-      <dd class="col-sm-8" id="display-data-homologacao">
-        {% if producao.data_homologacao %}{{ producao.data_homologacao|date:"d/m/Y" }}{% else %}—{% endif %}
+      {% if pode_homologar or producao.data_ajustes_ok %}
+      <dt class="col-sm-4">Data de ajustes OK</dt>
+      <dd class="col-sm-8">
+        {% if pode_homologar %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="date"
+                 id="data-ajustes-ok-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 180px"
+                 value="{% if producao.data_ajustes_ok %}{{ producao.data_ajustes_ok|date:'Y-m-d' }}{% endif %}">
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
+                  data-campo="data_ajustes_ok"
+                  data-input="data-ajustes-ok-input"
+                  data-display="display-data-ajustes-ok"
+                  data-erro="erro-data-ajustes-ok">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-data-ajustes-ok"></div>
+        <span class="d-none" id="display-data-ajustes-ok">
+          {% if producao.data_ajustes_ok %}{{ producao.data_ajustes_ok|date:"d/m/Y" }}{% else %}—{% endif %}
+        </span>
+        {% elif producao.data_ajustes_ok %}
+          {{ producao.data_ajustes_ok|date:"d/m/Y" }}
+        {% endif %}
+      </dd>
+      {% endif %}
+
+      {% if pode_homologar or producao.data_homologar %}
+      <dt class="col-sm-4">Data apto à homologação</dt>
+      <dd class="col-sm-8">
+        {% if pode_homologar %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="date"
+                 id="data-homologar-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 180px"
+                 value="{% if producao.data_homologar %}{{ producao.data_homologar|date:'Y-m-d' }}{% endif %}">
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
+                  data-campo="data_homologar"
+                  data-input="data-homologar-input"
+                  data-display="display-data-homologar"
+                  data-erro="erro-data-homologar">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-data-homologar"></div>
+        <span class="d-none" id="display-data-homologar">
+          {% if producao.data_homologar %}{{ producao.data_homologar|date:"d/m/Y" }}{% else %}—{% endif %}
+        </span>
+        {% elif producao.data_homologar %}
+          {{ producao.data_homologar|date:"d/m/Y" }}
+        {% endif %}
+      </dd>
+      {% endif %}
+
+      {% if pode_homologar or producao.data_enviado %}
+      <dt class="col-sm-4">Data de envio ao SEI</dt>
+      <dd class="col-sm-8">
+        {% if pode_homologar %}
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <input type="date"
+                 id="data-enviado-input"
+                 class="form-control form-control-sm"
+                 style="max-width: 180px"
+                 value="{% if producao.data_enviado %}{{ producao.data_enviado|date:'Y-m-d' }}{% endif %}">
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
+                  data-campo="data_enviado"
+                  data-input="data-enviado-input"
+                  data-display="display-data-enviado"
+                  data-erro="erro-data-enviado">
+            Salvar
+          </button>
+        </div>
+        <div class="text-danger small mt-1 d-none" id="erro-data-enviado"></div>
+        <span class="d-none" id="display-data-enviado">
+          {% if producao.data_enviado %}{{ producao.data_enviado|date:"d/m/Y" }}{% else %}—{% endif %}
+        </span>
+        {% elif producao.data_enviado %}
+          {{ producao.data_enviado|date:"d/m/Y" }}
+        {% endif %}
       </dd>
       {% endif %}
     </dl>
-    {% if not pode_homologar and not producao.data_entrega_avaliacao and not producao.data_entrega_revisao and not producao.data_entrega_ajustes and not producao.data_homologacao %}
+    {% if not pode_homologar and not producao.data_entrega_avaliacao and not producao.data_entrega_revisao and not producao.data_entrega_ajustes and not producao.data_ajustes_ok and not producao.data_homologar and not producao.data_enviado %}
     <p class="text-muted small mb-0">Nenhuma data registrada.</p>
     {% endif %}
   </div>
@@ -434,7 +514,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var STATUS_DISTRIBUIDO = 'DISTRIBUIDO';
-  var STATUS_HOMOLOGADO = 'HOMOLOGADO';
+  var STATUS_ENVIADO = 'ENVIADO';
   var statusUrl = '{% url "producao_alterar_status" producao.pk %}';
 
   function atualizarTabelaStatus(logs) {
@@ -483,7 +563,7 @@ document.addEventListener('DOMContentLoaded', function () {
     campoAutor.classList.add('d-none');
     if (destino === STATUS_DISTRIBUIDO) {
       campoServidor.classList.remove('d-none');
-    } else if (destino === STATUS_HOMOLOGADO) {
+    } else if (destino === STATUS_ENVIADO) {
       campoAutor.classList.remove('d-none');
     }
 

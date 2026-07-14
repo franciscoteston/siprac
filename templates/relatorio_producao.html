@@ -72,7 +72,7 @@
             <td>{{ linha.numero_os }}</td>
             <td>{{ linha.natureza }}</td>
             <td>{{ linha.processo_sei }}</td>
-            <td>{% if linha.data_homologacao %}{{ linha.data_homologacao|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+            <td>{% if linha.data_enviado %}{{ linha.data_enviado|date:"d/m/Y" }}{% else %}—{% endif %}</td>
             <td>{{ linha.homologado_por }}</td>
             <td>{{ linha.unidade }}</td>
           </tr>

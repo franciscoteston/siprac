@@ -6,10 +6,10 @@ from core.models import Encaminhamento, OS, OsUnidadeStatus, Producao, TarefaInt
 CHAVE_ENTRADA_DIVISAO = "Entrada na Divisão"
 
 STATUS_ATIVOS = [
-    Producao.STATUS_ENTRADA,
+    Producao.STATUS_NAO_DISTRIBUIDO,
     Producao.STATUS_DISTRIBUIDO,
-    Producao.STATUS_PARA_REVISAO,
-    Producao.STATUS_PARA_AJUSTES,
+    Producao.STATUS_REVISAR,
+    Producao.STATUS_VER_AJUSTES,
     Producao.STATUS_HOMOLOGAR,
 ]
 
@@ -275,12 +275,14 @@ def contar_producoes_por_status_unidades(unidades_ids):
     """Contagem de produções por status para OS das unidades informadas."""
     hoje = timezone.localdate()
     resultado = {
-        "ENTRADA": 0,
+        "NAO_DISTRIBUIDO": 0,
         "DISTRIBUIDO": 0,
-        "PARA_REVISAO": 0,
-        "PARA_AJUSTES": 0,
+        "REVISAR": 0,
+        "REVISADO": 0,
+        "VER_AJUSTES": 0,
+        "ENTREGA_AJUSTES": 0,
+        "AJUSTES_OK": 0,
         "HOMOLOGAR": 0,
-        "HOMOLOGADO": 0,
         "ENVIADO": 0,
         "HOMOLOGADO_MES": 0,
     }
@@ -313,9 +315,9 @@ def contar_producoes_por_status_unidades(unidades_ids):
             resultado[item["status"]] = item["total"]
 
     resultado["HOMOLOGADO_MES"] = queryset.filter(
-        status=Producao.STATUS_HOMOLOGADO,
-        data_homologacao__year=hoje.year,
-        data_homologacao__month=hoje.month,
+        status=Producao.STATUS_ENVIADO,
+        data_enviado__year=hoje.year,
+        data_enviado__month=hoje.month,
     ).count()
 
     return resultado
@@ -440,12 +442,12 @@ def os_ativas_por_unidade():
             status=Producao.STATUS_DISTRIBUIDO,
         ).count()
         dados["para_revisao"] = producoes.filter(
-            status=Producao.STATUS_PARA_REVISAO,
+            status=Producao.STATUS_REVISAR,
         ).count()
         dados["homologadas_mes"] = producoes.filter(
-            status=Producao.STATUS_HOMOLOGADO,
-            data_homologacao__year=hoje.year,
-            data_homologacao__month=hoje.month,
+            status=Producao.STATUS_ENVIADO,
+            data_enviado__year=hoje.year,
+            data_enviado__month=hoje.month,
         ).count()
         resultado.append(dados)
 
@@ -478,12 +480,14 @@ def contar_producoes_por_os_ids(os_ids):
     """Contagem de produções por status para as OS informadas."""
     hoje = timezone.localdate()
     resultado = {
-        "ENTRADA": 0,
+        "NAO_DISTRIBUIDO": 0,
         "DISTRIBUIDO": 0,
-        "PARA_REVISAO": 0,
-        "PARA_AJUSTES": 0,
+        "REVISAR": 0,
+        "REVISADO": 0,
+        "VER_AJUSTES": 0,
+        "ENTREGA_AJUSTES": 0,
+        "AJUSTES_OK": 0,
         "HOMOLOGAR": 0,
-        "HOMOLOGADO": 0,
         "ENVIADO": 0,
         "HOMOLOGADO_MES": 0,
     }
@@ -500,9 +504,9 @@ def contar_producoes_por_os_ids(os_ids):
             resultado[item["status"]] = item["total"]
 
     resultado["HOMOLOGADO_MES"] = queryset.filter(
-        status=Producao.STATUS_HOMOLOGADO,
-        data_homologacao__year=hoje.year,
-        data_homologacao__month=hoje.month,
+        status=Producao.STATUS_ENVIADO,
+        data_enviado__year=hoje.year,
+        data_enviado__month=hoje.month,
     ).count()
 
     return resultado
@@ -560,8 +564,8 @@ def itens_pendentes_usuario(servidor):
         servidor_responsavel=servidor,
         status__in=[
             Producao.STATUS_DISTRIBUIDO,
-            Producao.STATUS_PARA_AJUSTES,
-            Producao.STATUS_PARA_REVISAO,
+            Producao.STATUS_VER_AJUSTES,
+            Producao.STATUS_REVISAR,
         ],
     ).count()
 
@@ -573,7 +577,7 @@ def itens_pendentes_usuario(servidor):
     if perfil and perfil.perfil.pode_homologar:
         revisoes_pendentes = Producao.objects.filter(
             os__os_imoveis__isnull=False,
-            status="PARA_REVISAO",
+            status="REVISAR",
         ).filter(
             os__encaminhamentos__unidade_interna_destino_id__in=vinculos_ativos
         ).distinct().count()

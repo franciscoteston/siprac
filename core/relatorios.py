@@ -159,7 +159,7 @@ def relatorio_producao_por_servidor(filtros):
     Retorna queryset de Producao com select_related.
     """
     qs = (
-        Producao.objects.filter(status=Producao.STATUS_HOMOLOGADO)
+        Producao.objects.filter(status=Producao.STATUS_ENVIADO)
         .select_related(
             "tipo_producao",
             "os",
@@ -168,15 +168,15 @@ def relatorio_producao_por_servidor(filtros):
             "servidor_responsavel",
             "homologado_por",
         )
-        .order_by("autor_trabalho__nome", "data_homologacao")
+        .order_by("autor_trabalho__nome", "data_enviado")
     )
 
     if filtros.get("servidor_id"):
         qs = qs.filter(autor_trabalho__id=filtros["servidor_id"])
     if filtros.get("data_inicio"):
-        qs = qs.filter(data_homologacao__gte=filtros["data_inicio"])
+        qs = qs.filter(data_enviado__gte=filtros["data_inicio"])
     if filtros.get("data_fim"):
-        qs = qs.filter(data_homologacao__lte=filtros["data_fim"])
+        qs = qs.filter(data_enviado__lte=filtros["data_fim"])
     if filtros.get("tipo_producao_id"):
         qs = qs.filter(tipo_producao__id=filtros["tipo_producao_id"])
     if filtros.get("unidade_id"):
@@ -218,7 +218,7 @@ def linhas_relatorio_producao(queryset):
                     if processo_principal and processo_principal.processo_sei
                     else "—"
                 ),
-                "data_homologacao": producao.data_homologacao,
+                "data_enviado": producao.data_enviado,
                 "homologado_por": (
                     producao.homologado_por.nome if producao.homologado_por else "—"
                 ),
@@ -330,8 +330,8 @@ def exportar_producao_excel(queryset):
             row=row,
             column=7,
             value=(
-                producao.data_homologacao.strftime("%d/%m/%Y")
-                if producao.data_homologacao
+                producao.data_enviado.strftime("%d/%m/%Y")
+                if producao.data_enviado
                 else "—"
             ),
         )

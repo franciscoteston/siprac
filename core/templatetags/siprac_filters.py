@@ -46,26 +46,39 @@ def macroetapa_display(value):
 
 
 STATUS_PRODUCAO_LABELS = {
-    "ENTRADA": "Não distribuído",
+    "NAO_DISTRIBUIDO": "Não distribuído",
     "DISTRIBUIDO": "Distribuído",
-    "PARA_REVISAO": "Para revisão",
-    "PARA_AJUSTES": "Para ajustes",
+    "REVISAR": "Revisar",
+    "REVISADO": "Revisado",
+    "VER_AJUSTES": "Ver ajustes",
+    "ENTREGA_AJUSTES": "Entrega de ajustes",
+    "AJUSTES_OK": "Ajustes OK",
     "HOMOLOGAR": "Homologar",
-    "HOMOLOGADO": "Homologado",
     "ENVIADO": "Enviado",
     "CANCELADO": "Cancelado",
+    # Legados (histórico / logs)
+    "ENTRADA": "Não distribuído",
+    "PARA_REVISAO": "Para revisão",
+    "PARA_AJUSTES": "Para ajustes",
+    "HOMOLOGADO": "Homologado",
     "EM_ELABORACAO": "Em elaboração",
 }
 
 STATUS_PRODUCAO_CORES = {
-    "ENTRADA": "secondary",
+    "NAO_DISTRIBUIDO": "secondary",
     "DISTRIBUIDO": "info",
-    "PARA_REVISAO": "warning",
-    "PARA_AJUSTES": "warning",
+    "REVISAR": "warning",
+    "REVISADO": "info",
+    "VER_AJUSTES": "warning",
+    "ENTREGA_AJUSTES": "warning",
+    "AJUSTES_OK": "success",
     "HOMOLOGAR": "primary",
-    "HOMOLOGADO": "success",
     "ENVIADO": "success",
     "CANCELADO": "danger",
+    "ENTRADA": "secondary",
+    "PARA_REVISAO": "warning",
+    "PARA_AJUSTES": "warning",
+    "HOMOLOGADO": "success",
     "EM_ELABORACAO": "primary",
 }
 

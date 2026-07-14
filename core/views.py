@@ -130,7 +130,6 @@ PRIORIDADE_OS_LABELS = {
 }
 
 STATUS_PRODUCAO_FINAL = [
-    Producao.STATUS_HOMOLOGADO,
     Producao.STATUS_ENVIADO,
     Producao.STATUS_CANCELADO,
 ]
@@ -178,10 +177,10 @@ def _contexto_dashboard_vazio():
         "os_por_natureza": [],
         "producoes_unidade_por_status": contar_producoes_por_status_unidades([]),
         "producoes_minha_por_status": {
-            "ENTRADA": 0,
+            "NAO_DISTRIBUIDO": 0,
             "DISTRIBUIDO": 0,
-            "PARA_REVISAO": 0,
-            "PARA_AJUSTES": 0,
+            "REVISAR": 0,
+            "VER_AJUSTES": 0,
             "HOMOLOGAR": 0,
             "HOMOLOGADO_MES": 0,
         },
@@ -202,7 +201,7 @@ def _producoes_pendentes_os(os):
         Producao.objects.filter(os=os)
         .exclude(
             status__in=[
-                Producao.STATUS_HOMOLOGADO,
+                Producao.STATUS_ENVIADO,
                 Producao.STATUS_ENVIADO,
                 Producao.STATUS_CANCELADO,
             ],
@@ -384,9 +383,9 @@ def _obter_os_aguardando_retorno():
 def _obter_producao_por_tipo_mes(os_ids=None):
     hoje = timezone.localdate()
     queryset = Producao.objects.filter(
-        status=Producao.STATUS_HOMOLOGADO,
-        data_homologacao__year=hoje.year,
-        data_homologacao__month=hoje.month,
+        status=Producao.STATUS_ENVIADO,
+        data_enviado__year=hoje.year,
+        data_enviado__month=hoje.month,
     )
     if os_ids is not None:
         if not os_ids:
@@ -415,9 +414,9 @@ def _obter_producao_por_semana(os_ids=None):
         semana_inicio = inicio + datetime.timedelta(days=7 * indice)
         semana_fim = semana_inicio + datetime.timedelta(days=6)
         queryset = Producao.objects.filter(
-            status=Producao.STATUS_HOMOLOGADO,
-            data_homologacao__gte=semana_inicio,
-            data_homologacao__lte=semana_fim,
+            status=Producao.STATUS_ENVIADO,
+            data_enviado__gte=semana_inicio,
+            data_enviado__lte=semana_fim,
         )
         if os_ids is not None:
             if not os_ids:
@@ -433,9 +432,9 @@ def _obter_producao_por_semana(os_ids=None):
 def _contar_producao_homologada_mes(os_ids=None):
     hoje = timezone.localdate()
     queryset = Producao.objects.filter(
-        status=Producao.STATUS_HOMOLOGADO,
-        data_homologacao__year=hoje.year,
-        data_homologacao__month=hoje.month,
+        status=Producao.STATUS_ENVIADO,
+        data_enviado__year=hoje.year,
+        data_enviado__month=hoje.month,
     )
     if os_ids is not None:
         if not os_ids:
@@ -584,9 +583,9 @@ def _serializar_minha_fila_padronizada(queryset):
 
 def _statuses_chefia_fila(perfil):
     if perfil and perfil.visibilidade_total:
-        return [Producao.STATUS_PARA_REVISAO]
+        return [Producao.STATUS_REVISAR]
     if perfil and perfil.pode_homologar:
-        return [Producao.STATUS_PARA_REVISAO, Producao.STATUS_PARA_AJUSTES]
+        return [Producao.STATUS_REVISAR, Producao.STATUS_VER_AJUSTES]
     return []
 
 
@@ -648,10 +647,10 @@ def _obter_fila_unidade(unidade):
 def _contar_producoes_minhas_por_status(servidor):
     hoje = timezone.localdate()
     resultado = {
-        "ENTRADA": 0,
+        "NAO_DISTRIBUIDO": 0,
         "DISTRIBUIDO": 0,
-        "PARA_REVISAO": 0,
-        "PARA_AJUSTES": 0,
+        "REVISAR": 0,
+        "VER_AJUSTES": 0,
         "HOMOLOGAR": 0,
         "HOMOLOGADO_MES": 0,
     }
@@ -663,9 +662,9 @@ def _contar_producoes_minhas_por_status(servidor):
             resultado[item["status"]] = item["total"]
 
     resultado["HOMOLOGADO_MES"] = queryset.filter(
-        status=Producao.STATUS_HOMOLOGADO,
-        data_homologacao__year=hoje.year,
-        data_homologacao__month=hoje.month,
+        status=Producao.STATUS_ENVIADO,
+        data_enviado__year=hoje.year,
+        data_enviado__month=hoje.month,
     ).count()
     return resultado
 
@@ -725,8 +724,8 @@ def _contexto_dashboard_unidade(servidor, unidades_ids, perfil):
         ),
         "card_em_elaboracao": producoes_unidade.get("DISTRIBUIDO", 0),
         "card_para_revisao_ajustes": (
-            producoes_unidade.get("PARA_REVISAO", 0)
-            + producoes_unidade.get("PARA_AJUSTES", 0)
+            producoes_unidade.get("REVISAR", 0)
+            + producoes_unidade.get("VER_AJUSTES", 0)
         ),
         "card_producao_mes": producoes_unidade.get("HOMOLOGADO_MES", 0),
     }
@@ -1046,7 +1045,7 @@ def _queryset_os_anotado():
     producao_ativa = Producao.objects.filter(
         os_id=OuterRef("pk"),
     ).exclude(
-        status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
+        status__in=[Producao.STATUS_ENVIADO, Producao.STATUS_CANCELADO],
     ).order_by("-data_criacao")
 
     base = OS.objects.select_related("natureza")
@@ -1162,9 +1161,9 @@ def _aplicar_filtros_producao(queryset, request):
     if periodo == "mes_atual":
         hoje = timezone.localdate()
         queryset = queryset.filter(
-            data_homologacao__year=hoje.year,
-            data_homologacao__month=hoje.month,
-            status=Producao.STATUS_HOMOLOGADO,
+            data_enviado__year=hoje.year,
+            data_enviado__month=hoje.month,
+            status=Producao.STATUS_ENVIADO,
         )
 
     unidade_sigla = request.GET.get("unidade", "").strip()
@@ -1484,8 +1483,9 @@ COLUNAS_GERENCIAL_CONFIG = {
     "revisor": {"label": "REVISOR"},
     "entrega_rev": {"label": "ENTREGA_REV"},
     "entrega_aju": {"label": "ENTREGA_AJU"},
-    "ajustes_ok": {"label": "AJUSTES_OK"},
-    "envio_sei": {"label": "ENVIO_SEI"},
+    "data_ajustes_ok": {"label": "AJUSTES_OK"},
+    "data_homologar": {"label": "HOMOLOGAR"},
+    "enviado": {"label": "ENVIADO"},
     "la_pt_ptf": {"label": "LA_PT_PTF"},
     "tipo_trabalho": {"label": "TIPO_TRABALHO"},
     "doc_sei": {"label": "DOC_SEI"},
@@ -1534,8 +1534,9 @@ GRUPOS_COLUNAS_GERENCIAL = [
             "revisor",
             "entrega_rev",
             "entrega_aju",
-            "ajustes_ok",
-            "envio_sei",
+            "data_ajustes_ok",
+            "data_homologar",
+            "enviado",
         ],
     ),
     (
@@ -1565,8 +1566,9 @@ COLUNAS_GERENCIAL_NOVAS = {
     "revisor",
     "entrega_rev",
     "entrega_aju",
-    "ajustes_ok",
-    "envio_sei",
+    "data_ajustes_ok",
+    "data_homologar",
+    "enviado",
     "la_pt_ptf",
     "doc_sei",
     "destino",
@@ -1599,8 +1601,9 @@ COLUNAS_GERENCIAL_PADRAO = [
     "revisor",
     "entrega_rev",
     "entrega_aju",
-    "ajustes_ok",
-    "envio_sei",
+    "data_ajustes_ok",
+    "data_homologar",
+    "enviado",
     "tipo_trabalho",
     "prazo_eav",
     "dias_sei",
@@ -1610,12 +1613,14 @@ COLUNAS_GERENCIAL_PADRAO = [
 ]
 
 STATUS_GERENCIAL_CARDS = [
-    Producao.STATUS_ENTRADA,
+    Producao.STATUS_NAO_DISTRIBUIDO,
     Producao.STATUS_DISTRIBUIDO,
-    Producao.STATUS_PARA_REVISAO,
-    Producao.STATUS_PARA_AJUSTES,
+    Producao.STATUS_REVISAR,
+    Producao.STATUS_REVISADO,
+    Producao.STATUS_VER_AJUSTES,
+    Producao.STATUS_ENTREGA_AJUSTES,
+    Producao.STATUS_AJUSTES_OK,
     Producao.STATUS_HOMOLOGAR,
-    Producao.STATUS_HOMOLOGADO,
     Producao.STATUS_ENVIADO,
 ]
 
@@ -1726,12 +1731,12 @@ def _formatar_decimal_br(valor):
 
 
 def _destino_pos_homologacao(os_obj, producao):
-    if not producao or not producao.data_homologacao:
+    if not producao or not producao.data_enviado:
         return "—"
     enc = (
         Encaminhamento.objects.filter(
             os=os_obj,
-            data_hora__date__gte=producao.data_homologacao,
+            data_hora__date__gte=producao.data_enviado,
         )
         .select_related("unidade_externa_destino", "unidade_interna_destino")
         .order_by("-data_hora")
@@ -1764,12 +1769,14 @@ def _label_status_producao_gerencial(status):
 
 def _cor_status_producao_gerencial(status):
     return {
-        "ENTRADA": "secondary",
+        "NAO_DISTRIBUIDO": "secondary",
         "DISTRIBUIDO": "info",
-        "PARA_REVISAO": "warning",
-        "PARA_AJUSTES": "warning",
+        "REVISAR": "warning",
+        "REVISADO": "info",
+        "VER_AJUSTES": "warning",
+        "ENTREGA_AJUSTES": "warning",
+        "AJUSTES_OK": "success",
         "HOMOLOGAR": "primary",
-        "HOMOLOGADO": "success",
         "ENVIADO": "success",
         "CANCELADO": "danger",
     }.get(status, "secondary")
@@ -1820,13 +1827,14 @@ def _campos_vazios_gerencial():
         "entrega_aval": "—",
         "entrega_rev": "—",
         "entrega_aju": "—",
-        "envio_sei": "—",
+        "data_ajustes_ok": "—",
+        "data_homologar": "—",
+        "enviado": "—",
         "la_pt_ptf": "—",
         "tipo_trabalho": "—",
         "doc_sei": "—",
         "destino": "—",
         "prazo_recompra_itbi": "—",
-        "ajustes_ok": "—",
         "producao_pk": None,
         "tem_producao": False,
     }
@@ -1920,8 +1928,9 @@ def _montar_cells_gerencial(linha):
         "revisor": linha.get("revisor", "—"),
         "entrega_rev": linha.get("entrega_rev", "—"),
         "entrega_aju": linha.get("entrega_aju", "—"),
-        "ajustes_ok": linha.get("ajustes_ok", "—"),
-        "envio_sei": linha.get("envio_sei", "—"),
+        "data_ajustes_ok": linha.get("data_ajustes_ok", "—"),
+        "data_homologar": linha.get("data_homologar", "—"),
+        "enviado": linha.get("enviado", "—"),
         "la_pt_ptf": linha.get("la_pt_ptf", "—"),
         "tipo_trabalho": linha.get("tipo_trabalho", "—"),
         "doc_sei": linha.get("doc_sei", "—"),
@@ -2033,10 +2042,35 @@ def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai
             if producao and producao.data_entrega_ajustes
             else ""
         ),
-        "envio_sei": (
-            _formatar_data_br(producao.data_homologacao)
-            if producao and producao.data_homologacao
+        "data_ajustes_ok": (
+            _formatar_data_br(producao.data_ajustes_ok)
+            if producao and producao.data_ajustes_ok
             else "—"
+        ),
+        "data_ajustes_ok_iso": (
+            producao.data_ajustes_ok.isoformat()
+            if producao and producao.data_ajustes_ok
+            else ""
+        ),
+        "data_homologar": (
+            _formatar_data_br(producao.data_homologar)
+            if producao and producao.data_homologar
+            else "—"
+        ),
+        "data_homologar_iso": (
+            producao.data_homologar.isoformat()
+            if producao and producao.data_homologar
+            else ""
+        ),
+        "enviado": (
+            _formatar_data_br(producao.data_enviado)
+            if producao and producao.data_enviado
+            else "—"
+        ),
+        "enviado_iso": (
+            producao.data_enviado.isoformat()
+            if producao and producao.data_enviado
+            else ""
         ),
         "status": producao.status if producao else "",
         "status_label": (
@@ -2132,7 +2166,6 @@ def _serializar_linhas_gerencial(
         "prioridade": prioridade_label,
         "dias_sei": dias_sei,
         "prazo_recompra_itbi": "—",
-        "ajustes_ok": "—",
         "status_unidade": (
             OsUnidadeStatus.objects.filter(
                 os=os_obj,
@@ -2262,7 +2295,9 @@ def _serializar_linhas_gerencial(
                 "entrega_aval": _formatar_data_br(producao.data_entrega_avaliacao),
                 "entrega_rev": _formatar_data_br(producao.data_entrega_revisao),
                 "entrega_aju": _formatar_data_br(producao.data_entrega_ajustes),
-                "envio_sei": _formatar_data_br(producao.data_homologacao),
+                "data_ajustes_ok": _formatar_data_br(producao.data_ajustes_ok),
+                "data_homologar": _formatar_data_br(producao.data_homologar),
+                "enviado": _formatar_data_br(producao.data_enviado),
                 "la_pt_ptf": producao.numero_producao or "—",
                 "tipo_trabalho": (
                     producao.tipo_producao.prefixo if producao.tipo_producao else "—"
@@ -2270,7 +2305,6 @@ def _serializar_linhas_gerencial(
                 "doc_sei": producao.numero_sei or "—",
                 "destino": _destino_pos_homologacao(os_obj, producao),
                 "prazo_recompra_itbi": "—",
-                "ajustes_ok": "—",
             },
         )
         linhas.append(finalizar_linha(linha, producao, dados_imovel))
@@ -2857,13 +2891,19 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
             tipo_producao = dados["tipo_producao_obj"]
             numero_sei = dados.get("numero_sei") or None
 
+        unidade_logada = None
+        vinculo = servidor.vinculos_unidade.filter(data_fim__isnull=True).first()
+        if vinculo:
+            unidade_logada = vinculo.unidade
+
         producao = Producao.objects.create(
             os=self.os_obj,
             tipo_producao=tipo_producao,
             numero_producao=None,
             numero_sei=numero_sei,
             ano=ano,
-            status=Producao.STATUS_ENTRADA,
+            status=Producao.STATUS_NAO_DISTRIBUIDO,
+            unidade=unidade_logada,
             criado_por=servidor,
             observacao=dados.get("observacao") or None,
         )
@@ -3576,7 +3616,7 @@ def _contexto_imoveis_producao(producao):
 
 
 def _validar_justificativa_homologada(producao, justificativa):
-    if producao.status == Producao.STATUS_HOMOLOGADO and not (justificativa or "").strip():
+    if producao.status == Producao.STATUS_ENVIADO and not (justificativa or "").strip():
         return "Justificativa obrigatória para alterações em produção homologada."
     return None
 
@@ -3656,46 +3696,56 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
 
 
 TRANSICOES_PERMITIDAS_PRODUCAO = {
-    Producao.STATUS_ENTRADA: [
+    Producao.STATUS_NAO_DISTRIBUIDO: [
         (Producao.STATUS_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_DISTRIBUIDO: [
-        (Producao.STATUS_PARA_REVISAO, False),
-        (Producao.STATUS_ENTRADA, True),
+        (Producao.STATUS_REVISAR, False),
+        (Producao.STATUS_NAO_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
     ],
-    Producao.STATUS_PARA_REVISAO: [
-        (Producao.STATUS_PARA_AJUSTES, True),
-        (Producao.STATUS_HOMOLOGAR, True),
-        (Producao.STATUS_HOMOLOGADO, True),
+    Producao.STATUS_REVISAR: [
+        (Producao.STATUS_REVISADO, True),
+        (Producao.STATUS_VER_AJUSTES, True),
         (Producao.STATUS_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
     ],
-    Producao.STATUS_PARA_AJUSTES: [
-        (Producao.STATUS_PARA_REVISAO, False),
+    Producao.STATUS_REVISADO: [
         (Producao.STATUS_HOMOLOGAR, True),
-        (Producao.STATUS_HOMOLOGADO, True),
-        (Producao.STATUS_DISTRIBUIDO, True),
+        (Producao.STATUS_VER_AJUSTES, True),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_VER_AJUSTES: [
+        (Producao.STATUS_ENTREGA_AJUSTES, False),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_ENTREGA_AJUSTES: [
+        (Producao.STATUS_AJUSTES_OK, True),
+        (Producao.STATUS_REVISAR, False),
+        (Producao.STATUS_CANCELADO, True),
+    ],
+    Producao.STATUS_AJUSTES_OK: [
+        (Producao.STATUS_HOMOLOGAR, True),
+        (Producao.STATUS_REVISAR, False),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_HOMOLOGAR: [
-        (Producao.STATUS_HOMOLOGADO, True),
-        (Producao.STATUS_PARA_AJUSTES, True),
-        (Producao.STATUS_CANCELADO, True),
-    ],
-    Producao.STATUS_HOMOLOGADO: [
         (Producao.STATUS_ENVIADO, True),
+        (Producao.STATUS_VER_AJUSTES, True),
+        (Producao.STATUS_CANCELADO, True),
     ],
 }
 
 STATUS_PRODUCAO_BOTAO_CLASSES = {
-    Producao.STATUS_ENTRADA: "btn-secondary",
+    Producao.STATUS_NAO_DISTRIBUIDO: "btn-secondary",
     Producao.STATUS_DISTRIBUIDO: "btn-primary",
-    Producao.STATUS_PARA_REVISAO: "btn-warning",
-    Producao.STATUS_PARA_AJUSTES: "btn-warning btn-ajustes",
+    Producao.STATUS_REVISAR: "btn-warning",
+    Producao.STATUS_REVISADO: "btn-info",
+    Producao.STATUS_VER_AJUSTES: "btn-warning btn-ajustes",
+    Producao.STATUS_ENTREGA_AJUSTES: "btn-warning",
+    Producao.STATUS_AJUSTES_OK: "btn-success",
     Producao.STATUS_HOMOLOGAR: "btn-primary",
-    Producao.STATUS_HOMOLOGADO: "btn-success",
     Producao.STATUS_ENVIADO: "btn-success",
     Producao.STATUS_CANCELADO: "btn-danger",
 }
@@ -3705,8 +3755,8 @@ def _justificativa_obrigatoria_status(status_atual, status_novo):
     if status_novo == Producao.STATUS_CANCELADO:
         return True
     if status_novo == Producao.STATUS_DISTRIBUIDO and status_atual in (
-        Producao.STATUS_PARA_REVISAO,
-        Producao.STATUS_PARA_AJUSTES,
+        Producao.STATUS_REVISAR,
+        Producao.STATUS_VER_AJUSTES,
     ):
         return True
     return False
@@ -3748,7 +3798,7 @@ def _verificar_conflito_producao(os_imovel, producao):
         os_imovel__imovel=os_imovel.imovel,
         producao__tipo_producao=producao.tipo_producao,
     ).exclude(
-        producao__status__in=[Producao.STATUS_HOMOLOGADO, Producao.STATUS_CANCELADO],
+        producao__status__in=[Producao.STATUS_ENVIADO, Producao.STATUS_CANCELADO],
     ).exclude(
         producao=producao,
     ).exists()
@@ -3836,7 +3886,7 @@ def _pode_redistribuir_producao(producao, request):
     if perfil is None or not perfil.pode_homologar:
         return False
     return producao.status not in (
-        Producao.STATUS_HOMOLOGADO,
+        Producao.STATUS_ENVIADO,
         Producao.STATUS_CANCELADO,
     )
 
@@ -4145,7 +4195,7 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             servidor_destino_log = novo_responsavel
             campos_atualizar.append("servidor_responsavel")
 
-        if status_novo == Producao.STATUS_HOMOLOGADO:
+        if status_novo == Producao.STATUS_ENVIADO:
             autor_trabalho, erro = _obter_autor_trabalho_post(request)
             if erro:
                 if _request_wants_json(request):
@@ -4166,12 +4216,12 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
                 campos_atualizar.append("numero_producao")
             self.producao_obj.autor_trabalho = autor_trabalho
             self.producao_obj.homologado_por = servidor
-            self.producao_obj.data_homologacao = timezone.localdate()
-            campos_atualizar.extend(["autor_trabalho", "homologado_por", "data_homologacao"])
+            self.producao_obj.data_enviado = timezone.localdate()
+            campos_atualizar.extend(["autor_trabalho", "homologado_por", "data_enviado"])
 
         perfil = getattr(request, "perfil_acesso", None)
         if (
-            status_novo == Producao.STATUS_PARA_REVISAO
+            status_novo == Producao.STATUS_REVISAR
             and perfil is not None
             and perfil.pode_homologar
         ):
@@ -4193,34 +4243,41 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             campos_atualizar.append("revisor")
 
         self.producao_obj.status = status_novo
-        if status_novo == Producao.STATUS_PARA_REVISAO:
+        if status_novo == Producao.STATUS_REVISAR:
             self.producao_obj.numero_revisao += 1
             campos_atualizar.append("numero_revisao")
-        if status_novo == Producao.STATUS_PARA_AJUSTES:
+        if status_novo == Producao.STATUS_VER_AJUSTES:
             self.producao_obj.numero_ajustes += 1
             campos_atualizar.append("numero_ajustes")
-        self.producao_obj.save(update_fields=campos_atualizar)
 
         hoje = timezone.localdate()
-        campos_data = []
-        if status_novo == Producao.STATUS_PARA_REVISAO:
-            if status_anterior == Producao.STATUS_PARA_AJUSTES:
-                if not self.producao_obj.data_entrega_ajustes:
-                    self.producao_obj.data_entrega_ajustes = hoje
-                    campos_data.append("data_entrega_ajustes")
-            elif not self.producao_obj.data_entrega_avaliacao:
+        if status_novo == Producao.STATUS_REVISAR:
+            if not self.producao_obj.data_entrega_avaliacao:
                 self.producao_obj.data_entrega_avaliacao = hoje
-                campos_data.append("data_entrega_avaliacao")
-        elif (
-            status_novo == Producao.STATUS_PARA_AJUSTES
-            and status_anterior == Producao.STATUS_PARA_REVISAO
-            and not self.producao_obj.data_entrega_revisao
-        ):
-            self.producao_obj.data_entrega_revisao = hoje
-            campos_data.append("data_entrega_revisao")
+                campos_atualizar.append("data_entrega_avaliacao")
+        elif status_novo == Producao.STATUS_REVISADO:
+            if not self.producao_obj.data_entrega_revisao:
+                self.producao_obj.data_entrega_revisao = hoje
+                campos_atualizar.append("data_entrega_revisao")
+        elif status_novo == Producao.STATUS_ENTREGA_AJUSTES:
+            if not self.producao_obj.data_entrega_ajustes:
+                self.producao_obj.data_entrega_ajustes = hoje
+                campos_atualizar.append("data_entrega_ajustes")
+        elif status_novo == Producao.STATUS_AJUSTES_OK:
+            if not self.producao_obj.data_ajustes_ok:
+                self.producao_obj.data_ajustes_ok = hoje
+                campos_atualizar.append("data_ajustes_ok")
+        elif status_novo == Producao.STATUS_HOMOLOGAR:
+            if not self.producao_obj.data_homologar:
+                self.producao_obj.data_homologar = hoje
+                campos_atualizar.append("data_homologar")
+        elif status_novo == Producao.STATUS_ENVIADO:
+            if not self.producao_obj.data_enviado:
+                self.producao_obj.data_enviado = hoje
+                if "data_enviado" not in campos_atualizar:
+                    campos_atualizar.append("data_enviado")
 
-        if campos_data:
-            self.producao_obj.save(update_fields=campos_data)
+        self.producao_obj.save(update_fields=campos_atualizar)
 
         _criar_producao_status_log(
             self.producao_obj,
@@ -4258,6 +4315,9 @@ CAMPOS_DATA_PRODUCAO = frozenset(
         "data_entrega_avaliacao",
         "data_entrega_revisao",
         "data_entrega_ajustes",
+        "data_ajustes_ok",
+        "data_homologar",
+        "data_enviado",
         "prazo_interno",
     },
 )
@@ -4644,7 +4704,7 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
                 "os": self.producao_obj.os,
                 "imoveis_disponiveis": imoveis_disponiveis,
                 "imoveis_producao": imoveis_producao,
-                "producao_homologada": self.producao_obj.status == Producao.STATUS_HOMOLOGADO,
+                "producao_homologada": self.producao_obj.status == Producao.STATUS_ENVIADO,
             },
         )
 
@@ -4671,7 +4731,7 @@ class ProducaoVincularImovelView(RequerLoginMixin, View):
         ).first()
 
     def _auditar_se_homologada(self, servidor, producao_imovel, justificativa, **kwargs):
-        if self.producao_obj.status == Producao.STATUS_HOMOLOGADO:
+        if self.producao_obj.status == Producao.STATUS_ENVIADO:
             _registrar_auditoria_producao_imovel(
                 servidor,
                 producao_imovel,

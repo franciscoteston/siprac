@@ -724,7 +724,9 @@ body.gerencial-mode .siprac-content {
     }
     html += '<dl class="row mb-0 small gerencial-dl mt-2">';
     html += '<dt class="col-5">AJUSTES_OK</dt><dd class="col-7">—</dd>';
-    html += '<dt class="col-5">ENVIO_SEI</dt><dd class="col-7">' + escapeHtml(data.envio_sei) + '</dd>';
+    html += '<dt class="col-5">AJUSTES_OK</dt><dd class="col-7">' + escapeHtml(data.data_ajustes_ok) + '</dd>';
+    html += '<dt class="col-5">HOMOLOGAR</dt><dd class="col-7">' + escapeHtml(data.data_homologar) + '</dd>';
+    html += '<dt class="col-5">ENVIADO</dt><dd class="col-7">' + escapeHtml(data.enviado) + '</dd>';
     html += '<dt class="col-5">STATUS</dt><dd class="col-7">';
     if (podeHomologar && data.producao_pk) {
       html += '<select class="form-select form-select-sm" id="panel-status-producao">';

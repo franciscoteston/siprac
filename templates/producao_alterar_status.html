@@ -185,8 +185,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const campoRevisor = document.getElementById('campo-revisor');
   const podeHomologar = {{ pode_homologar|yesno:"true,false" }};
   const STATUS_DISTRIBUIDO = 'DISTRIBUIDO';
-  const STATUS_HOMOLOGADO = 'HOMOLOGADO';
-  const STATUS_PARA_REVISAO = 'PARA_REVISAO';
+  const STATUS_ENVIADO = 'ENVIADO';
+  const STATUS_REVISAR = 'REVISAR';
 
   function ocultarCamposAtribuicao() {
     campoServidor.classList.add('d-none');
@@ -240,9 +240,9 @@ document.addEventListener('DOMContentLoaded', function () {
       const destino = botao.dataset.destino;
       if (destino === STATUS_DISTRIBUIDO) {
         mostrarServidorResponsavel();
-      } else if (destino === STATUS_HOMOLOGADO) {
+      } else if (destino === STATUS_ENVIADO) {
         mostrarAutorTrabalho();
-      } else if (destino === STATUS_PARA_REVISAO) {
+      } else if (destino === STATUS_REVISAR) {
         mostrarRevisor();
       } else {
         ocultarCamposAtribuicao();
@@ -266,9 +266,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const primeiroDestino = botoesTransicao[0].dataset.destino;
     if (primeiroDestino === STATUS_DISTRIBUIDO) {
       mostrarServidorResponsavel();
-    } else if (primeiroDestino === STATUS_HOMOLOGADO) {
+    } else if (primeiroDestino === STATUS_ENVIADO) {
       mostrarAutorTrabalho();
-    } else if (primeiroDestino === STATUS_PARA_REVISAO) {
+    } else if (primeiroDestino === STATUS_REVISAR) {
       mostrarRevisor();
     }
   }

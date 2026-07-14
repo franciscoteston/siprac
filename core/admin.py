@@ -475,7 +475,7 @@ class ProducaoAdmin(admin.ModelAdmin):
         "ano",
         "criado_por",
         "homologado_por",
-        "data_homologacao",
+        "data_enviado",
     )
     list_filter = ("status", "tipo_producao", "ano")
     search_fields = ("numero_producao", "numero_sei", "os__numero_os")
@@ -486,10 +486,11 @@ class ProducaoAdmin(admin.ModelAdmin):
         "homologado_por",
         "servidor_responsavel",
         "autor_trabalho",
+        "unidade",
     )
     inlines = (ProducaoImovelInline,)
     ordering = ("-ano", "numero_producao")
-    date_hierarchy = "data_homologacao"
+    date_hierarchy = "data_enviado"
 
 
 @admin.register(ProducaoAtributo)

@@ -830,22 +830,26 @@ class OsImovel(models.Model):
 class Producao(models.Model):
     """Produto gerado pela OS (laudo, parecer, despacho, etc.)."""
 
-    STATUS_ENTRADA = "ENTRADA"
+    STATUS_NAO_DISTRIBUIDO = "NAO_DISTRIBUIDO"
     STATUS_DISTRIBUIDO = "DISTRIBUIDO"
-    STATUS_PARA_REVISAO = "PARA_REVISAO"
-    STATUS_PARA_AJUSTES = "PARA_AJUSTES"
+    STATUS_REVISAR = "REVISAR"
+    STATUS_REVISADO = "REVISADO"
+    STATUS_VER_AJUSTES = "VER_AJUSTES"
+    STATUS_ENTREGA_AJUSTES = "ENTREGA_AJUSTES"
+    STATUS_AJUSTES_OK = "AJUSTES_OK"
     STATUS_HOMOLOGAR = "HOMOLOGAR"
-    STATUS_HOMOLOGADO = "HOMOLOGADO"
     STATUS_ENVIADO = "ENVIADO"
     STATUS_CANCELADO = "CANCELADO"
 
     STATUS_CHOICES = [
-        (STATUS_ENTRADA, "Não distribuído"),
+        (STATUS_NAO_DISTRIBUIDO, "Não distribuído"),
         (STATUS_DISTRIBUIDO, "Distribuído"),
-        (STATUS_PARA_REVISAO, "Para revisão"),
-        (STATUS_PARA_AJUSTES, "Para ajustes"),
+        (STATUS_REVISAR, "Revisar"),
+        (STATUS_REVISADO, "Revisado"),
+        (STATUS_VER_AJUSTES, "Ver ajustes"),
+        (STATUS_ENTREGA_AJUSTES, "Entrega de ajustes"),
+        (STATUS_AJUSTES_OK, "Ajustes OK"),
         (STATUS_HOMOLOGAR, "Homologar"),
-        (STATUS_HOMOLOGADO, "Homologado"),
         (STATUS_ENVIADO, "Enviado"),
         (STATUS_CANCELADO, "Cancelado"),
     ]
@@ -866,7 +870,7 @@ class Producao(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default=STATUS_ENTRADA,
+        default=STATUS_NAO_DISTRIBUIDO,
     )
     numero_revisao = models.PositiveIntegerField(
         default=0,
@@ -875,6 +879,14 @@ class Producao(models.Model):
     numero_ajustes = models.PositiveIntegerField(
         default=0,
         verbose_name="Nº de ajustes",
+    )
+    unidade = models.ForeignKey(
+        "UnidadeInterna",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="producoes",
+        verbose_name="Unidade responsável",
     )
     servidor_responsavel = models.ForeignKey(
         Servidor,
@@ -919,7 +931,6 @@ class Producao(models.Model):
         blank=True,
         related_name="producoes_homologadas",
     )
-    data_homologacao = models.DateField(null=True, blank=True)
     data_entrega_avaliacao = models.DateField(
         null=True,
         blank=True,
@@ -934,6 +945,21 @@ class Producao(models.Model):
         null=True,
         blank=True,
         verbose_name="Data de entrega dos ajustes",
+    )
+    data_ajustes_ok = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de ajustes OK",
+    )
+    data_homologar = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data apto à homologação",
+    )
+    data_enviado = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de envio ao SEI",
     )
     observacao = models.TextField(null=True, blank=True)
     prazo_interno = models.DateField(
