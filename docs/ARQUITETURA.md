@@ -16,13 +16,13 @@ unidades operacionais:
 
 | Sigla | Nome | Tipo |
 |---|---|---|
-| DIVISÃO | Divisão de Avaliação de Imóveis | Administrativa |
+| DEPARTAMENTO | Divisão de Avaliação de Imóveis | Administrativa |
 | DAI | Divisão de Avaliação de Imóveis (unidade técnica) | Operacional |
 | EAV | Equipe de Avaliações | Operacional |
 | ESJL | Equipe de Suporte, Judiciais e Locações | Operacional |
 | EPGV | Equipe Genérica da Planta de Valores | Operacional |
 
-A DIVISÃO é a entidade administrativa representativa do
+O DEPARTAMENTO é a entidade administrativa representativa do
 conjunto — o "condomínio" que agrupa as unidades operacionais.
 Não executa trabalho técnico. Suas atribuições são:
 - Criar OSs
@@ -31,7 +31,7 @@ Não executa trabalho técnico. Suas atribuições são:
 - Realizar o primeiro encaminhamento para unidades operacionais
 - Incluir processos relacionados em qualquer momento
 
-[PENDENTE IMPLEMENTAÇÃO] A DIVISÃO será criada como
+[PENDENTE IMPLEMENTAÇÃO] O DEPARTAMENTO será criado como
 UnidadeInterna própria no sistema, com campo tipo='ADMINISTRATIVA'.
 As demais unidades terão tipo='OPERACIONAL'.
 
@@ -39,7 +39,7 @@ As demais unidades terão tipo='OPERACIONAL'.
 Um servidor pode estar lotado em mais de uma unidade simultaneamente, ou assumir cargo temporário (ex: substituição de coordenador em férias). Esses vínculos são registrados com data de início e data de fim.
 
 Um servidor pode ter mais de um vínculo ativo simultaneamente.
-Exemplo: Sabrina Ibeiro possui vínculo com DIVISÃO (papel
+Exemplo: Sabrina Ibeiro possui vínculo com DEPARTAMENTO (papel
 administrativo) e com ESJL (papel operacional).
 
 [PENDENTE IMPLEMENTAÇÃO] O sistema exibirá um seletor de
@@ -255,7 +255,7 @@ na unidade X"
 
 Quem pode encerrar:
 - Chefia da unidade onde a OS está ABERTA
-- Servidores com papel DIVISÃO
+- Servidores com papel DEPARTAMENTO
 
 ### 5.7 Tarefas internas
 TarefaInterna é criada automaticamente a cada encaminhamento,
@@ -467,7 +467,7 @@ As metas podem ser individuais (por servidor) ou coletivas (por unidade), e por 
 | Nível | Código | Quem | O que vê |
 |---|---|---|---|
 | Total | TOTAL | Diretor, Administrador | Todas as OSs, edição completa |
-| Divisão | DIVISAO | Aux. Adm. Gestão (papel DIVISÃO) | Todas as OSs, consulta e entrada |
+| Departamento | DEPARTAMENTO | Aux. Adm. Gestão (papel DEPARTAMENTO) | Todas as OSs, consulta e entrada |
 | Unidade | UNIDADE | Demais servidores | Apenas OSs da própria unidade |
 
 Atualmente a visibilidade é controlada pelo flag
@@ -485,7 +485,7 @@ implementado.
 | Coordenador | Coordenador | Sim | Sim (sua unidade) | Sim | UNIDADE | Não |
 | Aux. Téc. Coord. | Eng./Arq./AF — FG Coordenação | Sim | Não | Sim | UNIDADE | Não |
 | Técnico | Eng./Arq./AF sem FG | Não | Não | Não | UNIDADE | Não |
-| Aux. Adm. Gestão | Auxiliar Adm. — gestão | Sim | Não | Não | DIVISAO | Não |
+| Aux. Adm. Gestão | Auxiliar Adm. — gestão | Sim | Não | Não | DEPARTAMENTO | Não |
 | Aux. Adm. Pesquisa | Auxiliar Adm. — pesquisa | Não | Não | Não | UNIDADE | Não |
 
 ### 9.4 Níveis de dashboard
@@ -854,8 +854,8 @@ Servidores só podem acessar OSs que estejam ou já estiveram em sua unidade
 invisíveis, exceto para perfis com visibilidade_total=True (DAI/Direção).
 Pendente definir: onde e como exibir essas OSs para perfis com
 visibilidade_total, sem misturar com a fila operacional da unidade.
-Relacionado à implementação da unidade DIVISÃO (§15.21)
-e ao nível de visibilidade DIVISAO (§9.2).
+Relacionado à implementação da unidade DEPARTAMENTO (§15.21)
+e ao nível de visibilidade DEPARTAMENTO (§9.2).
 
 ### 15.18 Reabertura global da OS
 Reabertura na unidade: [IMPLEMENTADO] via OsUnidadeStatus
@@ -879,13 +879,13 @@ Exibe informações resumidas de todas as OSs independente
 da unidade. Visão a definir. Implementar após
 consolidação das telas principais.
 
-### 15.21 Unidade DIVISÃO no sistema
-A DIVISÃO será criada como UnidadeInterna com
+### 15.21 Unidade DEPARTAMENTO no sistema
+O DEPARTAMENTO será criado como UnidadeInterna com
 tipo='ADMINISTRATIVA'. As unidades operacionais
 (DAI, EAV, ESJL, EPGV) terão tipo='OPERACIONAL'.
-Servidores com papel DIVISÃO (ex: Sabrina, Vanessa,
+Servidores com papel DEPARTAMENTO (ex: Sabrina, Vanessa,
 Francisco) terão visibilidade de todas as OSs para
 consulta e gestão administrativa de entrada.
 Inclui implementação do seletor de perfil ativo
 para servidores com mais de um vínculo.
-Relacionado a §9.2 (visibilidade DIVISAO).
+Relacionado a §9.2 (visibilidade DEPARTAMENTO).
