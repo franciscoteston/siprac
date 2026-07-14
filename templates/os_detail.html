@@ -347,7 +347,6 @@
             <th>Data/hora</th>
             <th>Evento</th>
             <th>Etapa interna</th>
-            <th>Tipo de ação</th>
             <th>Origem</th>
             <th>Destino</th>
             <th>Servidor destino</th>
@@ -368,11 +367,6 @@
               {% endif %}
             </td>
             <td>{{ evento.etapa_interna|default:"—" }}</td>
-            <td>
-              {% if evento.tipo_acao and evento.tipo_acao != 'EXTERNO' and evento.tipo_acao != 'AUTOMATICO' %}
-              {{ evento.tipo_acao_label }}
-              {% else %}—{% endif %}
-            </td>
             <td>
               {% if evento.encaminhamento %}
                 {% if evento.encaminhamento.unidade_interna_origem %}

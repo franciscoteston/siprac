@@ -2747,7 +2747,6 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
     def get_initial(self):
         initial = super().get_initial()
         initial.setdefault("etapa_interna", "TRIAGEM")
-        initial.setdefault("tipo_acao", "ENTRADA")
         return initial
 
     def form_valid(self, form):
@@ -2770,11 +2769,9 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         )
         manter_aberta = bool(dados.get("manter_aberta_na_unidade"))
         if tipo_destino == "EXTERNO":
-            tipo_acao = "EXTERNO"
             etapa_interna = None
             etapa_tarefa = "TRIAGEM"
         else:
-            tipo_acao = dados["tipo_acao"]
             etapa_interna = dados["etapa_interna"]
             etapa_tarefa = etapa_interna
 
@@ -2787,7 +2784,6 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 servidor_destino=dados.get("servidor_destino"),
                 unidade_externa_destino=dados.get("unidade_externa_destino"),
                 etapa_interna=etapa_interna,
-                tipo_acao=tipo_acao,
                 tipo_macroetapa=(
                     Encaminhamento.TIPO_MACROETAPA_ATENDIMENTO_INTERNO
                     if tipo_destino == "INTERNO"
@@ -3152,8 +3148,7 @@ class OSLiberarProcessoView(RequerLoginMixin, View):
                     unidade_interna_origem=vinculo.unidade,
                     servidor_origem=servidor,
                     unidade_interna_destino=unidade_atual,
-                    etapa_interna="TRIAGEM",
-                    tipo_acao=Encaminhamento.TIPO_ACAO_ENTRADA,
+                    etapa_interna="ENTRADA",
                     observacao=(
                         f"Liberação do processo {numero_processo} "
                         f"para atendimento na unidade {unidade_atual.sigla}."
@@ -3164,7 +3159,7 @@ class OSLiberarProcessoView(RequerLoginMixin, View):
                     encaminhamento=encaminhamento,
                     unidade=unidade_atual,
                     servidor=servidor,
-                    etapa_interna="TRIAGEM",
+                    etapa_interna="ENTRADA",
                     status="PENDENTE",
                     data_inicio=agora,
                 )

@@ -64,7 +64,6 @@
         <div id="campos-internos" class="col-12">
           <div class="row g-3">
             <div class="col-md-6">{{ form.etapa_interna|as_crispy_field }}</div>
-            <div class="col-md-6">{{ form.tipo_acao|as_crispy_field }}</div>
           </div>
         </div>
         <div class="col-12">{{ form.observacao|as_crispy_field }}</div>
@@ -93,7 +92,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const secaoExterno = document.getElementById('secao-externo');
   const camposInternos = document.getElementById('campos-internos');
   const etapaInterna = document.getElementById('id_etapa_interna');
-  const tipoAcao = document.getElementById('id_tipo_acao');
   const radios = document.querySelectorAll('input[name="tipo_destino"]');
 
   function atualizarSecoes() {
@@ -103,15 +101,8 @@ document.addEventListener('DOMContentLoaded', function () {
     secaoExterno.classList.toggle('d-none', interno);
     camposInternos.classList.toggle('d-none', !interno);
 
-    if (interno) {
-      if (etapaInterna) {
-        etapaInterna.value = 'TRIAGEM';
-      }
-      if (tipoAcao) {
-        tipoAcao.value = 'ENTRADA';
-      }
-    } else if (tipoAcao) {
-      tipoAcao.value = 'EXTERNO';
+    if (interno && etapaInterna && !etapaInterna.value) {
+      etapaInterna.value = 'TRIAGEM';
     }
   }
 

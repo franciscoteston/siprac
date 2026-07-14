@@ -392,8 +392,8 @@ class EncaminhamentoAdmin(admin.ModelAdmin):
 
     list_display = (
         "os",
-        "tipo_acao",
         "etapa_interna",
+        "tipo_macroetapa",
         "unidade_interna_origem",
         "servidor_origem",
         "unidade_interna_destino",
@@ -402,12 +402,12 @@ class EncaminhamentoAdmin(admin.ModelAdmin):
         "data_hora",
     )
     list_filter = (
-        "tipo_acao",
         "etapa_interna",
+        "tipo_macroetapa",
         "aguarda_retorno",
         "unidade_interna_origem",
     )
-    search_fields = ("os__numero_os", "tipo_acao", "observacao")
+    search_fields = ("os__numero_os", "etapa_interna", "observacao")
     autocomplete_fields = (
         "os",
         "unidade_interna_origem",

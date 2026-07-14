@@ -558,24 +558,6 @@ class MacroetapaLog(models.Model):
 class Encaminhamento(models.Model):
     """Tramitação da OS entre unidades, servidores ou destinos externos."""
 
-    TIPO_ACAO_ENTRADA = "ENTRADA"
-    TIPO_ACAO_DEVOLUCAO = "DEVOLUCAO"
-    TIPO_ACAO_SOLICITACAO_AJUSTE = "SOLICITACAO_AJUSTE"
-    TIPO_ACAO_EXTERNO = "EXTERNO"
-    TIPO_ACAO_HOMOLOGACAO = "HOMOLOGACAO"
-    TIPO_ACAO_CONCLUSAO = "CONCLUSAO"
-    TIPO_ACAO_AUTOMATICO = "AUTOMATICO"
-
-    TIPO_ACAO_CHOICES = [
-        (TIPO_ACAO_ENTRADA, "Entrada"),
-        (TIPO_ACAO_DEVOLUCAO, "Devolução"),
-        (TIPO_ACAO_SOLICITACAO_AJUSTE, "Solicitação de ajuste"),
-        (TIPO_ACAO_EXTERNO, "Externo"),
-        (TIPO_ACAO_HOMOLOGACAO, "Homologação"),
-        (TIPO_ACAO_CONCLUSAO, "Conclusão"),
-        (TIPO_ACAO_AUTOMATICO, "Automático"),
-    ]
-
     TIPO_MACROETAPA_ENTRADA_DIVISAO = "ENTRADA_DIVISAO"
     TIPO_MACROETAPA_ATENDIMENTO_INTERNO = "ATENDIMENTO_INTERNO"
     TIPO_MACROETAPA_ATENDIMENTO_EXTERNO = "ATENDIMENTO_EXTERNO"
@@ -648,7 +630,6 @@ class Encaminhamento(models.Model):
         null=True,
         blank=True,
     )
-    tipo_acao = models.CharField(max_length=255, choices=TIPO_ACAO_CHOICES)
     tipo_macroetapa = models.CharField(
         max_length=30,
         null=True,
@@ -674,7 +655,8 @@ class Encaminhamento(models.Model):
         ordering = ["-data_hora"]
 
     def __str__(self):
-        return f"{self.os} — {self.tipo_acao} ({self.data_hora})"
+        etapa = self.etapa_interna or self.tipo_macroetapa or "—"
+        return f"{self.os} — {etapa} ({self.data_hora})"
 
 
 class TarefaInterna(models.Model):

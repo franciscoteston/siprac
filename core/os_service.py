@@ -78,8 +78,7 @@ def registrar_encaminhamento_automatico(os, tipo_macroetapa, servidor=None, obse
         servidor_origem=servidor,
         unidade_interna_destino=None,
         servidor_destino=None,
-        etapa_interna="SISTEMA",
-        tipo_acao=Encaminhamento.TIPO_ACAO_AUTOMATICO,
+        etapa_interna="ENTRADA",
         tipo_macroetapa=tipo_macroetapa,
         data_hora=timezone.now(),
         aguarda_retorno=False,
@@ -204,8 +203,10 @@ def timeline_os(os):
                 "" if enc.automatico
                 else ETAPAS_INTERNAS_LABELS.get(enc.etapa_interna or "", enc.etapa_interna or "")
             ),
-            "tipo_acao": enc.tipo_acao,
-            "tipo_acao_label": TIPO_ACAO_LABELS.get(enc.tipo_acao, enc.tipo_acao),
+            "etapa_interna_label": (
+                "" if enc.automatico
+                else ETAPAS_INTERNAS_LABELS.get(enc.etapa_interna or "", enc.etapa_interna or "")
+            ),
             "servidor_destino": enc.servidor_destino,
             "aguarda_retorno": enc.aguarda_retorno,
             "data_retorno_prevista": enc.data_retorno_prevista,
@@ -401,15 +402,19 @@ def origem_encaminhamento(os, servidor_logado=None):
 
 
 ETAPAS_INTERNAS_LABELS = {
+    "ENTRADA": "Entrada",
     "TRIAGEM": "Triagem",
+    "EM_ATENDIMENTO": "Em atendimento",
+    "DEVOLUCAO": "Devolução",
+    "SOLICITACAO_AJUSTE": "Solicitação de ajuste",
+    "HOMOLOGACAO": "Homologação",
+    "CONCLUIDA": "Concluída",
+    # legado
     "ANALISE": "Análise",
     "REVISAO": "Revisão",
-    "HOMOLOGACAO": "Homologação",
     "CONCLUSAO": "Conclusão",
     "SISTEMA": "Sistema",
 }
-
-TIPO_ACAO_LABELS = dict(Encaminhamento.TIPO_ACAO_CHOICES)
 
 
 def os_ativas_por_unidade():
