@@ -44,7 +44,25 @@ class Command(BaseCommand):
             f'Users: {criados} criados, {atualizados} atualizados.'
         ))
 
-        # 2. Carregar dados de servidores
+        # 2. Garantir unidade DIVISAO antes dos vinculos
+        divisao, divisao_created = UnidadeInterna.objects.get_or_create(
+            sigla='DIVISAO',
+            defaults={
+                'nome': 'Divisão de Avaliação de Imóveis',
+                'tipo': 'ADMINISTRATIVA',
+            },
+        )
+        if not divisao_created and divisao.tipo != 'ADMINISTRATIVA':
+            divisao.tipo = 'ADMINISTRATIVA'
+            divisao.save(update_fields=['tipo'])
+        if divisao_created:
+            self.stdout.write(self.style.SUCCESS('Unidade DIVISAO criada (ADMINISTRATIVA).'))
+        else:
+            self.stdout.write('Unidade DIVISAO ja existente.')
+
+        UnidadeInterna.objects.exclude(sigla='DIVISAO').update(tipo='OPERACIONAL')
+
+        # 3. Carregar dados de servidores (lista plana: 1 entrada = 1 vinculo)
         if not os.path.exists('servidores_config.json'):
             self.stdout.write(self.style.WARNING('servidores_config.json nao encontrado — pulando vinculos'))
             return
@@ -74,7 +92,7 @@ class Command(BaseCommand):
             if created:
                 srv_criados += 1
 
-            # Criar ServidorUnidade se nao existir
+            # Criar ServidorUnidade se nao existir (suporta multiplos vinculos por login)
             try:
                 unidade = UnidadeInterna.objects.get(sigla=item['unidade'])
                 perfil = PerfilAcesso.objects.get(nome=item['perfil'])

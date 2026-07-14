@@ -56,10 +56,21 @@ class PerfilAcesso(models.Model):
 
 
 class UnidadeInterna(models.Model):
-    """Unidade interna da DAI (DAI, EAV, ESJL, EPGV)."""
+    """Unidade interna da DAI (DIVISAO, DAI, EAV, ESJL, EPGV)."""
+
+    TIPO_CHOICES = [
+        ("ADMINISTRATIVA", "Administrativa"),
+        ("OPERACIONAL", "Operacional"),
+    ]
 
     sigla = models.CharField(max_length=50)
     nome = models.CharField(max_length=255)
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_CHOICES,
+        default="OPERACIONAL",
+        verbose_name="Tipo",
+    )
 
     class Meta:
         db_table = "UNIDADE_INTERNA"
@@ -455,6 +466,11 @@ class Comentario(models.Model):
 class OsProcesso(models.Model):
     """Vínculo entre uma OS e um processo SEI (principal ou relacionado)."""
 
+    TIPO_VINCULO_CHOICES = [
+        ("PRINCIPAL", "Principal"),
+        ("RELACIONADO", "Relacionado"),
+    ]
+
     os = models.ForeignKey(
         OS,
         on_delete=models.PROTECT,
@@ -465,7 +481,10 @@ class OsProcesso(models.Model):
         on_delete=models.PROTECT,
         related_name="vinculos_os",
     )
-    tipo_vinculo = models.CharField(max_length=255)
+    tipo_vinculo = models.CharField(
+        max_length=20,
+        choices=TIPO_VINCULO_CHOICES,
+    )
     data_vinculo = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Data de registro no SIPRAC",
@@ -479,6 +498,14 @@ class OsProcesso(models.Model):
         null=True,
         blank=True,
         related_name="processos_encerrados",
+    )
+    registrado_por = models.ForeignKey(
+        "Servidor",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="processos_registrados",
+        verbose_name="Registrado por",
     )
     aguardando_redistribuicao = models.BooleanField(
         default=False,
@@ -565,6 +592,16 @@ class Encaminhamento(models.Model):
         (TIPO_MACROETAPA_ENCERRAMENTO, "Encerramento"),
     ]
 
+    ETAPA_INTERNA_CHOICES = [
+        ("ENTRADA", "Entrada"),
+        ("TRIAGEM", "Triagem"),
+        ("EM_ATENDIMENTO", "Em atendimento"),
+        ("DEVOLUCAO", "Devolução"),
+        ("SOLICITACAO_AJUSTE", "Solicitação de ajuste"),
+        ("HOMOLOGACAO", "Homologação"),
+        ("CONCLUIDA", "Concluída"),
+    ]
+
     os = models.ForeignKey(
         OS,
         on_delete=models.PROTECT,
@@ -605,7 +642,12 @@ class Encaminhamento(models.Model):
         blank=True,
         related_name="encaminhamentos",
     )
-    etapa_interna = models.CharField(max_length=255, null=True, blank=True)
+    etapa_interna = models.CharField(
+        max_length=20,
+        choices=ETAPA_INTERNA_CHOICES,
+        null=True,
+        blank=True,
+    )
     tipo_acao = models.CharField(max_length=255, choices=TIPO_ACAO_CHOICES)
     tipo_macroetapa = models.CharField(
         max_length=30,
@@ -638,6 +680,8 @@ class Encaminhamento(models.Model):
 class TarefaInterna(models.Model):
     """Tarefa interna da unidade em uma etapa do fluxo (triagem até conclusão)."""
 
+    ETAPA_INTERNA_CHOICES = Encaminhamento.ETAPA_INTERNA_CHOICES
+
     os = models.ForeignKey(
         OS,
         on_delete=models.PROTECT,
@@ -658,7 +702,10 @@ class TarefaInterna(models.Model):
         on_delete=models.PROTECT,
         related_name="tarefas_internas",
     )
-    etapa_interna = models.CharField(max_length=255)
+    etapa_interna = models.CharField(
+        max_length=20,
+        choices=ETAPA_INTERNA_CHOICES,
+    )
     status = models.CharField(max_length=255)
     data_inicio = models.DateTimeField()
     data_conclusao = models.DateTimeField(null=True, blank=True)
