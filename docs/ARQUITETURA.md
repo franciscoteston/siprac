@@ -10,18 +10,57 @@ O SGBD da DAI foi concebido para operar em complemento ao SEI, oferecendo gerenc
 
 ## 2. Estrutura organizacional
 
-A DAI é composta por quatro Unidades Internas:
+### 2.1 Estrutura organizacional
+A DAI é composta por uma unidade administrativa e quatro
+unidades operacionais:
 
-| Sigla | Nome completo |
-|---|---|
-| DAI | Divisão de Avaliação de Imóveis (unidade técnica e de chefia) |
-| EAV | Equipe de Avaliações |
-| ESJL | Equipe de Suporte, Judiciais e Locações |
-| EPGV | Equipe Genérica da Planta de Valores |
+| Sigla | Nome | Tipo |
+|---|---|---|
+| DIVISÃO | Divisão de Avaliação de Imóveis | Administrativa |
+| DAI | Divisão de Avaliação de Imóveis (unidade técnica) | Operacional |
+| EAV | Equipe de Avaliações | Operacional |
+| ESJL | Equipe de Suporte, Judiciais e Locações | Operacional |
+| EPGV | Equipe Genérica da Planta de Valores | Operacional |
 
-A "Divisão" como figura formal representa o agrupamento das quatro unidades. Para fins de encaminhamento e registro no SGBD, a DAI opera como unidade interna com plenos poderes de envio e recebimento de OSs.
+A DIVISÃO é a entidade administrativa representativa do
+conjunto — o "condomínio" que agrupa as unidades operacionais.
+Não executa trabalho técnico. Suas atribuições são:
+- Criar OSs
+- Registrar processos (principal e relacionados)
+- Vincular imóveis
+- Realizar o primeiro encaminhamento para unidades operacionais
+- Incluir processos relacionados em qualquer momento
 
+[PENDENTE IMPLEMENTAÇÃO] A DIVISÃO será criada como
+UnidadeInterna própria no sistema, com campo tipo='ADMINISTRATIVA'.
+As demais unidades terão tipo='OPERACIONAL'.
+
+### 2.2 Vínculos e vigência
 Um servidor pode estar lotado em mais de uma unidade simultaneamente, ou assumir cargo temporário (ex: substituição de coordenador em férias). Esses vínculos são registrados com data de início e data de fim.
+
+Um servidor pode ter mais de um vínculo ativo simultaneamente.
+Exemplo: Sabrina Ibeiro possui vínculo com DIVISÃO (papel
+administrativo) e com ESJL (papel operacional).
+
+[PENDENTE IMPLEMENTAÇÃO] O sistema exibirá um seletor de
+perfil ativo na interface para servidores com mais de um
+vínculo. Ao trocar o perfil ativo:
+- A fila de OSs exibida muda conforme a unidade
+- As ações disponíveis mudam conforme o perfil
+- O perfil ativo fica registrado na sessão do usuário
+- O login e senha permanecem os mesmos
+
+### 2.3 Permissões especiais
+Permissões temporárias (ex: visibilidade cross-unidade)
+são concedidas pelo gestor com data_inicio e data_fim,
+registradas em PermissaoEspecial.
+
+### 2.4 Perfil ativo no middleware
+O middleware PerfilAcessoMiddleware carrega o vínculo ativo
+do servidor logado e o disponibiliza em request.vinculo_ativo
+e request.perfil_acesso para uso nas views e templates.
+Quando há mais de um vínculo, o sistema usa o de maior
+hierarquia ou o selecionado pelo usuário na sessão.
 
 ---
 
@@ -66,19 +105,53 @@ Cada processo vinculado tem data de entrada na Divisão e data de encerramento p
 
 ## 4. Macroetapas
 
-As macroetapas representam o estado atual da OS no seu ciclo de vida. Cada transição é registrada como um encaminhamento (`ENCAMINHAMENTO`) com `tipo_macroetapa` preenchido, ou como flag `OS.encerrada` para o encerramento. O histórico completo é derivado desses registros (timeline unificada). A tabela `MACROETAPA_LOG` está **DEPRECATED** — mantida apenas para compatibilidade com dados legados.
+### 4.1 Implementação atual das macroetapas
+O modelo MacroetapaLog foi eliminado e marcado como DEPRECATED.
+A macroetapa atual da OS é derivada dos Encaminhamentos:
+- Campo Encaminhamento.tipo_macroetapa registra a macroetapa
+  de cada transição
+- OS.encerrada (bool) e OS.data_encerramento substituem
+  o log de encerramento
+- A função macroetapa_atual_os() em core/os_service.py
+  retorna a macroetapa atual derivada do último encaminhamento
+- A função timeline_os() retorna a timeline unificada
 
-| # | Macroetapa | Regra de transição |
-|---|---|---|
-| 1 | Entrada na Divisão | Estado inicial — criação da OS |
-| 2 | Atendimento Interno | Livre após Entrada |
-| 3 | Atendimento Externo | Livre após Entrada |
-| 4 | Retorno Externo | Somente após Atendimento Externo |
-| 5 | Inclusão de Processo Relacionado | Qualquer estado exceto Encerrada |
-| 6 | Reabertura | Somente após Encerrada |
-| 7 | Encerrado na Divisão | Estado final — reversível via Reabertura |
+### 4.2 Tabela de macroetapas
+| # | Macroetapa | Código | Regra de transição | Situação |
+|---|---|---|---|---|
+| 1 | Entrada na Divisão | ENTRADA_DIVISAO | Estado inicial — criação da OS | ✓ Implementado |
+| 2 | Atendimento Interno | ATENDIMENTO_INTERNO | Após encaminhamento para unidade interna | ✓ Implementado |
+| 3 | Atendimento Externo | ATENDIMENTO_EXTERNO | Após encaminhamento para unidade externa | ✓ Implementado |
+| 4 | Retorno Externo | RETORNO_EXTERNO | Somente após Atendimento Externo | ✓ Implementado |
+| 5 | Inclusão de Processo | INCLUSAO_PROCESSO | Qualquer estado exceto Encerrada | ✓ Implementado |
+| 6 | Reabertura | — | Somente após Encerrada | [PENDENTE IMPLEMENTAÇÃO] |
+| 7 | Encerrado | OS.encerrada=True | Estado final | ✓ Implementado |
 
-Algumas transições podem ser automáticas (ex: ao registrar o retorno de uma unidade externa com `aguarda_retorno = true`, o sistema propõe a transição para Retorno Externo). Outras são manuais.
+### 4.3 Reabertura
+Distinguir claramente dois tipos:
+
+Reabertura na unidade (já implementada):
+- Modelo: OsUnidadeStatus.status = REABERTA
+- Quem pode: chefia da unidade
+- Efeito: OS volta a ser editável na unidade
+- View: OSReabrirNaUnidadeView
+
+Reabertura global da OS (pendente — ver §15.18):
+- Significaria OS.encerrada = False
+- Não implementada
+- Perfil que poderá fazer: Direção/Administrador
+
+### 4.4 Macroetapa automática ao registrar produção
+A função ativar_atendimento_interno_se_necessario() em
+core/os_service.py registra automaticamente um encaminhamento
+com tipo_macroetapa=ATENDIMENTO_INTERNO quando uma produção
+é criada e a OS ainda não tem macroetapa de atendimento.
+
+### 4.5 Encaminhamento sem tipo_macroetapa
+Quando tipo_macroetapa é nulo, a macroetapa é derivada
+pelo destino do encaminhamento:
+- unidade_interna_destino preenchida → ATENDIMENTO_INTERNO
+- unidade_externa_destino preenchida → ATENDIMENTO_EXTERNO
 
 ---
 
@@ -90,31 +163,108 @@ O encaminhamento é o mecanismo de tramitação da OS entre usuários e unidades
 
 Campos relevantes:
 
-- **Unidade origem** e **servidor origem** — sempre preenchidos
+- **Unidade origem** e **servidor origem**
 - **Unidade interna destino** — preenchida em encaminhamentos internos
 - **Servidor destino** — opcional; se ausente, o encaminhamento vai para a fila da unidade
 - **Unidade externa destino** — preenchida em encaminhamentos externos (mutuamente exclusivo com unidade interna destino)
-- **Etapa interna** — Triagem, Análise, Revisão, Homologação, Conclusão
-- **Tipo de ação** — Atribuição, Devolução, Solicitação de ajuste, Encaminhamento externo, Homologação, Conclusão
+- **Etapa interna** — ver §5.2
+- **Tipo de ação** — ver §5.3 (campo a eliminar)
 - **Aguarda retorno** — booleano; quando verdadeiro, a OS fica com pendência rastreável
 - **Data retorno prevista** e **data retorno efetiva** — para controle de encaminhamentos externos
 
-### 5.2 Etapas internas das unidades
+Campo manter_aberta_na_unidade (bool, default False):
+Ao encaminhar, por padrão a OS é concluída na unidade
+de origem. Quando manter_aberta_na_unidade=True, a unidade
+de origem permanece com OsUnidadeStatus=ABERTA mesmo após
+o encaminhamento — útil quando a unidade ainda precisa
+acompanhar a OS enquanto outra unidade também atua.
 
-Cada unidade processa a OS internamente em cinco etapas sequenciais:
+Origem vazia: o primeiro encaminhamento após ENTRADA_DIVISAO
+ou INCLUSAO_PROCESSO tem unidade_interna_origem nula —
+a função origem_encaminhamento(os, servidor_logado) em
+core/os_service.py determina a origem com base no
+OsUnidadeStatus=ABERTA do servidor logado.
 
-`Triagem → Análise → Revisão → Homologação → Conclusão`
+### 5.2 Etapa na unidade (etapa_interna)
 
-A homologação exige nível hierárquico mínimo de Auxiliar Técnico ou Coordenador (ou substituto vigente).
+O campo Encaminhamento.etapa_interna registra em qual
+etapa da OS a unidade se encontra. É o segundo nível
+hierárquico, abaixo da macroetapa global.
 
-Um servidor só pode encaminhar para seu superior hierárquico se o superior solicitar.
+[PENDENTE IMPLEMENTAÇÃO] Choices a implementar:
 
-### 5.3 Unidades externas
+| Código | Label | Quem aciona |
+|---|---|---|
+| ENTRADA | Entrada | Automático ao receber encaminhamento |
+| TRIAGEM | Triagem | Coordenação (ação explícita) |
+| EM_ATENDIMENTO | Em atendimento | Automático ao criar produção |
+| DEVOLUCAO | Devolução | Coordenação/Chefia |
+| SOLICITACAO_AJUSTE | Solicitação de ajuste | Coordenação/Chefia |
+| HOMOLOGACAO | Homologação | Coordenação/Chefia |
+| CONCLUIDA | Concluída | Automático ao encaminhar para fora |
 
-Encaminhamentos podem ter como destino unidades externas à DAI. Há dois casos:
+Atualmente o campo é CharField livre sem choices definidos.
 
-- **Unidade externa identificada** (ex: SCIM) — rastreamento completo com retorno esperado
-- **Unidade externa não identificada** — registro genérico quando a identificação é irrelevante
+### 5.3 Tipo de ação (tipo_acao)
+
+[PENDENTE IMPLEMENTAÇÃO — ELIMINAÇÃO]
+O campo Encaminhamento.tipo_acao será eliminado.
+As informações que ele carregava serão migradas para:
+- etapa_interna: DEVOLUCAO, SOLICITACAO_AJUSTE, HOMOLOGACAO
+- Campo automatico (bool): substitui tipo_acao=AUTOMATICO
+- unidade_externa_destino preenchida: substitui tipo_acao=EXTERNO
+- etapa_interna=ENTRADA: substitui tipo_acao=ENTRADA
+- etapa_interna=CONCLUIDA: substitui tipo_acao=CONCLUSAO
+
+Choices atuais ainda no código (a remover):
+ENTRADA, DEVOLUCAO, SOLICITACAO_AJUSTE, EXTERNO,
+HOMOLOGACAO, CONCLUSAO, AUTOMATICO
+
+### 5.4 Hierarquia das três camadas
+
+| Camada | Campo | Descrição |
+|---|---|---|
+| Macroetapa | Encaminhamento.tipo_macroetapa | Estado da OS no âmbito da Divisão |
+| Etapa na unidade | Encaminhamento.etapa_interna | Estado da OS dentro de uma unidade |
+| Status da produção | Producao.status | Estado do trabalho técnico |
+
+### 5.5 OsUnidadeStatus
+
+Modelo OsUnidadeStatus registra o estado da OS em cada
+unidade operacional que a recebeu:
+
+| Status | Descrição |
+|---|---|
+| ABERTA | OS recebida e em atendimento na unidade |
+| CONCLUIDA | Unidade finalizou sua parte |
+| REABERTA | OS devolvida à unidade após conclusão |
+| SOMENTE_LEITURA | OS encerrada globalmente — apenas consulta |
+
+Regras:
+- OS chega na unidade → OsUnidadeStatus=ABERTA (automático)
+- Encaminhar (padrão) → OsUnidadeStatus=CONCLUIDA (automático)
+- Encaminhar com manter_aberta=True → permanece ABERTA
+- Reabrir na unidade → REABERTA (chefia da unidade)
+
+### 5.6 Bloqueio de encerramento
+A OS só pode ser encerrada quando está ABERTA em apenas
+uma unidade operacional. Se estiver ABERTA em mais de uma,
+o sistema exibe mensagem:
+"OS não pode ser encerrada pois também está aberta
+na unidade X"
+
+Quem pode encerrar:
+- Chefia da unidade onde a OS está ABERTA
+- Servidores com papel DIVISÃO
+
+### 5.7 Tarefas internas
+TarefaInterna é criada automaticamente a cada encaminhamento,
+registrando a unidade destino, servidor destino (opcional),
+etapa interna e status (PENDENTE/CONCLUIDA).
+
+O campo etapa_interna em TarefaInterna receberá os mesmos
+choices de Encaminhamento.etapa_interna
+[PENDENTE IMPLEMENTAÇÃO].
 
 ---
 
@@ -180,33 +330,99 @@ Imóveis podem ser agrupados dentro de uma produção para atendimento conjunto,
 
 ## 7. Produção
 
-### 7.1 Tipos de produção
+### 7.1 Conceito
+A entidade Producao registra o produto gerado pela OS —
+tanto trabalhos técnicos quanto despachos. Uma OS pode
+gerar zero, um ou múltiplos registros de produção, em
+qualquer combinação. Cada produção pertence a uma unidade
+operacional específica (campo unidade).
 
-A produção é a entidade que registra o produto gerado pela OS — tanto trabalhos técnicos quanto despachos. Uma OS pode gerar zero, um ou múltiplos registros de produção, em qualquer combinação.
+### 7.2 Tipos de produção
 
 | Prefixo | Sequência | Exemplo |
 |---|---|---|
-| LA | Por tipo e ano, global da Divisão, máx. 999 | `LA_005_2026` |
-| PT | Idem | `PT_002_2025` |
-| PTF | Idem | `PTF_001_2026` |
-| PF | Idem | `PF_003_2026` |
-| PFF | Idem | `PFF_001_2026` |
-| IT | Idem | `IT_007_2026` |
-| PTJ | Idem | `PTJ_004_2026` |
-| Despacho | Sem numeração própria | Número SEI: `000000` |
+| LA | Por tipo e ano, global da Divisão, máx. 999 | LA_005_2026 |
+| PT | Idem | PT_002_2025 |
+| PTF | Idem | PTF_001_2026 |
+| PF | Idem | PF_003_2026 |
+| PFF | Idem | PFF_001_2026 |
+| IT | Idem | IT_007_2026 |
+| PTJ | Idem | PTJ_004_2026 |
+| Despacho | Sem numeração própria | Número SEI: 000000 |
 
-### 7.2 Campos comuns a todas as produções
+### 7.3 Campos principais
 
-- Número próprio (automático para trabalhos técnicos)
-- Número SEI (obrigatório para despachos, presente em trabalhos quando aplicável)
-- Status: Em elaboração, Concluído, Homologado, Cancelado
-- Servidor criador e servidor homologador
-- Data de homologação
-- Observação
+| Campo | Tipo | Descrição |
+|---|---|---|
+| os | FK → OS | OS à qual pertence |
+| unidade | FK → UnidadeInterna | Unidade responsável pela produção |
+| tipo_producao | FK → TipoProducao | Prefixo e descrição |
+| numero_producao | CharField | Gerado na homologação (ex: LA_005_2026) |
+| numero_sei | CharField | Número do documento no SEI |
+| servidor_responsavel | FK → Servidor | Avaliador/executor |
+| revisor | FK → Servidor | Responsável pela revisão |
+| autor_trabalho | CharField | Autor do trabalho técnico |
+| modelo_sugerido | CharField | Modelo de regressão sugerido |
+| prazo_interno | DateField | Prazo definido pela chefia |
+| mes_cronograma | DateField | Mês de referência no cronograma |
+| status | CharField | Status atual (ver 7.4) |
+| numero_revisao | PositiveIntegerField | Contador de revisões |
+| numero_ajustes | PositiveIntegerField | Contador de ajustes |
 
-### 7.3 Cancelamento
+### 7.4 Status da produção
 
-Uma produção pode ser cancelada após criação. Cancelamento após homologação exige justificativa registrada em auditoria.
+Fluxo sequencial sem volta (política da EAV):
+
+| Status | Código | Quem aciona | Descrição |
+|---|---|---|---|
+| Não distribuído | NAO_DISTRIBUIDO | Automático | Criada sem responsável |
+| Distribuído | DISTRIBUIDO | Chefia | Responsável atribuído |
+| Revisar | REVISAR | Responsável | Entregue para revisão |
+| Revisado | REVISADO | Revisor | Revisado sem ajustes relevantes |
+| Ver ajustes | VER_AJUSTES | Revisor | Ajustes relevantes solicitados |
+| Entrega ajustes | ENTREGA_AJUSTES | Responsável | Ajustes entregues para revisão final |
+| Ajustes OK | AJUSTES_OK | Revisor | Ajustes aprovados |
+| Homologar | HOMOLOGAR | Responsável | Apto à homologação |
+| Enviado | ENVIADO | Chefia | Concluído no SEI |
+| Cancelado | CANCELADO | Chefia | Cancelado |
+
+### 7.5 Datas do fluxo
+
+| Campo | Preenchimento | Corresponde a |
+|---|---|---|
+| prazo_interno | Manual (chefia) | Prazo do avaliador (PRAZO_AVAL) |
+| data_entrega_avaliacao | Automático → REVISAR | Entrega para revisão (ENTREGA_AVAL) |
+| data_entrega_revisao | Automático → REVISADO | Revisão concluída (ENTREGA_REV) |
+| data_entrega_ajustes | Automático → ENTREGA_AJUSTES | Ajustes entregues (ENTREGA_AJU) |
+| data_ajustes_ok | Automático → AJUSTES_OK | Ajustes aprovados |
+| data_homologar | Automático → HOMOLOGAR | Apto à homologação |
+| data_enviado | Automático → ENVIADO | Conclusão no SEI |
+
+Todas as datas automáticas são editáveis pela chefia
+via ProducaoEditarCampoView.
+
+### 7.6 Cancelamento
+Uma produção pode ser cancelada em qualquer etapa.
+Cancelamento após ENVIADO exige justificativa registrada
+em auditoria.
+
+### 7.7 Imóveis da produção
+Os imóveis de uma produção são registrados em ProducaoImovel
+(N:M). Uma produção pode abranger um subconjunto dos imóveis
+da OS. Cada vínculo tem campo grupo_ref para agrupamento
+dentro da produção.
+
+### 7.8 Log de status
+Cada transição de status é registrada em ProducaoStatusLog
+com data/hora, status anterior, status novo e servidor
+que realizou a transição.
+
+### 7.9 Visibilidade
+Na tela gerencial, cada linha corresponde a uma produção.
+OSs sem produção aparecem com uma linha "Sem produção".
+A filtragem de produções na tela gerencial considera
+apenas as produções da unidade do usuário logado
+(campo Producao.unidade).
 
 ---
 
@@ -233,18 +449,83 @@ As metas podem ser individuais (por servidor) ou coletivas (por unidade), e por 
 
 ## 9. Perfis de acesso
 
-| Perfil | Cargo correspondente | Cria OS | Encerra OS | Homologa | Cria OS interna | Visibilidade |
-|---|---|---|---|---|---|---|
-| Administrador | Administrador do sistema | Sim | Sim | Sim | Sim | Total |
-| Diretor | Diretor | Sim | Sim | Sim | Sim | Total |
-| Aux. Téc. Direção | Eng./Arq./AF – FG Direção | Sim | Sim | Sim | Sim | Total |
-| Coordenador | Coordenador | Sim | Sim (sua unidade) | Sim | Sim | Sua unidade + encaminhamentos |
-| Aux. Téc. Coord. | Eng./Arq./AF – FG Coordenação | Sim | Não | Sim | Não | Sua unidade + encaminhamentos |
-| Técnico | Eng./Arq./AF sem FG | Não | Não | Não | Não | Sua unidade + encaminhamentos |
-| Aux. Adm. Gestão | Auxiliar Adm. – gestão | Sim | Não | Não | Não | Sua unidade + encaminhamentos |
-| Aux. Adm. Pesquisa | Auxiliar Adm. – pesquisa | Não | Não | Não | Não | Somente imóveis (consulta) |
+### 9.1 Flags de permissão em PerfilAcesso
 
-Permissões especiais temporárias (ex: visibilidade cross-unidade por prazo determinado) são concedidas pelo gestor e registradas com data de início e fim.
+| Flag | Descrição |
+|---|---|
+| pode_criar_os | Pode criar novas OSs |
+| pode_encerrar_os | Pode encerrar OSs |
+| pode_homologar | Pode homologar produções |
+| pode_criar_os_interna | Pode criar OS sem processo SEI |
+| visibilidade_total | Acesso total a todas as OSs |
+| admin_sistema | Acesso ao painel de administração e SIAT |
+
+### 9.2 Visibilidade
+
+[PENDENTE IMPLEMENTAÇÃO] Três níveis de visibilidade:
+
+| Nível | Código | Quem | O que vê |
+|---|---|---|---|
+| Total | TOTAL | Diretor, Administrador | Todas as OSs, edição completa |
+| Divisão | DIVISAO | Aux. Adm. Gestão (papel DIVISÃO) | Todas as OSs, consulta e entrada |
+| Unidade | UNIDADE | Demais servidores | Apenas OSs da própria unidade |
+
+Atualmente a visibilidade é controlada pelo flag
+visibilidade_total (bool). O campo visibilidade com
+três níveis está definido conceitualmente mas não
+implementado.
+
+### 9.3 Tabela de perfis
+
+| Perfil | Cargo | Cria OS | Encerra OS | Homologa | Visibilidade | Admin |
+|---|---|---|---|---|---|---|
+| Administrador | Administrador do sistema | Sim | Sim | Sim | TOTAL | Sim |
+| Diretor | Diretor | Sim | Sim | Sim | TOTAL | Não |
+| Aux. Téc. Direção | Eng./Arq./AF — FG Direção | Sim | Sim | Sim | TOTAL | Não |
+| Coordenador | Coordenador | Sim | Sim (sua unidade) | Sim | UNIDADE | Não |
+| Aux. Téc. Coord. | Eng./Arq./AF — FG Coordenação | Sim | Não | Sim | UNIDADE | Não |
+| Técnico | Eng./Arq./AF sem FG | Não | Não | Não | UNIDADE | Não |
+| Aux. Adm. Gestão | Auxiliar Adm. — gestão | Sim | Não | Não | DIVISAO | Não |
+| Aux. Adm. Pesquisa | Auxiliar Adm. — pesquisa | Não | Não | Não | UNIDADE | Não |
+
+### 9.4 Níveis de dashboard
+
+O dashboard adapta sua visão conforme o perfil ativo:
+
+- SISTÊMICA: usuários com visibilidade_total=True —
+  visão consolidada de todas as unidades
+- UNIDADE: coordenadores e aux. técnicos —
+  visão da própria unidade
+- PESSOAL: técnicos —
+  visão das próprias produções e tarefas
+
+### 9.5 Permissões especiais temporárias
+
+Concedidas pelo gestor via modelo PermissaoEspecial,
+com data_inicio e data_fim. Exemplo: visibilidade
+cross-unidade por prazo determinado.
+
+### 9.6 Middleware e perfil ativo
+
+O PerfilAcessoMiddleware carrega o vínculo ativo do
+servidor logado e disponibiliza em request.vinculo_ativo
+e request.perfil_acesso. Os mixins de permissão
+(RequerLoginMixin, RequerAdminMixin, etc.) em
+core/mixins.py utilizam esses valores para controle
+de acesso nas views.
+
+Navbar: exibe cargo e sigla da unidade do vínculo ativo,
+não o nome do perfil.
+
+### 9.7 Pendências de perfil
+- [PENDENTE] Restrição de encerramento por escopo de
+  unidade no Coordenador (atualmente gate é apenas
+  pode_encerrar_os, sem verificação de unidade)
+- [PENDENTE] Restrição dedicada para Aux. Adm. Pesquisa
+  (somente tela de imóveis)
+- [PENDENTE §15.8] Visão sistêmica mínima para todos
+- [PENDENTE §15.9] Função Gratificada na interface
+- [PENDENTE §15.10] Cargo e perfil na navbar
 
 ---
 
@@ -283,33 +564,83 @@ Campos livres como observações e anotações internas não são auditados.
 
 ---
 
-## 12. Inventário de entidades — 29 entidades
+## 12. Inventário de entidades — 31 entidades
 
 ### Estrutura e segurança
-`SERVIDOR` · `UNIDADE_INTERNA` · `SERVIDOR_UNIDADE` · `PERFIL_ACESSO` · `PERMISSAO_ESPECIAL`
+`Servidor` · `UnidadeInterna` · `ServidorUnidade` · `PerfilAcesso` · `PermissaoEspecial`
 
 ### Externo
-`UNIDADE_EXTERNA`
+`UnidadeExterna`
 
 ### Classificação
-`NATUREZA` · `TIPO_DEMANDA` · `FINALIDADE` · `COMBINACAO_VALIDA`
+`Natureza` · `TipoDemanda` · `Finalidade` · `CombinacaoValida`
 
 ### Imóveis
-`IMOVEL` · `OS_IMOVEL` · `PRODUCAO_IMOVEL`
+`Imovel` · `OsImovel` · `ProducaoImovel` · `ProducaoImovelDados`
 
 ### OS e ciclo de vida
-`OS` · `PROCESSO_SEI` · `OS_PROCESSO` · `MACROETAPA_LOG` *(DEPRECATED — usar `Encaminhamento` e `OS.encerrada`)* · `ENCAMINHAMENTO` · `TAREFA_INTERNA` · `COMENTARIO`
-
-A macroetapa atual e o histórico da OS são derivados dos registros de `ENCAMINHAMENTO` (campo `tipo_macroetapa`) e do flag `OS.encerrada`, formando uma timeline unificada — sem consulta ao `MACROETAPA_LOG`.
+`OS` · `OsProcesso` · `MacroetapaLog` *(DEPRECATED — substituído
+por Encaminhamento.tipo_macroetapa e OS.encerrada)* ·
+`Encaminhamento` · `TarefaInterna` · `OsUnidadeStatus`
 
 ### Produção
-`PRODUCAO` · `PRODUCAO_ATRIBUTO` · `PRODUCAO_STATUS_LOG` · `TIPO_PRODUCAO` · `TIPO_PRODUCAO_UNIDADE`
+`Producao` · `ProducaoAtributo` · `TipoProducao` · `ProducaoStatusLog`
 
 ### Pesquisa
-`REGISTRO_PESQUISA` · `META_PESQUISA`
+`RegistroPesquisa` · `MetaPesquisa`
+*(modelos implementados — interface pendente, ver §15.6)*
+
+### Preferências
+`PreferenciaGerencial`
 
 ### Auditoria
-`LOG_AUDITORIA`
+`LogAuditoria`
+
+---
+
+### Campos relevantes adicionados após arquitetura inicial
+
+**OS:**
+- `encerrada` (bool) — substitui MacroetapaLog para encerramento
+- `data_encerramento` (DateTimeField)
+
+**OsProcesso:**
+- `registrado_por` (FK → Servidor) — [PENDENTE IMPLEMENTAÇÃO]
+- `tipo_vinculo` com choices: PRINCIPAL / RELACIONADO —
+  [PENDENTE IMPLEMENTAÇÃO]
+- `aguardando_redistribuicao` (bool) — bloqueio de processos
+  incluídos enquanto OS estava em outra unidade
+
+**Encaminhamento:**
+- `tipo_macroetapa` — macroetapa registrada no encaminhamento
+- `automatico` (bool) — encaminhamento gerado pelo sistema
+- `manter_aberta_na_unidade` (bool) — mantém OsUnidadeStatus=ABERTA
+  na unidade de origem ao encaminhar
+- `tipo_acao` — [PENDENTE ELIMINAÇÃO — ver §5.3]
+
+**Producao:**
+- `unidade` (FK → UnidadeInterna) — unidade responsável
+- `servidor_responsavel` (FK → Servidor) — executor
+- `revisor` (FK → Servidor)
+- `autor_trabalho` (CharField)
+- `modelo_sugerido` (CharField)
+- `prazo_interno` (DateField)
+- `mes_cronograma` (DateField)
+- `numero_revisao` (PositiveIntegerField)
+- `numero_ajustes` (PositiveIntegerField)
+- `data_entrega_avaliacao`, `data_entrega_revisao`,
+  `data_entrega_ajustes`, `data_ajustes_ok`,
+  `data_homologar`, `data_enviado`
+
+**OsUnidadeStatus** *(novo):*
+- `os`, `unidade`, `status` (ABERTA/CONCLUIDA/REABERTA/SOMENTE_LEITURA)
+- `data_abertura`, `data_conclusao`
+- `aberta_por`, `concluida_por`
+- `manter_aberta` (bool)
+
+**PreferenciaGerencial** *(novo):*
+- `servidor` (OneToOne → Servidor)
+- `colunas_visiveis` (JSONField)
 
 ---
 
@@ -343,11 +674,10 @@ A macroetapa atual e o histórico da OS são derivados dos registros de `ENCAMIN
 ## 15. Funcionalidades futuras previstas
 
 ### 15.1 Visualização geográfica de imóveis
-Os campos latitude, longitude, coord_x e coord_y armazenados na entidade Imovel
-permitem a implementação futura de um mapa interativo para gerenciamento visual
-dos imóveis vinculados a OSs e produções. Bibliotecas candidatas: Leaflet.js
-(coordenadas geográficas) ou mapa base TM POA (coordenadas UTM locais).
-A implementação será definida após a conclusão das fases principais do sistema.
+A tela /imoveis/mapa/ já existe com marcadores para imóveis
+com coordenadas. [IMPLEMENTADO PARCIALMENTE]
+Pendente: carregar mapa sem marcadores iniciais (ver 15.7),
+histórico georreferenciado, otimização de performance.
 
 ### 15.2 Deduplicação e reaproveitamento de ISICs
 Imóveis sem inscrição cadastral (ISIC) tendem a ser recadastrados por diferentes
@@ -401,49 +731,16 @@ A implementação seguirá o modelo de marcadores customizáveis por equipe,
 similar ao existente no SEI.
 
 ### 15.6 Módulo de Pesquisa de Dados
-Módulo independente para gerenciamento de pesquisas de dados de mercado
-(ofertas de venda, ofertas de aluguel, guias de ITBI). Funciona em paralelo
-às Ordens de Serviço mas com ciclo de vida próprio, centrado na
-Demanda de Pesquisa como entidade principal.
-
-**Entidade central: Demanda de Pesquisa**
-- Pode ter ou não vínculo com processo SEI
-- Pode ter ou não vínculo com imóveis específicos
-- Tem um solicitante (qualquer servidor, inclusive de outra unidade)
-- Passa pelo Supervisor de Pesquisa antes de chegar ao pesquisador
-- Pode ser recorrente (proposta pela chefia) ou pontual
-
-**Fluxo:**
-Solicitação (qualquer servidor ou chefia) → Supervisor analisa e distribui
-→ Pesquisador(es) executam → Supervisor homologa/encerra
-
-**Tipos de demanda:**
-- Sem demanda específica: pesquisador decide dentro da meta
-- Com demanda específica da chefia: recorrente ou pontual
-- Com demanda de outro servidor/unidade: obrigatório passar pelo Supervisor
-
-**Perfis envolvidos:**
-- Solicitante: qualquer servidor, inclusive de outras unidades
-- Supervisor de Pesquisa: Técnico com FG (atualmente cargo de Supervisor na ESJL)
-- Pesquisador: Auxiliar Administrativo — Pesquisa (ESJL)
-
-**Visão do pesquisador:**
-- Número do processo SEI e dados dos imóveis vinculados (inscrição, endereço, área)
-- Visualização restrita a processos com inscrições do SIAT
-- Futuramente: lista de finalidades que necessitam dados de mercado como filtro
-
-**Metas:**
-- Definidas pelo Supervisor de Pesquisa (Técnico com FG ou substituto)
-- Individual e coletiva, por tipo de pesquisa ou agregada
-- Relatório semanal de entrega e apuração mensal vs. meta (exportável em Excel)
-
-**Tipos de pesquisa:** Guia de ITBI, Ofertas — Aluguel, Ofertas — Vendas
-
-**Implementação prevista para Fase 5 ou posterior.**
+Os modelos RegistroPesquisa e MetaPesquisa já estão
+implementados no banco. [MODELOS IMPLEMENTADOS]
+Pendente: interface completa do módulo de pesquisa,
+telas de registro semanal e apuração mensal de metas.
 
 ### 15.7 Otimização do mapa geral de imóveis
 Com volume de 280mil+ imóveis no banco, carregar todos os marcadores
 no mapa geral (/imoveis/mapa/) causa timeout e experiência ruim.
+Relacionado a 15.1 — mapa já existe mas carrega todos
+os marcadores sem paginação.
 
 Melhorias previstas:
 - Mapa inicia vazio, sem marcadores
@@ -502,15 +799,12 @@ externas de encaminhamento.
 Referência: campo Origem da planilha gerencial EAV (SIGA).
 
 ### 15.12 Revisão dos status de produção
-O sistema EAV possui dois status intermediários não implementados no SIPRAC:
-- **REVISADO**: estado entre PARA_REVISAO e PARA_AJUSTES — servidor entregou
-  para revisão, chefia ainda não avaliou
-- **HOMOLOGAR**: estado entre PARA_AJUSTES e HOMOLOGADO — ajustes aprovados
-  pela chefia, aguardando homologação formal
-
-Avaliar futuramente se esses estados intermediários são relevantes
-operacionalmente para a DAI, considerando o volume de trabalho e
-a necessidade de granularidade no rastreio do fluxo de revisão.
+[IMPLEMENTADO] Os status REVISADO e HOMOLOGAR foram
+implementados. O modelo final de status da produção
+está documentado na seção 7.4.
+Os status intermediários adicionais (VER_AJUSTES,
+ENTREGA_AJUSTES, AJUSTES_OK, ENVIADO) também foram
+implementados conforme definição da EAV.
 
 ### 15.13 Prazo Recompra ou ITBI
 Campo calculado presente na planilha gerencial EAV:
@@ -550,15 +844,9 @@ por tipo de produção técnica por unidade — considerando:
 - Integração com o dashboard gerencial e relatórios de produtividade
 
 ### 15.16 Correção de encoding nos dropdowns do formulário de OS
-No ambiente Railway (Linux/UTF-8), os textos dos dropdowns de Natureza
-estão exibindo caracteres corrompidos (ex: "Tribut Írio ÔÇô IPTU" em vez
-de "Tributário – IPTU"). Isso indica que os dados foram inseridos no banco
-com encoding incorreto (provavelmente via fixture gerada no Windows com
-encoding Latin-1/Windows-1252).
-
-Ação necessária: verificar o encoding dos dados de domínio (Natureza,
-TipoDemanda, Finalidade, CombinacaoValida) no banco do Railway e
-regenerar o dump em UTF-8 correto antes da próxima carga de dados.
+[RESOLVIDO] O problema de encoding foi corrigido com
+geração de dumps UTF-8 sem BOM para carga no Railway.
+Procedimento documentado em docs/RAILWAY_MANUTENCAO.md.
 
 ### 15.17 Acesso a OSs que nunca passaram pela unidade
 Servidores só podem acessar OSs que estejam ou já estiveram em sua unidade
@@ -566,9 +854,38 @@ Servidores só podem acessar OSs que estejam ou já estiveram em sua unidade
 invisíveis, exceto para perfis com visibilidade_total=True (DAI/Direção).
 Pendente definir: onde e como exibir essas OSs para perfis com
 visibilidade_total, sem misturar com a fila operacional da unidade.
+Relacionado à implementação da unidade DIVISÃO (§15.21)
+e ao nível de visibilidade DIVISAO (§9.2).
 
 ### 15.18 Reabertura global da OS
-Atualmente a reabertura é apenas na unidade (OsUnidadeStatus).
-Não há reabertura global da OS (OS.encerrada → False).
-Avaliar futuramente se é necessário reabrir uma OS encerrada na Divisão
-e qual perfil teria essa permissão (provável: apenas Direção/Administrador).
+Reabertura na unidade: [IMPLEMENTADO] via OsUnidadeStatus
+e OSReabrirNaUnidadeView. Apenas a chefia da unidade
+pode reabrir. OS volta ao status REABERTA na unidade.
+
+Reabertura global (OS.encerrada → False): [PENDENTE]
+Avaliar futuramente. Perfil provável: Direção/Administrador.
+
+### 15.19 Módulo de Notificações
+Estrutura separada do fluxo de OSs, acessível por item
+próprio no menu lateral, com visibilidade controlada
+por perfil. Usuários sem habilitação não veem o item
+no menu. Sabrina e Vanessa (ESJL) são as usuárias
+principais. Detalhar futuramente: tipos de notificação,
+fluxo, campos, integração com produção da ESJL.
+
+### 15.20 Painel de Consulta Geral
+Acessível a todos os usuários em modo somente leitura.
+Exibe informações resumidas de todas as OSs independente
+da unidade. Visão a definir. Implementar após
+consolidação das telas principais.
+
+### 15.21 Unidade DIVISÃO no sistema
+A DIVISÃO será criada como UnidadeInterna com
+tipo='ADMINISTRATIVA'. As unidades operacionais
+(DAI, EAV, ESJL, EPGV) terão tipo='OPERACIONAL'.
+Servidores com papel DIVISÃO (ex: Sabrina, Vanessa,
+Francisco) terão visibilidade de todas as OSs para
+consulta e gestão administrativa de entrada.
+Inclui implementação do seletor de perfil ativo
+para servidores com mais de um vínculo.
+Relacionado a §9.2 (visibilidade DIVISAO).
