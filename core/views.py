@@ -2115,19 +2115,29 @@ def _serializar_linhas_gerencial(
     ]
 
     macroetapa = macroetapa_atual_os(os_obj)
-    etapa_interna = "—"
+    status_unidade = None
+    etapa_interna = None
     if unidade_logada:
-        tarefa = (
-            TarefaInterna.objects.filter(
+        status_unidade = (
+            OsUnidadeStatus.objects.filter(
                 os=os_obj,
                 unidade=unidade_logada,
-                status="PENDENTE",
             )
-            .order_by("-data_inicio")
+            .values_list("status", flat=True)
             .first()
         )
-        if tarefa:
-            etapa_interna = tarefa.etapa_interna
+        if status_unidade in ("ABERTA", "REABERTA"):
+            tarefa = (
+                TarefaInterna.objects.filter(
+                    os=os_obj,
+                    unidade=unidade_logada,
+                )
+                .order_by("-data_inicio")
+                .first()
+            )
+            if tarefa:
+                etapa_interna = tarefa.etapa_interna
+        # CONCLUIDA / SOMENTE_LEITURA: não exibir etapa interna
 
     processo_principal = next(
         (p for p in processos if p.tipo_vinculo == "PRINCIPAL"),
@@ -2166,14 +2176,7 @@ def _serializar_linhas_gerencial(
         "prioridade": prioridade_label,
         "dias_sei": dias_sei,
         "prazo_recompra_itbi": "—",
-        "status_unidade": (
-            OsUnidadeStatus.objects.filter(
-                os=os_obj,
-                unidade=unidade_logada,
-            ).values_list("status", flat=True).first()
-            if unidade_logada
-            else None
-        ),
+        "status_unidade": status_unidade,
     }
 
     outra_equipe = False
@@ -2725,8 +2728,11 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["os"] = self.os_obj
-        context["unidade_origem"] = origem_encaminhamento(self.os_obj)
         servidor = _obter_servidor(self.request.user)
+        context["unidade_origem"] = origem_encaminhamento(
+            self.os_obj,
+            servidor_logado=servidor,
+        )
         unidade = _obter_unidade_principal_servidor(servidor) if servidor else None
         context["mostrar_manter_aberta"] = bool(
             unidade
@@ -2758,7 +2764,10 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         agora = timezone.now()
         dados = form.cleaned_data
         tipo_destino = dados["tipo_destino"]
-        unidade_origem = origem_encaminhamento(self.os_obj)
+        unidade_origem = origem_encaminhamento(
+            self.os_obj,
+            servidor_logado=servidor,
+        )
         manter_aberta = bool(dados.get("manter_aberta_na_unidade"))
         if tipo_destino == "EXTERNO":
             tipo_acao = "EXTERNO"

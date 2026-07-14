@@ -4,6 +4,10 @@
 {% block title %}Encaminhar {{ os.numero_os }} — SIPRAC{% endblock %}
 
 {% block content %}
+<div class="mb-2">
+  <button type="button" class="btn btn-link btn-sm text-decoration-none ps-0"
+          onclick="history.back()">← Voltar</button>
+</div>
 <h1 class="h3 mb-1 text-dark">Encaminhar OS</h1>
 <p class="text-muted mb-4">{{ os.numero_os }}</p>
 

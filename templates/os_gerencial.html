@@ -303,19 +303,25 @@ body.gerencial-mode .siprac-content {
             </td>
             <td class="gerencial-col-fixa">
               <div>{{ linha.macroetapa_label }}</div>
-              {% if linha.etapa_interna and linha.etapa_interna != '—' %}
+              {% with status_unidade=linha.status_unidade %}
+              {% if status_unidade == 'CONCLUIDA' %}
+              <div class="ms-2 small">
+                <span class="text-secondary">● Concluída</span>
+              </div>
+              {% elif status_unidade == 'ABERTA' or status_unidade == 'REABERTA' %}
+              {% if linha.etapa_interna %}
               <div class="ms-2 small text-muted">{{ linha.etapa_interna }}</div>
               {% endif %}
-              {% with status_unidade=linha.status_unidade %}
-              {% if status_unidade %}
               <div class="ms-2 small">
                 {% if status_unidade == 'ABERTA' %}
                 <span class="text-success">● Aberta</span>
-                {% elif status_unidade == 'CONCLUIDA' %}
-                <span class="text-secondary">● Concluída</span>
-                {% elif status_unidade == 'REABERTA' %}
+                {% else %}
                 <span class="text-warning">● Reaberta</span>
                 {% endif %}
+              </div>
+              {% elif status_unidade == 'SOMENTE_LEITURA' %}
+              <div class="ms-2 small">
+                <span class="text-muted">● Somente leitura</span>
               </div>
               {% endif %}
               {% endwith %}

@@ -364,27 +364,40 @@ def unidade_atual_da_os(os):
     return ultimo.unidade_interna_destino if ultimo else None
 
 
-def origem_encaminhamento(os):
+def origem_encaminhamento(os, servidor_logado=None):
     """
     Retorna a unidade de origem para o próximo encaminhamento.
-    Se o último evento for ENTRADA_DIVISAO ou INCLUSAO_PROCESSO,
-    retorna None (origem vazia).
-    Caso contrário, retorna a unidade atual da OS.
+    Preferencialmente a unidade do servidor com OsUnidadeStatus ABERTA/REABERTA.
     """
     ultimo = Encaminhamento.objects.filter(
         os=os,
-    ).order_by("-data_hora", "-id").first()
+    ).order_by("-data_hora").first()
 
-    if not ultimo:
-        return None
-
-    if ultimo.tipo_macroetapa in (
-        Encaminhamento.TIPO_MACROETAPA_ENTRADA_DIVISAO,
-        Encaminhamento.TIPO_MACROETAPA_INCLUSAO_PROCESSO,
+    if not ultimo or ultimo.tipo_macroetapa in (
+        "ENTRADA_DIVISAO",
+        "INCLUSAO_PROCESSO",
     ):
         return None
 
-    return unidade_atual_da_os(os)
+    if servidor_logado:
+        vinculos_ativos = servidor_logado.vinculos_unidade.filter(
+            data_fim__isnull=True,
+        ).values_list("unidade_id", flat=True)
+
+        status_aberto = (
+            OsUnidadeStatus.objects.filter(
+                os=os,
+                unidade_id__in=vinculos_ativos,
+                status__in=("ABERTA", "REABERTA"),
+            )
+            .select_related("unidade")
+            .first()
+        )
+
+        if status_aberto:
+            return status_aberto.unidade
+
+    return None
 
 
 ETAPAS_INTERNAS_LABELS = {

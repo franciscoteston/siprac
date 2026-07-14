@@ -6,6 +6,10 @@
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
   <div>
+    <div class="mb-2">
+      <button type="button" class="btn btn-link btn-sm text-decoration-none ps-0"
+              onclick="history.back()">← Voltar</button>
+    </div>
     <h1 class="h3 mb-2 text-dark d-flex flex-wrap align-items-center gap-2">
       {{ os.numero_os }}
       {% if os.apelido %}
@@ -447,7 +451,6 @@
   </div>
 </div>
 
-<a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Voltar ao dashboard</a>
 {% endblock %}
 
 {% block extra_css %}
