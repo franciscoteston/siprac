@@ -205,9 +205,9 @@ class EncaminhamentoForm(forms.Form):
     )
     etapa_interna = forms.ChoiceField(
         label="Etapa interna",
-        choices=Encaminhamento.ETAPA_INTERNA_CHOICES,
-        initial="ENTRADA",
+        choices=[("", "---------")] + list(Encaminhamento.ETAPA_INTERNA_CHOICES),
         required=False,
+        initial="",
     )
     aguarda_retorno = forms.BooleanField(
         label="Aguarda retorno",

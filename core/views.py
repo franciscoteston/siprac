@@ -2870,9 +2870,8 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
 
     def get_initial(self):
         initial = super().get_initial()
-        # Padrão: ENTRADA (unidade diferente). O JS ajusta para TRIAGEM
-        # se o destino for a unidade atual da OS.
-        initial.setdefault("etapa_interna", "ENTRADA")
+        # Deixa etapa em branco; o JS preenche conforme o destino selecionado.
+        initial.setdefault("etapa_interna", "")
         return initial
 
     def form_valid(self, form):
