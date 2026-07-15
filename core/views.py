@@ -2868,7 +2868,7 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
 
     def get_initial(self):
         initial = super().get_initial()
-        initial.setdefault("etapa_interna", "TRIAGEM")
+        initial.setdefault("etapa_interna", "ENTRADA")
         return initial
 
     def form_valid(self, form):

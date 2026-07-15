@@ -101,8 +101,10 @@ document.addEventListener('DOMContentLoaded', function () {
     secaoExterno.classList.toggle('d-none', interno);
     camposInternos.classList.toggle('d-none', !interno);
 
-    if (interno && etapaInterna && !etapaInterna.value) {
-      etapaInterna.value = 'TRIAGEM';
+    if (interno && etapaInterna) {
+      if (!etapaInterna.value || etapaInterna.value === 'TRIAGEM') {
+        etapaInterna.value = 'ENTRADA';
+      }
     }
   }
 

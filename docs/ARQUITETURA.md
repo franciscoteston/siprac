@@ -191,7 +191,7 @@ O campo Encaminhamento.etapa_interna registra em qual
 etapa da OS a unidade se encontra. É o segundo nível
 hierárquico, abaixo da macroetapa global.
 
-[PENDENTE IMPLEMENTAÇÃO] Choices a implementar:
+Choices implementados (migração 0029):
 
 | Código | Label | Quem aciona |
 |---|---|---|
@@ -203,7 +203,8 @@ hierárquico, abaixo da macroetapa global.
 | HOMOLOGACAO | Homologação | Coordenação/Chefia |
 | CONCLUIDA | Concluída | Automático ao encaminhar para fora |
 
-Atualmente o campo é CharField livre sem choices definidos.
+O mesmo conjunto de choices é usado em TarefaInterna.etapa_interna.
+O valor padrão ao encaminhar para outra unidade é ENTRADA.
 
 ### 5.3 Tipo de ação (tipo_acao)
 

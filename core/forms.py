@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from core.models import (
     CombinacaoValida,
+    Encaminhamento,
     Finalidade,
     Imovel,
     Natureza,
@@ -204,16 +205,8 @@ class EncaminhamentoForm(forms.Form):
     )
     etapa_interna = forms.ChoiceField(
         label="Etapa interna",
-        choices=[
-            ("ENTRADA", "Entrada"),
-            ("TRIAGEM", "Triagem"),
-            ("EM_ATENDIMENTO", "Em atendimento"),
-            ("DEVOLUCAO", "Devolução"),
-            ("SOLICITACAO_AJUSTE", "Solicitação de ajuste"),
-            ("HOMOLOGACAO", "Homologação"),
-            ("CONCLUIDA", "Concluída"),
-        ],
-        initial="TRIAGEM",
+        choices=Encaminhamento.ETAPA_INTERNA_CHOICES,
+        initial="ENTRADA",
         required=False,
     )
     aguarda_retorno = forms.BooleanField(
