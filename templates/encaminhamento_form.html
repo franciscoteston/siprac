@@ -87,11 +87,26 @@
 
 {% block extra_js %}
 <script>
+const unidadeAtualPk = "{{ unidade_atual_pk|default:'' }}";
+
+function atualizarEtapaInterna() {
+  const destino = document.getElementById('id_unidade_interna_destino');
+  const etapa = document.getElementById('id_etapa_interna');
+  if (!destino || !etapa) return;
+
+  const destinoPk = destino.value;
+  if (destinoPk && String(destinoPk) === String(unidadeAtualPk)) {
+    etapa.value = 'TRIAGEM';
+  } else {
+    etapa.value = 'ENTRADA';
+  }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   const secaoInterno = document.getElementById('secao-interno');
   const secaoExterno = document.getElementById('secao-externo');
   const camposInternos = document.getElementById('campos-internos');
-  const etapaInterna = document.getElementById('id_etapa_interna');
+  const destino = document.getElementById('id_unidade_interna_destino');
   const radios = document.querySelectorAll('input[name="tipo_destino"]');
 
   function atualizarSecoes() {
@@ -101,11 +116,13 @@ document.addEventListener('DOMContentLoaded', function () {
     secaoExterno.classList.toggle('d-none', interno);
     camposInternos.classList.toggle('d-none', !interno);
 
-    if (interno && etapaInterna) {
-      if (!etapaInterna.value || etapaInterna.value === 'TRIAGEM') {
-        etapaInterna.value = 'ENTRADA';
-      }
+    if (interno) {
+      atualizarEtapaInterna();
     }
+  }
+
+  if (destino) {
+    destino.addEventListener('change', atualizarEtapaInterna);
   }
 
   radios.forEach(function (radio) {

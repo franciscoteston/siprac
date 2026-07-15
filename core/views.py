@@ -2864,10 +2864,14 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 status="ABERTA",
             ).exists()
         )
+        unidade_atual = unidade_atual_da_os(self.os_obj)
+        context["unidade_atual_pk"] = unidade_atual.pk if unidade_atual else None
         return context
 
     def get_initial(self):
         initial = super().get_initial()
+        # Padrão: ENTRADA (unidade diferente). O JS ajusta para TRIAGEM
+        # se o destino for a unidade atual da OS.
         initial.setdefault("etapa_interna", "ENTRADA")
         return initial
 
