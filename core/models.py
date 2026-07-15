@@ -38,12 +38,24 @@ class Servidor(models.Model):
 class PerfilAcesso(models.Model):
     """Perfil de permissões vinculado ao cargo do servidor na unidade."""
 
+    VISIBILIDADE_CHOICES = [
+        ("UNIDADE", "Apenas sua unidade"),
+        ("DEPARTAMENTO", "Todas as OSs (consulta e entrada)"),
+        ("TOTAL", "Total (edição completa)"),
+    ]
+
     nome = models.CharField(max_length=255)
     pode_criar_os = models.BooleanField(default=False)
     pode_encerrar_os = models.BooleanField(default=False)
     pode_criar_os_interna = models.BooleanField(default=False)
     pode_homologar = models.BooleanField(default=False)
     visibilidade_total = models.BooleanField(default=False)
+    visibilidade = models.CharField(
+        max_length=15,
+        choices=VISIBILIDADE_CHOICES,
+        default="UNIDADE",
+        verbose_name="Visibilidade",
+    )
     admin_sistema = models.BooleanField(default=False)
 
     class Meta:

@@ -115,19 +115,22 @@ class UnidadeInternaAdmin(admin.ModelAdmin):
 class ServidorUnidadeAdmin(admin.ModelAdmin):
     """Vínculos de lotação servidor-unidade."""
 
-    list_display = (
+    list_display = [
         "servidor",
         "unidade",
         "perfil",
         "cargo",
-        "substituto",
         "data_inicio",
         "data_fim",
-    )
-    list_filter = ("unidade", "perfil", "substituto")
-    search_fields = ("servidor__nome", "servidor__login", "unidade__sigla", "cargo")
-    autocomplete_fields = ("servidor", "unidade", "perfil")
-    ordering = ("-data_inicio",)
+    ]
+    list_filter = ["unidade", "perfil", "data_fim"]
+    search_fields = [
+        "servidor__nome",
+        "servidor__login",
+    ]
+    ordering = ["servidor__nome", "unidade__sigla"]
+    raw_id_fields = ["servidor"]
+    autocomplete_fields = ("unidade", "perfil")
     date_hierarchy = "data_inicio"
 
 
@@ -135,21 +138,44 @@ class ServidorUnidadeAdmin(admin.ModelAdmin):
 class PerfilAcessoAdmin(admin.ModelAdmin):
     """Perfis de acesso e permissões."""
 
-    list_display = (
+    list_display = [
         "nome",
-        "pode_criar_os",
-        "pode_encerrar_os",
-        "pode_criar_os_interna",
-        "pode_homologar",
-        "visibilidade_total",
-        "admin_sistema",
-    )
-    list_filter = (
+        "visibilidade",
         "pode_criar_os",
         "pode_encerrar_os",
         "pode_homologar",
         "admin_sistema",
-    )
+    ]
+    list_editable = [
+        "visibilidade",
+        "pode_criar_os",
+        "pode_encerrar_os",
+        "pode_homologar",
+        "admin_sistema",
+    ]
+    fieldsets = [
+        ("Identificação", {
+            "fields": ["nome"],
+        }),
+        ("Visibilidade", {
+            "fields": ["visibilidade"],
+            "description": (
+                "UNIDADE: só vê OSs da própria unidade. "
+                "DEPARTAMENTO: vê todas (consulta e entrada). "
+                "TOTAL: acesso completo a todas as OSs."
+            ),
+        }),
+        ("Permissões operacionais", {
+            "fields": [
+                "pode_criar_os",
+                "pode_encerrar_os",
+                "pode_homologar",
+                "pode_criar_os_interna",
+                "visibilidade_total",
+                "admin_sistema",
+            ],
+        }),
+    ]
     search_fields = ("nome",)
     ordering = ("nome",)
 

@@ -889,3 +889,10 @@ consulta e gestão administrativa de entrada.
 Inclui implementação do seletor de perfil ativo
 para servidores com mais de um vínculo.
 Relacionado a §9.2 (visibilidade DEPARTAMENTO).
+
+### 15.22 Painel de administração de usuários
+Tela própria no SIPRAC (/administracao/usuarios/) para
+gestão de servidores, perfis e vínculos com checkboxes
+intuitivos, sem depender do Django Admin.
+Implementar após consolidação das telas principais.
+Atualmente gerenciado via Django Admin (/admin/).

@@ -74,6 +74,8 @@ class PerfilAcessoMiddleware:
     def __call__(self, request):
         request.perfil_acesso = None
         request.admin_sistema = False
+        request.vinculo_ativo = None
+        request.visibilidade = "UNIDADE"
 
         if request.user.is_authenticated:
             try:
@@ -82,7 +84,13 @@ class PerfilAcessoMiddleware:
                 servidor = None
 
             if servidor is not None:
-                request.perfil_acesso = obter_perfil_acesso_ativo(servidor)
+                request.vinculo_ativo = obter_vinculo_unidade_ativo(servidor)
+                request.perfil_acesso = (
+                    request.vinculo_ativo.perfil if request.vinculo_ativo else None
+                )
                 request.admin_sistema = servidor_tem_admin_sistema(servidor)
+                request.visibilidade = getattr(
+                    request.perfil_acesso, "visibilidade", "UNIDADE"
+                )
 
         return self.get_response(request)

@@ -1076,6 +1076,31 @@ def _aplicar_visibilidade_os(queryset, request):
     ).distinct()
 
 
+def _queryset_os_por_visibilidade(request):
+    servidor = _obter_servidor(request.user)
+    if not servidor:
+        return OS.objects.none()
+
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+        return OS.objects.filter(encerrada=False)
+
+    # UNIDADE
+    vinculo = getattr(request, "vinculo_ativo", None)
+    if not vinculo:
+        return OS.objects.none()
+    return OS.objects.filter(
+        encerrada=False,
+        status_unidades__unidade=vinculo.unidade,
+        status_unidades__status__in=(
+            "ABERTA",
+            "REABERTA",
+            "CONCLUIDA",
+        ),
+    ).distinct()
+
+
 def _aplicar_filtros_os(queryset, request):
     macroetapa = request.GET.get("macroetapa", "").strip()
     natureza_id = request.GET.get("natureza", "").strip()
@@ -2469,10 +2494,8 @@ class OSListView(RequerLoginMixin, ListView):
         return self.paginate_by
 
     def get_queryset(self):
-        queryset = _aplicar_visibilidade_os(
-            _queryset_os_anotado(),
-            self.request,
-        )
+        os_visiveis = _queryset_os_por_visibilidade(self.request)
+        queryset = _queryset_os_anotado().filter(pk__in=os_visiveis.values("pk"))
         queryset = _aplicar_filtros_os(queryset, self.request)
         self._qs_gerencial_completo = queryset
 
