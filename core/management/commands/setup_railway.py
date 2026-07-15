@@ -44,11 +44,11 @@ class Command(BaseCommand):
             f'Users: {criados} criados, {atualizados} atualizados.'
         ))
 
-        # 2. Garantir unidade DIVISAO antes dos vinculos
+        # 2. Garantir unidade DEPARTAMENTO antes dos vinculos
         divisao, divisao_created = UnidadeInterna.objects.get_or_create(
-            sigla='DIVISAO',
+            sigla='DEPARTAMENTO',
             defaults={
-                'nome': 'Divisão de Avaliação de Imóveis',
+                'nome': 'Departamento',
                 'tipo': 'ADMINISTRATIVA',
             },
         )
@@ -56,11 +56,11 @@ class Command(BaseCommand):
             divisao.tipo = 'ADMINISTRATIVA'
             divisao.save(update_fields=['tipo'])
         if divisao_created:
-            self.stdout.write(self.style.SUCCESS('Unidade DIVISAO criada (ADMINISTRATIVA).'))
+            self.stdout.write(self.style.SUCCESS('Unidade DEPARTAMENTO criada (ADMINISTRATIVA).'))
         else:
-            self.stdout.write('Unidade DIVISAO ja existente.')
+            self.stdout.write('Unidade DEPARTAMENTO ja existente.')
 
-        UnidadeInterna.objects.exclude(sigla='DIVISAO').update(tipo='OPERACIONAL')
+        UnidadeInterna.objects.exclude(sigla='DEPARTAMENTO').update(tipo='OPERACIONAL')
 
         # 3. Carregar dados de servidores (lista plana: 1 entrada = 1 vinculo)
         if not os.path.exists('servidores_config.json'):

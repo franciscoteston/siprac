@@ -56,7 +56,7 @@ class PerfilAcesso(models.Model):
 
 
 class UnidadeInterna(models.Model):
-    """Unidade interna da DAI (DIVISAO, DAI, EAV, ESJL, EPGV)."""
+    """Unidade interna da DAI (DEPARTAMENTO, DAI, EAV, ESJL, EPGV)."""
 
     TIPO_CHOICES = [
         ("ADMINISTRATIVA", "Administrativa"),
