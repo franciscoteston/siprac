@@ -16,6 +16,44 @@ STATUS_ATIVOS = [
 ]
 
 
+def os_editavel_para_usuario(os, request):
+    """
+    Retorna True se o usuário logado pode editar a OS.
+
+    Regras:
+    - Visibilidade TOTAL: sempre pode editar
+    - Visibilidade DEPARTAMENTO: pode editar (criar OS, registrar processo)
+      mas NÃO pode encaminhar nem criar produção
+    - Visibilidade UNIDADE: só pode editar se OsUnidadeStatus
+      da sua unidade for ABERTA ou REABERTA
+    - Se OsUnidadeStatus for CONCLUIDA ou SOMENTE_LEITURA:
+      somente leitura
+    """
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+
+    if visibilidade == "TOTAL":
+        return True
+
+    vinculo = getattr(request, "vinculo_ativo", None)
+    if not vinculo:
+        return False
+
+    if visibilidade == "DEPARTAMENTO":
+        # DEPARTAMENTO pode criar OS e registrar processo
+        # mas não pode editar OS que está em unidade operacional
+        return True
+
+    # UNIDADE — verificar OsUnidadeStatus
+    try:
+        status = OsUnidadeStatus.objects.get(
+            os=os,
+            unidade=vinculo.unidade,
+        )
+        return status.status in ("ABERTA", "REABERTA")
+    except OsUnidadeStatus.DoesNotExist:
+        return False
+
+
 def _atualizar_status_unidade_encaminhamento(
     os,
     unidade_origem,

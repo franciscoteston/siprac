@@ -65,6 +65,7 @@ from core.os_service import (
     origem_encaminhamento,
     os_ativas_por_unidade,
     os_da_unidade_atual,
+    os_editavel_para_usuario,
     queryset_os_com_macroetapa,
     registrar_encaminhamento_automatico,
     timeline_os,
@@ -112,6 +113,10 @@ from core.models import (
 
 
 MSG_SEM_PERMISSAO = "Você não tem permissão para realizar esta ação."
+MSG_OS_SOMENTE_LEITURA = (
+    "Esta OS está em modo somente leitura para sua unidade. "
+    "Solicite a reabertura à chefia da unidade responsável."
+)
 
 NIVEL_VISAO_SISTEMICA = "SISTEMICA"
 NIVEL_VISAO_UNIDADE = "UNIDADE"
@@ -2780,18 +2785,31 @@ class OSDetailView(RequerLoginMixin, DetailView):
             .order_by("-data_hora")
         )
         servidor = _obter_servidor(self.request.user)
-        unidade = _obter_unidade_principal_servidor(servidor) if servidor else None
+        vinculo = getattr(self.request, "vinculo_ativo", None)
+        unidade = (
+            vinculo.unidade
+            if vinculo
+            else (_obter_unidade_principal_servidor(servidor) if servidor else None)
+        )
         context["data_entrada_unidade_atual"] = (
             data_entrada_unidade(os_obj, unidade) if unidade else None
         )
         status_unidade = None
-        if unidade:
+        if vinculo:
+            status_unidade = OsUnidadeStatus.objects.filter(
+                os=os_obj,
+                unidade=vinculo.unidade,
+            ).first()
+        elif unidade:
             status_unidade = OsUnidadeStatus.objects.filter(
                 os=os_obj,
                 unidade=unidade,
             ).first()
+        context["status_unidade"] = status_unidade
         context["status_unidade_atual"] = status_unidade
+        context["os_editavel"] = os_editavel_para_usuario(os_obj, self.request)
         perfil = getattr(self.request, "perfil_acesso", None)
+        context["pode_homologar"] = bool(perfil and perfil.pode_homologar)
         context["pode_reabrir_na_unidade"] = (
             perfil is not None
             and perfil.pode_homologar
@@ -2809,6 +2827,16 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
         if _obter_servidor(request.user) is None:
             messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if not os_editavel_para_usuario(self.os_obj, request):
+            messages.error(request, MSG_OS_SOMENTE_LEITURA)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
+            messages.error(
+                request,
+                "Perfil DEPARTAMENTO não pode encaminhar OS. "
+                "Encaminhe com um vínculo operacional.",
+            )
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
@@ -2967,6 +2995,16 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
         if _obter_servidor(request.user) is None:
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if not os_editavel_para_usuario(self.os_obj, request):
+            messages.error(request, MSG_OS_SOMENTE_LEITURA)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
+            messages.error(
+                request,
+                "Perfil DEPARTAMENTO não pode registrar produção. "
+                "Use um vínculo operacional.",
+            )
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -3042,6 +3080,9 @@ class OSEncerramentoView(RequerLoginMixin, FormView):
         if perfil is None or not perfil.pode_encerrar_os:
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if not os_editavel_para_usuario(self.os_obj, request):
+            messages.error(request, MSG_OS_SOMENTE_LEITURA)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -3102,6 +3143,9 @@ class OSVincularProcessoView(RequerLoginMixin, FormView):
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         if _os_esta_encerrada(self.os_obj):
             messages.error(request, "Não é possível incluir processos em OS encerrada.")
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+        if not os_editavel_para_usuario(self.os_obj, request):
+            messages.error(request, MSG_OS_SOMENTE_LEITURA)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
@@ -4970,6 +5014,9 @@ class OSVincularImovelView(RequerLoginMixin, View):
 
     def dispatch(self, request, *args, **kwargs):
         self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
+        if not os_editavel_para_usuario(self.os_obj, request):
+            messages.error(request, MSG_OS_SOMENTE_LEITURA)
+            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
