@@ -1,3 +1,5 @@
+import datetime
+
 from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.utils import timezone
 
@@ -144,10 +146,25 @@ def timeline_os(os):
     """
     eventos = []
 
+    # Buscar data_entrada_divisao do processo principal
+    processo_principal = os.processos_vinculados.filter(
+        tipo_vinculo="PRINCIPAL"
+    ).first()
+
+    if processo_principal and processo_principal.data_entrada_divisao:
+        data_entrada = datetime.datetime.combine(
+            processo_principal.data_entrada_divisao,
+            datetime.time.min,
+            tzinfo=timezone.get_current_timezone(),
+        )
+    else:
+        data_entrada = os.data_criacao_sgbd
+
     eventos.append({
         "tipo": "ENTRADA_DIVISAO",
         "label": "Entrada na Divisão",
-        "data_hora": os.data_criacao_sgbd,
+        "data_hora": data_entrada,
+        "exibir_hora": False,  # novo campo para controle
         "servidor": os.criado_por,
         "automatico": True,
         "observacao": "",

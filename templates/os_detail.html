@@ -358,7 +358,13 @@
         <tbody>
           {% for evento in timeline %}
           <tr>
-            <td>{{ evento.data_hora|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if evento.exibir_hora == False %}
+              {{ evento.data_hora|date:"d/m/Y" }}
+              {% else %}
+              {{ evento.data_hora|date:"d/m/Y H:i" }}
+              {% endif %}
+            </td>
             <td>
               <i class="bi {{ evento.icone }}"></i>
               <span class="badge bg-{{ evento.cor }}">{{ evento.label }}</span>

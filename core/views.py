@@ -2725,6 +2725,13 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields["unidade_interna_destino"].queryset = (
+            UnidadeInterna.objects.filter(tipo="OPERACIONAL").order_by("sigla")
+        )
+        return form
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["os"] = self.os_obj

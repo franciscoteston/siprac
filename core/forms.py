@@ -40,7 +40,7 @@ class OSForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date"}),
         label="Data de entrada na Divisão",
         required=True,
-        help_text="Data em que o processo chegou à DAI",
+        help_text="Data em que o processo chegou à Divisão",
     )
     natureza = forms.ModelChoiceField(
         label="Natureza",
@@ -187,7 +187,9 @@ class EncaminhamentoForm(forms.Form):
     )
     unidade_interna_destino = forms.ModelChoiceField(
         label="Unidade interna destino",
-        queryset=UnidadeInterna.objects.all().order_by("sigla"),
+        queryset=UnidadeInterna.objects.filter(
+            tipo="OPERACIONAL",
+        ).order_by("sigla"),
         required=False,
     )
     servidor_destino = forms.ModelChoiceField(
