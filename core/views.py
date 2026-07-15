@@ -2483,6 +2483,64 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
     }
 
 
+def _etapas_unidades_abertas(os):
+    from core.os_service import ETAPAS_INTERNAS_LABELS
+
+    status_abertos = OsUnidadeStatus.objects.filter(
+        os=os,
+        status__in=("ABERTA", "REABERTA"),
+    ).select_related("unidade")
+
+    resultado = []
+    for su in status_abertos:
+        tarefa = (
+            TarefaInterna.objects.filter(
+                os=os,
+                unidade=su.unidade,
+                status="PENDENTE",
+            )
+            .order_by("-data_inicio")
+            .first()
+        )
+
+        if tarefa and tarefa.etapa_interna:
+            etapa = ETAPAS_INTERNAS_LABELS.get(
+                tarefa.etapa_interna,
+                tarefa.etapa_interna,
+            )
+        else:
+            etapa = "—"
+
+        resultado.append(
+            {
+                "sigla": su.unidade.sigla,
+                "etapa": etapa,
+                "status_unidade": su.status,
+            }
+        )
+    return resultado
+
+
+def _enriquecer_os_lista(ordens):
+    from core.templatetags.siprac_filters import MACROETAPA_LABELS
+
+    for os_obj in ordens:
+        os_obj.unidades_abertas = _etapas_unidades_abertas(os_obj)
+        os_obj.macroetapa_display = MACROETAPA_LABELS.get(
+            getattr(os_obj, "macroetapa_atual", None),
+            getattr(os_obj, "macroetapa_atual", None) or "—",
+        )
+        processos = list(os_obj.processos_vinculados.all())
+        processos.sort(key=lambda op: (0 if op.tipo_vinculo == "PRINCIPAL" else 1, op.pk))
+        os_obj.processos_lista = [
+            {
+                "numero_processo": op.processo_sei.numero_processo,
+                "tipo_vinculo": op.tipo_vinculo,
+            }
+            for op in processos
+        ]
+
+
 class OSListView(RequerLoginMixin, ListView):
     template_name = "os_list.html"
     context_object_name = "ordens"
@@ -2516,6 +2574,10 @@ class OSListView(RequerLoginMixin, ListView):
                 queryset = queryset.filter(pk__in=os_ids)
             else:
                 queryset = queryset.none()
+        else:
+            queryset = queryset.prefetch_related(
+                "processos_vinculados__processo_sei",
+            )
 
         return _ordenar_queryset_os_fila(queryset)
 
@@ -2566,6 +2628,8 @@ class OSListView(RequerLoginMixin, ListView):
                     linhas_pagina,
                 ),
             )
+        else:
+            _enriquecer_os_lista(context["ordens"])
         return context
 
 

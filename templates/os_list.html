@@ -87,10 +87,10 @@
   <table class="table table-hover siprac-table align-middle mb-0">
     <thead>
       <tr>
-        <th scope="col">Nº OS</th>
-        <th scope="col">Processo SEI</th>
+        <th scope="col">Nº OS / Processo SEI</th>
         <th scope="col">Natureza</th>
-        <th scope="col">Etapa</th>
+        <th scope="col">Macroetapa</th>
+        <th scope="col">Etapa na unidade</th>
         <th scope="col">Prazo OS</th>
         <th scope="col">Prazo interno</th>
         <th scope="col">Prioridade</th>
@@ -100,12 +100,48 @@
       {% for os in ordens %}
       <tr class="siprac-os-row" data-href="{% url 'os_detalhe' os.pk %}" style="cursor: pointer;">
         <td>
-          <a href="{% url 'os_detalhe' os.pk %}" class="text-decoration-none fw-semibold"
-             onclick="event.stopPropagation();">{{ os.numero_os }}{% if os.apelido %} ({{ os.apelido }}){% endif %}</a>
+          <div class="fw-bold">
+            <a href="{% url 'os_detalhe' os.pk %}" class="text-decoration-none"
+               onclick="event.stopPropagation();">{{ os.numero_os }}</a>
+            {% if os.apelido %}
+            <small class="text-muted ms-1">({{ os.apelido }})</small>
+            {% endif %}
+          </div>
+          {% for proc in os.processos_lista %}
+          <div class="ms-3 small text-muted">
+            <i class="bi bi-file-text"></i>
+            {{ proc.numero_processo }}
+            {% if proc.tipo_vinculo == 'RELACIONADO' %}
+            <span class="badge bg-info" style="font-size:9px;">Rel.</span>
+            {% endif %}
+          </div>
+          {% endfor %}
         </td>
-        <td>{% if os.processo_sei_numero %}{{ os.processo_sei_numero }}{% else %}—{% endif %}</td>
         <td>{{ os.natureza.descricao }}</td>
-        <td>{% if os.macroetapa_atual %}{{ os.macroetapa_atual|macroetapa_display }}{% else %}—{% endif %}</td>
+        <td>
+          <div>{{ os.macroetapa_display }}</div>
+          {% for uu in os.unidades_abertas %}
+          <div class="ms-2 small">
+            <span class="badge bg-primary" style="font-size:10px;">
+              {{ uu.sigla }}
+            </span>
+            {% if uu.status_unidade == 'REABERTA' %}
+            <span class="badge bg-warning" style="font-size:9px;">Reaberta</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </td>
+        <td>
+          {% for uu in os.unidades_abertas %}
+          <div class="small">
+            <span class="text-muted">{{ uu.sigla }}:</span>
+            {{ uu.etapa|default:"—" }}
+          </div>
+          {% endfor %}
+          {% if not os.unidades_abertas %}
+          <span class="text-muted">—</span>
+          {% endif %}
+        </td>
         <td>
           {% if os.prazo_data %}
             {{ os.prazo_data|date:"d/m/Y" }}
