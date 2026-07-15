@@ -16,6 +16,14 @@ STATUS_ATIVOS = [
 ]
 
 
+def is_primeiro_encaminhamento(os):
+    """
+    Retorna True se a OS ainda não foi encaminhada para
+    nenhuma unidade operacional (nenhum OsUnidadeStatus existe).
+    """
+    return not OsUnidadeStatus.objects.filter(os=os).exists()
+
+
 def os_editavel_para_usuario(os, request):
     """
     Retorna True se o usuário logado pode editar a OS.

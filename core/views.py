@@ -65,6 +65,7 @@ from core.os_service import (
     origem_encaminhamento,
     os_ativas_por_unidade,
     os_da_unidade_atual,
+    is_primeiro_encaminhamento,
     os_editavel_para_usuario,
     queryset_os_com_macroetapa,
     registrar_encaminhamento_automatico,
@@ -2831,6 +2832,7 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context["status_unidade"] = status_unidade
         context["status_unidade_atual"] = status_unidade
         context["os_editavel"] = os_editavel_para_usuario(os_obj, self.request)
+        context["is_primeiro_encaminhamento"] = is_primeiro_encaminhamento(os_obj)
         perfil = getattr(self.request, "perfil_acesso", None)
         context["pode_homologar"] = bool(perfil and perfil.pode_homologar)
         context["pode_reabrir_na_unidade"] = (
@@ -2855,12 +2857,18 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
             messages.error(request, MSG_OS_SOMENTE_LEITURA)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
-            messages.error(
-                request,
-                "Perfil DEPARTAMENTO não pode encaminhar OS. "
-                "Encaminhe com um vínculo operacional.",
-            )
-            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
+            # DEPARTAMENTO só pode fazer o primeiro encaminhamento
+            # ou incluir processo relacionado
+            if not is_primeiro_encaminhamento(self.os_obj):
+                messages.error(
+                    request,
+                    "Perfil DEPARTAMENTO só pode fazer o primeiro "
+                    "encaminhamento. Para reencaminhar, use um "
+                    "vínculo operacional.",
+                )
+                return redirect(
+                    reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}),
+                )
         return super().dispatch(request, *args, **kwargs)
 
     def get_form(self, form_class=None):
