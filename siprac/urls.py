@@ -46,12 +46,14 @@ from core.views import (
     SipracLoginView,
     SipracLogoutView,
     TiposDemandaAPIView,
+    TrocarPerfilView,
 )
 
 urlpatterns = [
     path('', DashboardView.as_view(), name='dashboard'),
     path('login/', SipracLoginView.as_view(), name='login'),
     path('logout/', SipracLogoutView.as_view(), name='logout'),
+    path('trocar-perfil/', TrocarPerfilView.as_view(), name='trocar_perfil'),
     path('os/nova/', OSCreateView.as_view(), name='os_nova'),
     path('os/<int:pk>/encaminhar/', EncaminhamentoCreateView.as_view(), name='os_encaminhar'),
     path(

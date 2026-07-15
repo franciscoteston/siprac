@@ -21,12 +21,14 @@ def siprac_navbar(request):
     except Servidor.DoesNotExist:
         return context
 
-    vinculo = (
-        servidor.vinculos_unidade.filter(data_fim__isnull=True)
-        .select_related("unidade", "perfil")
-        .order_by("-perfil__pode_homologar")
-        .first()
-    )
+    vinculo = getattr(request, "vinculo_ativo", None)
+    if vinculo is None:
+        vinculo = (
+            servidor.vinculos_unidade.filter(data_fim__isnull=True)
+            .select_related("unidade", "perfil")
+            .order_by("-perfil__pode_homologar")
+            .first()
+        )
     if vinculo:
         context["vinculo_navbar"] = vinculo
 

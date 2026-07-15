@@ -1279,6 +1279,29 @@ class SipracLogoutView(LogoutView):
     next_page = reverse_lazy("login")
 
 
+class TrocarPerfilView(RequerLoginMixin, View):
+    def post(self, request):
+        vinculo_id = request.POST.get("vinculo_id")
+        servidor = _obter_servidor(request.user)
+
+        if vinculo_id and servidor:
+            try:
+                hoje = timezone.localdate()
+                vinculo = ServidorUnidade.objects.get(
+                    pk=vinculo_id,
+                    servidor=servidor,
+                    data_inicio__lte=hoje,
+                )
+                if vinculo.data_fim is not None and vinculo.data_fim < hoje:
+                    raise ServidorUnidade.DoesNotExist
+                request.session["vinculo_ativo_id"] = vinculo.pk
+            except (ServidorUnidade.DoesNotExist, ValueError, TypeError):
+                pass
+
+        next_url = request.META.get("HTTP_REFERER") or "/"
+        return redirect(next_url)
+
+
 class DashboardView(RequerLoginMixin, TemplateView):
     template_name = "dashboard.html"
 

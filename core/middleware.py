@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from core.models import Servidor
 
-# Ordem decrescente de hierarquia (índice menor = maior nível).
+# Ordem decrescente de hierarquia por nome de perfil (legado).
 HIERARQUIA_PERFIS = (
     "Administrador",
     "Diretor",
@@ -14,6 +14,13 @@ HIERARQUIA_PERFIS = (
     "Aux. Adm. Gestão",
     "Aux. Adm. Pesquisa",
 )
+
+# Hierarquia por nível de visibilidade (menor = maior prioridade).
+ORDEM_VISIBILIDADE = {
+    "TOTAL": 0,
+    "DEPARTAMENTO": 1,
+    "UNIDADE": 2,
+}
 
 
 def _nivel_hierarquico(nome_perfil: str) -> int:
@@ -41,20 +48,26 @@ def servidor_tem_admin_sistema(servidor: Servidor) -> bool:
     ).exists()
 
 
+def _escolher_vinculo_padrao(vinculos):
+    """Escolhe vínculo por visibilidade (TOTAL > DEPARTAMENTO > UNIDADE), depois data_inicio."""
+    if not vinculos:
+        return None
+
+    def chave(vinculo):
+        visibilidade = getattr(vinculo.perfil, "visibilidade", "UNIDADE") or "UNIDADE"
+        ordem = ORDEM_VISIBILIDADE.get(visibilidade, 99)
+        data_inicio = vinculo.data_inicio
+        # Mais recente primeiro (ordena crescente via negativo de ordinal)
+        data_key = -(data_inicio.toordinal() if data_inicio else 0)
+        return (ordem, data_key, vinculo.pk)
+
+    return sorted(vinculos, key=chave)[0]
+
+
 def obter_vinculo_unidade_ativo(servidor: Servidor):
-    """Retorna o ServidorUnidade ativo de maior hierarquia."""
-    vinculos_ativos = _vinculos_unidade_ativos(servidor)
-
-    vinculo_escolhido = None
-    melhor_nivel = len(HIERARQUIA_PERFIS)
-
-    for vinculo in vinculos_ativos:
-        nivel = _nivel_hierarquico(vinculo.perfil.nome)
-        if nivel < melhor_nivel:
-            melhor_nivel = nivel
-            vinculo_escolhido = vinculo
-
-    return vinculo_escolhido
+    """Retorna o ServidorUnidade ativo de maior hierarquia de visibilidade."""
+    vinculos_ativos = list(_vinculos_unidade_ativos(servidor))
+    return _escolher_vinculo_padrao(vinculos_ativos)
 
 
 def obter_perfil_acesso_ativo(servidor: Servidor):
@@ -66,7 +79,7 @@ def obter_perfil_acesso_ativo(servidor: Servidor):
 
 
 class PerfilAcessoMiddleware:
-    """Anexa o perfil de acesso ativo do servidor autenticado à requisição."""
+    """Anexa o perfil/vínculo ativo do servidor autenticado à requisição."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -75,7 +88,9 @@ class PerfilAcessoMiddleware:
         request.perfil_acesso = None
         request.admin_sistema = False
         request.vinculo_ativo = None
+        request.vinculos_disponiveis = []
         request.visibilidade = "UNIDADE"
+        request.servidor = None
 
         if request.user.is_authenticated:
             try:
@@ -84,10 +99,30 @@ class PerfilAcessoMiddleware:
                 servidor = None
 
             if servidor is not None:
-                request.vinculo_ativo = obter_vinculo_unidade_ativo(servidor)
-                request.perfil_acesso = (
-                    request.vinculo_ativo.perfil if request.vinculo_ativo else None
-                )
+                request.servidor = servidor
+                vinculos = list(_vinculos_unidade_ativos(servidor))
+                request.vinculos_disponiveis = vinculos
+
+                vinculo = None
+                session_id = request.session.get("vinculo_ativo_id")
+                if session_id:
+                    try:
+                        session_id = int(session_id)
+                    except (TypeError, ValueError):
+                        session_id = None
+                    if session_id is not None:
+                        vinculo = next(
+                            (v for v in vinculos if v.pk == session_id),
+                            None,
+                        )
+
+                if vinculo is None:
+                    vinculo = _escolher_vinculo_padrao(vinculos)
+                    if vinculo is not None:
+                        request.session["vinculo_ativo_id"] = vinculo.pk
+
+                request.vinculo_ativo = vinculo
+                request.perfil_acesso = vinculo.perfil if vinculo else None
                 request.admin_sistema = servidor_tem_admin_sistema(servidor)
                 request.visibilidade = getattr(
                     request.perfil_acesso, "visibilidade", "UNIDADE"
