@@ -68,6 +68,7 @@ from core.os_service import (
     is_primeiro_encaminhamento,
     os_editavel_para_usuario,
     queryset_os_com_macroetapa,
+    registrar_em_atendimento_na_unidade,
     registrar_encaminhamento_automatico,
     timeline_os,
     unidade_atual_da_os,
@@ -3080,6 +3081,13 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
         )
 
         ativar_atendimento_interno_se_necessario(producao.os, servidor=servidor)
+        # Atualizar etapa interna da unidade para EM_ATENDIMENTO
+        if unidade_logada:
+            registrar_em_atendimento_na_unidade(
+                producao.os,
+                unidade_logada,
+                servidor=servidor,
+            )
         messages.success(self.request, "Produção registrada.")
         return redirect(reverse("producao_detail", kwargs={"pk": producao.pk}))
 

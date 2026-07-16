@@ -310,6 +310,49 @@ def ativar_atendimento_interno_se_necessario(os, servidor=None):
     return True
 
 
+def registrar_em_atendimento_na_unidade(os, unidade, servidor=None):
+    """
+    Registra encaminhamento automático com etapa_interna=EM_ATENDIMENTO
+    na unidade onde a produção foi criada.
+    Só registra se a etapa atual da unidade não for já EM_ATENDIMENTO.
+    """
+    tarefa_atual = (
+        TarefaInterna.objects.filter(
+            os=os,
+            unidade=unidade,
+            status="PENDENTE",
+        )
+        .order_by("-data_inicio")
+        .first()
+    )
+
+    if tarefa_atual and tarefa_atual.etapa_interna == "EM_ATENDIMENTO":
+        return False
+
+    Encaminhamento.objects.create(
+        os=os,
+        unidade_interna_origem=unidade,
+        servidor_origem=servidor,
+        unidade_interna_destino=unidade,
+        servidor_destino=None,
+        etapa_interna="EM_ATENDIMENTO",
+        tipo_macroetapa=None,
+        data_hora=timezone.now(),
+        aguarda_retorno=False,
+        automatico=True,
+        observacao="Derivado automaticamente: produção registrada na unidade.",
+        manter_aberta_na_unidade=True,
+    )
+
+    TarefaInterna.objects.filter(
+        os=os,
+        unidade=unidade,
+        status="PENDENTE",
+    ).update(etapa_interna="EM_ATENDIMENTO")
+
+    return True
+
+
 def queryset_os_com_macroetapa(queryset=None):
     """Anota queryset de OS com macroetapa_atual derivada de encaminhamentos."""
     if queryset is None:
