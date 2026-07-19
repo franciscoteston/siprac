@@ -1698,18 +1698,22 @@ class OSUploadInscricoesView(RequerLoginMixin, View):
             workbook = load_workbook(arquivo, read_only=True, data_only=True)
             sheet = workbook.active
             inscricoes = []
-            for idx, row in enumerate(sheet.iter_rows(min_col=1, max_col=1, values_only=True)):
+            for idx, row in enumerate(sheet.iter_rows(
+                min_col=1, max_col=1, values_only=True
+            )):
                 valor = row[0]
                 if valor is None:
                     continue
                 texto = str(valor).strip()
                 if not texto:
                     continue
-                if idx == 0 and not any(ch.isdigit() for ch in texto):
+                # Ignorar cabeçalho (primeira linha sem dígitos)
+                if idx == 0 and not texto.isdigit():
                     continue
-                digitos = "".join(ch for ch in texto if ch.isdigit())
-                if digitos:
-                    inscricoes.append(digitos)
+                # Aceitar apenas células com dígitos puros
+                if not texto.isdigit():
+                    continue
+                inscricoes.append(texto)
             workbook.close()
         except Exception as exc:  # noqa: BLE001
             return JsonResponse(
