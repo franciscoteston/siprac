@@ -32,79 +32,70 @@
       </div>
     </div>
     <div id="wizard-erro" class="alert alert-danger mt-3 d-none"></div>
-    <div id="wizard-alerta-os" class="alert alert-warning mt-3 d-none">
-      Há inscrição(ões) com OS ativa. Você pode criar uma nova OS ou incluir processo relacionado.
-    </div>
   </div>
 </div>
 
-<div class="card siprac-card mb-4">
-  <div class="card-header bg-white">
-    <strong>Inscrições adicionadas</strong>
-  </div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table mb-0 align-middle">
-        <thead>
-          <tr>
-            <th>Inscrição</th>
-            <th>Endereço</th>
-            <th>Bairro</th>
-            <th>OS ativas</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="lista-inscricoes">
-          {% for item in wizard_inscricoes %}
-          <tr data-inscricao="{{ item.inscricao }}">
-            <td class="fw-semibold">{{ item.inscricao }}</td>
-            <td>{% if item.encontrada %}{{ item.endereco|default:"—" }}{% else %}<span class="text-danger">Não encontrada no SIAT</span>{% endif %}</td>
-            <td>{{ item.bairro|default:"—" }}</td>
-            <td>
-              {% if item.os_ativas %}
-                {% for os in item.os_ativas %}
-                <div class="small">
-                  <a href="{% url 'os_detalhe' os.pk %}">{{ os.numero_os }}</a>
-                  {% if os.processo %}<span class="text-muted">({{ os.processo }})</span>{% endif %}
-                  <a class="ms-1" href="{% url 'os_nova_passo2' %}?relacionado={{ os.pk }}">Relacionar →</a>
-                </div>
-                {% endfor %}
-              {% else %}
-                <span class="text-muted">—</span>
-              {% endif %}
-            </td>
-            <td class="text-end">
-              <button type="button" class="btn btn-sm btn-outline-danger btn-remover">Remover</button>
-            </td>
-          </tr>
-          {% empty %}
-          <tr id="linha-vazia">
-            <td colspan="5" class="text-muted text-center py-4">Nenhuma inscrição adicionada.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+<div class="alert alert-warning" id="alertaOsAtiva" style="display:none;">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>Atenção:</strong> algumas inscrições já possuem OS ativa.
+  Verifique se este é um processo relacionado antes de criar uma nova OS.
+
+  <table class="table table-sm mt-2 mb-0">
+    <thead>
+      <tr>
+        <th>Inscrição</th>
+        <th>Endereço</th>
+        <th>Bairro</th>
+        <th>OS ativa</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="listaOsAtiva"></tbody>
+  </table>
 </div>
 
-<div class="d-flex justify-content-between">
+<div id="secaoInscricoes" style="display:none;">
+  <h6 class="mt-3">Inscrições adicionadas</h6>
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Inscrição</th>
+        <th>Endereço</th>
+        <th>Bairro</th>
+        <th>Situação</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="listaInscricoes"></tbody>
+  </table>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-4">
   <a href="{% url 'os_list' %}" class="btn btn-outline-secondary">Cancelar</a>
-  <button type="button" id="btn-proximo" class="btn btn-primary siprac-btn-primary">Próximo →</button>
+  <button type="button" class="btn btn-primary btn-lg" id="btnCriarOS" disabled>
+    <i class="bi bi-plus-circle me-1"></i>
+    Criar nova OS com estas inscrições →
+  </button>
 </div>
+{{ wizard_inscricoes|json_script:"wizard-inscricoes-data" }}
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const input = document.getElementById('input-inscricao');
-  const lista = document.getElementById('lista-inscricoes');
+  const listaInscricoes = document.getElementById('listaInscricoes');
+  const listaOsAtiva = document.getElementById('listaOsAtiva');
+  const secaoInscricoes = document.getElementById('secaoInscricoes');
+  const alertaOsAtiva = document.getElementById('alertaOsAtiva');
+  const btnCriarOS = document.getElementById('btnCriarOS');
   const erro = document.getElementById('wizard-erro');
-  const alertaOs = document.getElementById('wizard-alerta-os');
   const csrf = '{{ csrf_token }}';
   const urlBusca = '{% url "os_nova" %}';
   const urlUpload = '{% url "os_upload_inscricoes" %}';
   const urlPasso2 = '{% url "os_nova_passo2" %}';
+  const iniciaisEl = document.getElementById('wizard-inscricoes-data');
+  const iniciais = iniciaisEl ? JSON.parse(iniciaisEl.textContent) : [];
 
   function mostrarErro(msg) {
     erro.textContent = msg;
@@ -116,48 +107,78 @@ document.addEventListener('DOMContentLoaded', function () {
     erro.textContent = '';
   }
 
+  function escapeHtml(texto) {
+    return String(texto == null ? '' : texto)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
   function inscricoesAtuais() {
-    return Array.from(lista.querySelectorAll('tr[data-inscricao]'))
+    return Array.from(listaInscricoes.querySelectorAll('tr[data-inscricao]'))
       .map(tr => tr.dataset.inscricao);
   }
 
-  function atualizarAlerta() {
-    const temOs = lista.querySelector('tr[data-inscricao] a[href*="relacionado"]');
-    alertaOs.classList.toggle('d-none', !temOs);
+  function atualizarVisibilidade() {
+    const qtdInsc = listaInscricoes.querySelectorAll('tr[data-inscricao]').length;
+    const qtdOs = listaOsAtiva.querySelectorAll('tr').length;
+    secaoInscricoes.style.display = qtdInsc > 0 ? '' : 'none';
+    alertaOsAtiva.style.display = qtdOs > 0 ? '' : 'none';
+    btnCriarOS.disabled = qtdInsc === 0;
   }
 
   function renderResultados(itens) {
-    const vazia = document.getElementById('linha-vazia');
-    if (vazia) vazia.remove();
-    lista.innerHTML = '';
-    if (!itens.length) {
-      lista.innerHTML = '<tr id="linha-vazia"><td colspan="5" class="text-muted text-center py-4">Nenhuma inscrição adicionada.</td></tr>';
-      atualizarAlerta();
-      return;
-    }
-    itens.forEach(item => {
-      const tr = document.createElement('tr');
-      tr.dataset.inscricao = item.inscricao;
-      let osHtml = '<span class="text-muted">—</span>';
-      if (item.os_ativas && item.os_ativas.length) {
-        osHtml = item.os_ativas.map(os => {
-          const proc = os.processo ? ` <span class="text-muted">(${os.processo})</span>` : '';
-          return `<div class="small"><a href="/os/${os.pk}/">${os.numero_os}</a>${proc}
-            <a class="ms-1" href="${urlPasso2}?relacionado=${os.pk}">Relacionar →</a></div>`;
-        }).join('');
-      }
+    listaInscricoes.innerHTML = '';
+    listaOsAtiva.innerHTML = '';
+
+    (itens || []).forEach(item => {
+      const temOsAtiva = item.os_ativas && item.os_ativas.length > 0;
       const endereco = item.encontrada
         ? (item.endereco || '—')
-        : '<span class="text-danger">Não encontrada no SIAT</span>';
-      tr.innerHTML = `
-        <td class="fw-semibold">${item.inscricao}</td>
-        <td>${endereco}</td>
-        <td>${item.bairro || '—'}</td>
-        <td>${osHtml}</td>
-        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger btn-remover">Remover</button></td>`;
-      lista.appendChild(tr);
+        : 'Não encontrada no SIAT';
+      const bairro = item.bairro || '—';
+      const situacao = temOsAtiva
+        ? '<span class="badge text-bg-warning">⚠ OS ativa</span>'
+        : '<span class="badge text-bg-success">✓ Livre</span>';
+
+      const trGeral = document.createElement('tr');
+      trGeral.dataset.inscricao = item.inscricao;
+      trGeral.innerHTML = `
+        <td class="fw-semibold">${escapeHtml(item.inscricao)}</td>
+        <td>${item.encontrada ? escapeHtml(endereco) : '<span class="text-danger">' + escapeHtml(endereco) + '</span>'}</td>
+        <td>${escapeHtml(bairro)}</td>
+        <td>${situacao}</td>
+        <td class="text-end">
+          <button type="button" class="btn btn-sm btn-outline-danger btn-remover">Remover</button>
+        </td>`;
+      listaInscricoes.appendChild(trGeral);
+
+      if (temOsAtiva) {
+        item.os_ativas.forEach(os => {
+          const trAlerta = document.createElement('tr');
+          trAlerta.dataset.inscricao = item.inscricao;
+          const processo = os.processo
+            ? `<div class="small text-muted">${escapeHtml(os.processo)}</div>`
+            : '';
+          trAlerta.innerHTML = `
+            <td class="fw-semibold">${escapeHtml(item.inscricao)}</td>
+            <td>${escapeHtml(item.endereco || '—')}</td>
+            <td>${escapeHtml(bairro)}</td>
+            <td>
+              <a href="/os/${os.pk}/" target="_blank">${escapeHtml(os.numero_os)}</a>
+              ${processo}
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-primary"
+                 href="${urlPasso2}?relacionado=${os.pk}">Relacionar →</a>
+            </td>`;
+          listaOsAtiva.appendChild(trAlerta);
+        });
+      }
     });
-    atualizarAlerta();
+
+    atualizarVisibilidade();
   }
 
   async function buscarInscricoes(listaInsc) {
@@ -202,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
-  lista.addEventListener('click', async function (ev) {
+  listaInscricoes.addEventListener('click', async function (ev) {
     const btn = ev.target.closest('.btn-remover');
     if (!btn) return;
     const tr = btn.closest('tr');
@@ -235,7 +256,7 @@ document.addEventListener('DOMContentLoaded', function () {
     ev.target.value = '';
   });
 
-  document.getElementById('btn-proximo').addEventListener('click', async function () {
+  btnCriarOS.addEventListener('click', async function () {
     const atuais = inscricoesAtuais();
     if (!atuais.length) {
       mostrarErro('Adicione ao menos uma inscrição.');
@@ -245,7 +266,11 @@ document.addEventListener('DOMContentLoaded', function () {
     window.location.href = urlPasso2;
   });
 
-  atualizarAlerta();
+  if (Array.isArray(iniciais) && iniciais.length) {
+    renderResultados(iniciais);
+  } else {
+    atualizarVisibilidade();
+  }
 });
 </script>
 {% endblock %}
