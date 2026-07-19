@@ -124,8 +124,23 @@ class PerfilAcessoMiddleware:
                 request.vinculo_ativo = vinculo
                 request.perfil_acesso = vinculo.perfil if vinculo else None
                 request.admin_sistema = servidor_tem_admin_sistema(servidor)
-                request.visibilidade = getattr(
-                    request.perfil_acesso, "visibilidade", "UNIDADE"
-                )
+                visibilidade = None
+                if request.perfil_acesso is not None:
+                    visibilidade = getattr(
+                        request.perfil_acesso,
+                        "visibilidade",
+                        None,
+                    )
+                if visibilidade not in ("UNIDADE", "DEPARTAMENTO", "TOTAL"):
+                    # Compatibilidade com flag legada
+                    if request.perfil_acesso and getattr(
+                        request.perfil_acesso,
+                        "visibilidade_total",
+                        False,
+                    ):
+                        visibilidade = "TOTAL"
+                    else:
+                        visibilidade = "UNIDADE"
+                request.visibilidade = visibilidade
 
         return self.get_response(request)

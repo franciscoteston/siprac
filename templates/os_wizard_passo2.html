@@ -82,12 +82,18 @@
   {% if form.non_field_errors %}
   <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
   {% endif %}
-
-  <div class="d-flex justify-content-between mt-4">
-    <a href="{% url 'os_nova' %}" class="btn btn-outline-secondary">← Voltar</a>
-    <button type="submit" class="btn btn-primary siprac-btn-primary">Próximo →</button>
-  </div>
 </form>
+
+<div class="d-flex justify-content-between mt-4">
+  <div class="d-flex flex-wrap gap-2">
+    <form method="post" action="{% url 'os_wizard_cancelar' %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-secondary">Cancelar</button>
+    </form>
+    <a href="{% url 'os_nova' %}" class="btn btn-outline-secondary">← Voltar</a>
+  </div>
+  <button type="submit" form="wizard-passo2-form" class="btn btn-primary siprac-btn-primary">Próximo →</button>
+</div>
 {% endblock %}
 
 {% block extra_js %}

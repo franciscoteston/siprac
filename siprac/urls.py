@@ -24,6 +24,7 @@ from core.views import (
     OSUploadInscricoesView,
     OSVincularImovelView,
     OSVincularProcessoView,
+    OSWizardCancelarView,
     OSWizardPasso2View,
     OSWizardPasso3View,
     OSWizardView,
@@ -59,6 +60,11 @@ urlpatterns = [
     path('logout/', SipracLogoutView.as_view(), name='logout'),
     path('trocar-perfil/', TrocarPerfilView.as_view(), name='trocar_perfil'),
     path('os/nova/', OSWizardView.as_view(), name='os_nova'),
+    path(
+        'os/nova/cancelar/',
+        OSWizardCancelarView.as_view(),
+        name='os_wizard_cancelar',
+    ),
     path('os/nova/passo2/', OSWizardPasso2View.as_view(), name='os_nova_passo2'),
     path('os/nova/passo3/', OSWizardPasso3View.as_view(), name='os_nova_passo3'),
     path(

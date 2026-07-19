@@ -74,18 +74,24 @@
           {% if form.non_field_errors %}
           <div class="alert alert-danger">{{ form.non_field_errors }}</div>
           {% endif %}
+        </form>
 
-          <div class="d-flex flex-wrap gap-2 justify-content-between mt-4">
+        <div class="d-flex flex-wrap gap-2 justify-content-between mt-4">
+          <div class="d-flex flex-wrap gap-2">
+            <form method="post" action="{% url 'os_wizard_cancelar' %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-secondary">Cancelar</button>
+            </form>
             <a href="{% url 'os_nova_passo2' %}{% if modo_relacionado %}?relacionado={{ os_relacionada.pk }}{% endif %}"
                class="btn btn-outline-secondary">← Voltar</a>
-            <div class="d-flex flex-wrap gap-2">
-              <button type="submit" name="encaminhar" value="False"
-                      class="btn btn-outline-warning">Salvar sem encaminhar</button>
-              <button type="submit" name="encaminhar" value="True"
-                      class="btn btn-primary siprac-btn-primary">Concluir ✓</button>
-            </div>
           </div>
-        </form>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="submit" form="wizard-passo3-form" name="encaminhar" value="False"
+                    class="btn btn-outline-warning">Salvar sem encaminhar</button>
+            <button type="submit" form="wizard-passo3-form" name="encaminhar" value="True"
+                    class="btn btn-primary siprac-btn-primary">Concluir ✓</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

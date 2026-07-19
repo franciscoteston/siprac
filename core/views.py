@@ -1606,8 +1606,16 @@ def _limpar_sessao_wizard(request):
         "wizard_inscricoes",
         "wizard_dados_os",
         "wizard_relacionado_os_pk",
+        "wizard_relacionado_pk",
     ):
         request.session.pop(chave, None)
+
+
+class OSWizardCancelarView(RequerLoginMixin, View):
+    def post(self, request, *args, **kwargs):
+        _limpar_sessao_wizard(request)
+        messages.info(request, "Criação de OS cancelada.")
+        return redirect("os_list")
 
 
 class OSWizardView(RequerLoginMixin, TemplateView):
