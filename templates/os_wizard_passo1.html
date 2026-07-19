@@ -70,9 +70,14 @@
   </table>
 </div>
 
-<div class="d-flex justify-content-between align-items-center mt-4">
-  <a href="{% url 'os_list' %}" class="btn btn-outline-secondary">Cancelar</a>
-  <button type="button" class="btn btn-primary btn-lg" id="btnCriarOS" disabled>
+<div class="d-flex justify-content-between align-items-center mt-3">
+  <a href="{% url 'os_list' %}" class="btn btn-secondary">
+    Cancelar
+  </a>
+  <button type="button"
+          class="btn btn-primary"
+          id="btnCriarOS"
+          style="display:none;">
     <i class="bi bi-plus-circle me-1"></i>
     Criar nova OS com estas inscrições →
   </button>
@@ -83,6 +88,17 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  // Ao trocar de perfil durante o wizard, limpar sessão e ir para /os/
+  document.querySelectorAll('form[action*="trocar-perfil"]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'limpar_wizard';
+      input.value = '1';
+      form.appendChild(input);
+    });
+  });
+
   const input = document.getElementById('input-inscricao');
   const listaInscricoes = document.getElementById('listaInscricoes');
   const listaOsAtiva = document.getElementById('listaOsAtiva');
@@ -120,12 +136,17 @@ document.addEventListener('DOMContentLoaded', function () {
       .map(tr => tr.dataset.inscricao);
   }
 
+  function atualizarBotao() {
+    const qtdInsc = listaInscricoes.querySelectorAll('tr[data-inscricao]').length;
+    btnCriarOS.style.display = qtdInsc > 0 ? 'inline-block' : 'none';
+  }
+
   function atualizarVisibilidade() {
     const qtdInsc = listaInscricoes.querySelectorAll('tr[data-inscricao]').length;
     const qtdOs = listaOsAtiva.querySelectorAll('tr').length;
     secaoInscricoes.style.display = qtdInsc > 0 ? '' : 'none';
     alertaOsAtiva.style.display = qtdOs > 0 ? '' : 'none';
-    btnCriarOS.disabled = qtdInsc === 0;
+    atualizarBotao();
   }
 
   function renderResultados(itens) {

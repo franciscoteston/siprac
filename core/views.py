@@ -1304,6 +1304,15 @@ class TrocarPerfilView(RequerLoginMixin, View):
             except (ServidorUnidade.DoesNotExist, ValueError, TypeError):
                 pass
 
+        if request.POST.get("limpar_wizard"):
+            for key in (
+                "wizard_inscricoes",
+                "wizard_dados_os",
+                "wizard_relacionado_os_pk",
+            ):
+                request.session.pop(key, None)
+            return redirect("os_list")
+
         next_url = request.META.get("HTTP_REFERER") or "/"
         return redirect(next_url)
 
@@ -1494,10 +1503,14 @@ def _buscar_dados_siat_inscricao(inscricao):
         inscricao_int = int(str(inscricao).strip())
     except (TypeError, ValueError):
         return None
+    # Consulta O(1) no índice em memória
     dados = siat_index.buscar_por_inscricao(inscricao_int)
     if dados:
         return dados
-    return buscar_inscricao_no_arquivo(inscricao_int, SIAT_ARQUIVO_PATH)
+    # Fallback para streaming só se o índice ainda não estiver pronto
+    if not siat_index.indice_pronto():
+        return buscar_inscricao_no_arquivo(inscricao_int, SIAT_ARQUIVO_PATH)
+    return None
 
 
 def _os_ativas_para_inscricao(inscricao):
@@ -1506,29 +1519,35 @@ def _os_ativas_para_inscricao(inscricao):
     except (TypeError, ValueError):
         return []
 
-    vinculos = (
-        OsImovel.objects.filter(
-            imovel__inscricao_cadastral=inscricao_int,
-            os__encerrada=False,
-        )
-        .select_related("os")
-        .order_by("-os__data_criacao_sgbd")
-    )
-    resultado = []
-    vistos = set()
-    for vinculo in vinculos:
-        if vinculo.os_id in vistos:
-            continue
-        vistos.add(vinculo.os_id)
-        processo = (
-            OsProcesso.objects.filter(os=vinculo.os, tipo_vinculo="PRINCIPAL")
+    processos_principais = Prefetch(
+        "processos_vinculados",
+        queryset=(
+            OsProcesso.objects.filter(tipo_vinculo="PRINCIPAL")
             .select_related("processo_sei")
-            .first()
+        ),
+        to_attr="_processos_principais",
+    )
+
+    ordens = (
+        OS.objects.filter(
+            encerrada=False,
+            os_imoveis__imovel__inscricao_cadastral=inscricao_int,
         )
+        .prefetch_related(processos_principais)
+        .distinct()
+        .order_by("-data_criacao_sgbd")[:5]
+    )
+
+    resultado = []
+    for os_obj in ordens:
+        processo = None
+        principais = getattr(os_obj, "_processos_principais", None) or []
+        if principais:
+            processo = principais[0]
         resultado.append(
             {
-                "pk": vinculo.os.pk,
-                "numero_os": vinculo.os.numero_os,
+                "pk": os_obj.pk,
+                "numero_os": os_obj.numero_os,
                 "processo": (
                     processo.processo_sei.numero_processo if processo else ""
                 ),
@@ -1563,6 +1582,25 @@ def _montar_resultado_wizard_inscricao(inscricao):
     }
 
 
+def _resolver_resultados_wizard_inscricoes(request, inscricoes):
+    """Reutiliza resultados já na sessão para evitar reconsulta SIAT/DB."""
+    cache = {
+        str(item.get("inscricao")): item
+        for item in (request.session.get("wizard_inscricoes") or [])
+        if item.get("inscricao") is not None
+    }
+    resultados = []
+    for inscricao in inscricoes:
+        chave = str(inscricao).strip()
+        if not chave:
+            continue
+        if chave in cache:
+            resultados.append(cache[chave])
+        else:
+            resultados.append(_montar_resultado_wizard_inscricao(chave))
+    return resultados
+
+
 def _limpar_sessao_wizard(request):
     for chave in (
         "wizard_inscricoes",
@@ -1576,7 +1614,8 @@ class OSWizardView(RequerLoginMixin, TemplateView):
     template_name = "os_wizard_passo1.html"
 
     def dispatch(self, request, *args, **kwargs):
-        if not _wizard_requer_departamento(request):
+        visibilidade = getattr(request, "visibilidade", "UNIDADE")
+        if visibilidade not in ("DEPARTAMENTO", "TOTAL"):
             messages.error(
                 request,
                 "A criação de OS pelo wizard é restrita ao perfil DEPARTAMENTO.",
@@ -1604,11 +1643,7 @@ class OSWizardView(RequerLoginMixin, TemplateView):
                 payload = {}
             inscricoes = payload.get("inscricoes") or []
 
-        resultados = []
-        for inscricao in inscricoes:
-            if not str(inscricao).strip():
-                continue
-            resultados.append(_montar_resultado_wizard_inscricao(inscricao))
+        resultados = _resolver_resultados_wizard_inscricoes(request, inscricoes)
 
         request.session["wizard_inscricoes"] = resultados
         request.session.modified = True
