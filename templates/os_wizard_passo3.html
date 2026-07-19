@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Nova OS — Passo 3 — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <nav aria-label="Progresso do wizard" class="small text-muted">
+    <span class="text-success">Passo 1 ✓</span>
+    <span class="mx-1">→</span>
+    <span class="text-success">Passo 2 ✓</span>
+    <span class="mx-1">→</span>
+    <span class="fw-semibold text-primary">Passo 3</span>
+  </nav>
+  <h1 class="h3 mb-1 text-dark">
+    {% if modo_relacionado %}
+    Concluir processo relacionado
+    {% else %}
+    Nova OS — Encaminhamento
+    {% endif %}
+  </h1>
+  <p class="text-muted mb-0">Revise o resumo e escolha encaminhar agora ou salvar sem encaminhar.</p>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white"><strong>Resumo</strong></div>
+      <div class="card-body">
+        {% if modo_relacionado %}
+        <p class="mb-2"><strong>OS existente:</strong> {{ os_relacionada.numero_os }}</p>
+        <p class="mb-2"><strong>Tipo de vínculo:</strong> Relacionado</p>
+        {% else %}
+        <p class="mb-2"><strong>Natureza:</strong> {{ natureza.descricao|default:"—" }}</p>
+        <p class="mb-2"><strong>Requerimento:</strong> {{ tipo_demanda.descricao|default:"—" }}</p>
+        <p class="mb-2"><strong>Finalidade:</strong> {{ finalidade.descricao|default:"—" }}</p>
+        <p class="mb-2"><strong>Prioridade:</strong> {{ wizard_dados_os.prioridade|default:"NORMAL" }}</p>
+        {% if wizard_dados_os.apelido %}
+        <p class="mb-2"><strong>Apelido:</strong> {{ wizard_dados_os.apelido }}</p>
+        {% endif %}
+        {% endif %}
+        <p class="mb-2"><strong>Processo SEI:</strong> {{ wizard_dados_os.numero_processo }}</p>
+        <p class="mb-2"><strong>Data criação SEI:</strong> {{ wizard_dados_os.data_abertura_sei }}</p>
+        <p class="mb-3"><strong>Entrada na Divisão:</strong> {{ wizard_dados_os.data_entrada_divisao }}</p>
+
+        <h2 class="h6">Inscrições</h2>
+        <ul class="list-unstyled mb-0">
+          {% for item in wizard_inscricoes %}
+          <li class="mb-2">
+            <span class="fw-semibold">{{ item.inscricao }}</span>
+            <span class="text-muted">— {{ item.endereco|default:"sem endereço" }}{% if item.bairro %}, {{ item.bairro }}{% endif %}</span>
+            {% if not item.encontrada %}
+            <span class="badge text-bg-danger">SIAT</span>
+            {% endif %}
+          </li>
+          {% empty %}
+          <li class="text-muted">Nenhuma inscrição</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card siprac-card h-100">
+      <div class="card-header bg-white"><strong>Encaminhamento</strong></div>
+      <div class="card-body">
+        <form method="post" id="wizard-passo3-form" novalidate>
+          {% csrf_token %}
+          {{ form.unidade_interna_destino|as_crispy_field }}
+          {{ form.servidor_destino|as_crispy_field }}
+          {{ form.observacao|as_crispy_field }}
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap gap-2 justify-content-between mt-4">
+            <a href="{% url 'os_nova_passo2' %}{% if modo_relacionado %}?relacionado={{ os_relacionada.pk }}{% endif %}"
+               class="btn btn-outline-secondary">← Voltar</a>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="submit" name="encaminhar" value="False"
+                      class="btn btn-outline-warning">Salvar sem encaminhar</button>
+              <button type="submit" name="encaminhar" value="True"
+                      class="btn btn-primary siprac-btn-primary">Concluir ✓</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

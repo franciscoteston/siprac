@@ -8,7 +8,7 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h1 class="h3 mb-0 text-dark">Ordens de serviço</h1>
-  {% if request.perfil_acesso and request.perfil_acesso.pode_criar_os %}
+  {% if request.visibilidade == 'DEPARTAMENTO' or request.visibilidade == 'TOTAL' %}
   <a href="{% url 'os_nova' %}" class="btn btn-primary siprac-btn-primary">+ Nova OS</a>
   {% endif %}
 </div>
@@ -103,6 +103,9 @@
           <div class="fw-bold">
             <a href="{% url 'os_detalhe' os.pk %}" class="text-decoration-none"
                onclick="event.stopPropagation();">{{ os.numero_os }}</a>
+            {% if os.pendente_encaminhamento %}
+            <span class="badge text-bg-warning ms-1">Pendente encaminhamento</span>
+            {% endif %}
             {% if os.apelido %}
             <small class="text-muted ms-1">({{ os.apelido }})</small>
             {% endif %}

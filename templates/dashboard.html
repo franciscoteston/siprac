@@ -27,7 +27,7 @@
     <p class="text-muted mb-0" style="font-size:13px;">{{ visao_label }}</p>
     {% endif %}
   </div>
-  {% if request.perfil_acesso and request.perfil_acesso.pode_criar_os %}
+  {% if request.visibilidade == 'DEPARTAMENTO' or request.visibilidade == 'TOTAL' %}
   <a href="{% url 'os_nova' %}" class="btn btn-primary siprac-btn-primary">+ Nova OS</a>
   {% endif %}
 </div>

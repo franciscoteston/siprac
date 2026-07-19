@@ -288,6 +288,9 @@ body.gerencial-mode .siprac-content {
               <div class="fw-bold">
                 <a href="{% url 'os_detalhe' linha.os_pk %}" class="text-decoration-none"
                    onclick="event.stopPropagation();">{{ linha.numero_os }}</a>
+                {% if linha.pendente_encaminhamento %}
+                <span class="badge text-bg-warning ms-1" style="font-size:9px;">Pendente</span>
+                {% endif %}
                 {% if linha.apelido %}
                 <small class="text-muted d-block">{{ linha.apelido }}</small>
                 {% endif %}

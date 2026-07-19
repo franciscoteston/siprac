@@ -4,6 +4,18 @@
 {% block title %}{{ os.numero_os }} — SIPRAC{% endblock %}
 
 {% block content %}
+{% if os.pendente_encaminhamento %}
+<div class="alert alert-warning d-flex align-items-center mb-3">
+  <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+  <div>
+    <strong>⚠ Pendente de encaminhamento</strong> —
+    Esta OS ainda não foi encaminhada para nenhuma unidade operacional.
+    <a href="{% url 'os_encaminhar' os.pk %}" class="alert-link ms-2">
+      Encaminhar agora →
+    </a>
+  </div>
+</div>
+{% endif %}
 {% if not os_editavel %}
 <div class="alert alert-secondary d-flex align-items-center mb-3">
   <i class="bi bi-lock-fill me-2"></i>

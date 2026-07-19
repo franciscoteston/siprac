@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Nova OS — Passo 2 — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <nav aria-label="Progresso do wizard" class="small text-muted">
+    <span class="text-success">Passo 1 ✓</span>
+    <span class="mx-1">→</span>
+    <span class="fw-semibold text-primary">Passo 2</span>
+    <span class="mx-1">→</span>
+    <span>Passo 3</span>
+  </nav>
+  <h1 class="h3 mb-1 text-dark">
+    {% if modo_relacionado %}
+    Processo relacionado — {{ os_relacionada.numero_os }}
+    {% else %}
+    Nova OS — Dados
+    {% endif %}
+  </h1>
+  <p class="text-muted mb-0">
+    {% if modo_relacionado %}
+    Informe o processo SEI a vincular como relacionado.
+    {% else %}
+    Preencha os dados do processo e da Ordem de Serviço.
+    {% endif %}
+  </p>
+</div>
+
+{% if wizard_inscricoes %}
+<div class="alert alert-light border mb-4">
+  <strong>{{ wizard_inscricoes|length }}</strong> inscrição(ões) selecionada(s):
+  {% for item in wizard_inscricoes %}
+    <span class="badge bg-secondary me-1">{{ item.inscricao }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" id="wizard-passo2-form" novalidate>
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-md-6">
+      {{ form.numero_processo|as_crispy_field }}
+      <div id="processo-sei-info" class="form-text"></div>
+    </div>
+    <div class="col-md-3">
+      {{ form.data_abertura_sei|as_crispy_field }}
+    </div>
+    <div class="col-md-3">
+      {{ form.data_entrada_divisao|as_crispy_field }}
+    </div>
+
+    {% if not modo_relacionado %}
+    <div class="col-md-4">
+      {{ form.natureza|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.tipo_demanda|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.finalidade|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.prioridade|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ form.prazo_tipo|as_crispy_field }}
+    </div>
+    <div class="col-md-4" id="campo-prazo-data">
+      {{ form.prazo_data|as_crispy_field }}
+    </div>
+    <div class="col-12">
+      {{ form.apelido|as_crispy_field }}
+    </div>
+    <div class="col-12">
+      {{ form.observacao|as_crispy_field }}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <div class="d-flex justify-content-between mt-4">
+    <a href="{% url 'os_nova' %}" class="btn btn-outline-secondary">← Voltar</a>
+    <button type="submit" class="btn btn-primary siprac-btn-primary">Próximo →</button>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const numero = document.getElementById('id_numero_processo');
+  const dataAbertura = document.getElementById('id_data_abertura_sei');
+  const info = document.getElementById('processo-sei-info');
+  const urlApi = '{% url "api_processo_sei" %}';
+
+  async function buscarProcesso() {
+    if (!numero || !dataAbertura) return;
+    const valor = (numero.value || '').trim();
+    if (!valor) {
+      dataAbertura.readOnly = false;
+      if (info) info.textContent = '';
+      return;
+    }
+    const resp = await fetch(urlApi + '?numero=' + encodeURIComponent(valor), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.encontrado) {
+      if (data.data_abertura_sei) {
+        dataAbertura.value = data.data_abertura_sei;
+        dataAbertura.readOnly = true;
+      } else {
+        dataAbertura.readOnly = false;
+      }
+      const osTxt = (data.os_ativas || []).map(o => o.numero_os).join(', ');
+      if (info) {
+        info.textContent = osTxt
+          ? 'Processo já cadastrado. OS ativas: ' + osTxt
+          : 'Processo já cadastrado no SIPRAC.';
+      }
+    } else {
+      dataAbertura.readOnly = false;
+      if (info) info.textContent = 'Processo novo — informe a data de criação no SEI.';
+    }
+  }
+
+  if (numero) {
+    numero.addEventListener('blur', buscarProcesso);
+  }
+
+  {% if not modo_relacionado %}
+  const naturezaSelect = document.getElementById('id_natureza');
+  const tipoSelect = document.getElementById('id_tipo_demanda');
+  const finalidadeSelect = document.getElementById('id_finalidade');
+  const prazoTipo = document.getElementById('id_prazo_tipo');
+  const campoPrazoData = document.getElementById('campo-prazo-data');
+  const urlTiposDemanda = '{% url "api_tipos_demanda" %}';
+  const urlFinalidades = '{% url "api_finalidades" %}';
+  const fetchOptions = {
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  };
+
+  function limparSelect(select, placeholder) {
+    select.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = placeholder;
+    select.appendChild(option);
+    select.disabled = false;
+  }
+
+  function preencherSelect(select, items, selectedId) {
+    limparSelect(select, '---------');
+    items.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.descricao;
+      if (String(selectedId) === String(item.id)) option.selected = true;
+      select.appendChild(option);
+    });
+    if (items.length === 1) {
+      select.value = items[0].id;
+      select.dispatchEvent(new Event('change'));
+    }
+  }
+
+  async function carregarTipos(naturezaId, selectedTipo, selectedFin) {
+    limparSelect(tipoSelect, '---------');
+    limparSelect(finalidadeSelect, '---------');
+    if (!naturezaId) return;
+    const resp = await fetch(urlTiposDemanda + '?natureza_id=' + naturezaId, fetchOptions);
+    const items = await resp.json();
+    preencherSelect(tipoSelect, items, selectedTipo);
+    if (selectedTipo) {
+      await carregarFinalidades(selectedTipo, selectedFin);
+    }
+  }
+
+  async function carregarFinalidades(tipoId, selectedFin) {
+    limparSelect(finalidadeSelect, '---------');
+    if (!tipoId) return;
+    const resp = await fetch(urlFinalidades + '?tipo_demanda_id=' + tipoId, fetchOptions);
+    const items = await resp.json();
+    preencherSelect(finalidadeSelect, items, selectedFin);
+  }
+
+  if (naturezaSelect && tipoSelect && finalidadeSelect) {
+    naturezaSelect.addEventListener('change', function () {
+      carregarTipos(naturezaSelect.value);
+    });
+    tipoSelect.addEventListener('change', function () {
+      carregarFinalidades(tipoSelect.value);
+    });
+    if (naturezaSelect.value) {
+      carregarTipos(
+        naturezaSelect.value,
+        tipoSelect.value,
+        finalidadeSelect.value
+      );
+    }
+  }
+
+  function atualizarPrazoData() {
+    if (!prazoTipo || !campoPrazoData) return;
+    campoPrazoData.style.display = prazoTipo.value === 'SEM_PRIORIDADE' ? 'none' : '';
+  }
+  if (prazoTipo) {
+    prazoTipo.addEventListener('change', atualizarPrazoData);
+    atualizarPrazoData();
+  }
+  {% endif %}
+});
+</script>
+{% endblock %}

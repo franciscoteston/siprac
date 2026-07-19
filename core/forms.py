@@ -176,6 +176,171 @@ class OSVincularProcessoForm(forms.Form):
         return numero
 
 
+class OSWizardPasso2Form(forms.Form):
+    numero_processo = forms.CharField(
+        label="Número do processo SEI",
+        max_length=255,
+    )
+    data_abertura_sei = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de criação no SEI",
+        required=True,
+    )
+    data_entrada_divisao = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de entrada na Divisão",
+        required=True,
+    )
+    natureza = forms.ModelChoiceField(
+        label="Natureza",
+        queryset=Natureza.objects.filter(ativa=True),
+    )
+    tipo_demanda = forms.ModelChoiceField(
+        label="Requerimento",
+        queryset=TipoDemanda.objects.none(),
+    )
+    finalidade = forms.ModelChoiceField(
+        label="Finalidade",
+        queryset=Finalidade.objects.none(),
+    )
+    prioridade = forms.ChoiceField(
+        label="Prioridade",
+        choices=[
+            ("NORMAL", "Normal"),
+            ("PRIORITARIO", "Prioritário"),
+            ("URGENTE", "Urgente"),
+        ],
+        initial="NORMAL",
+    )
+    observacao = forms.CharField(
+        label="Observação",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+    apelido = forms.CharField(
+        label="Apelido (identificação rápida)",
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(
+            attrs={"placeholder": "Ex: Golden Lake, Escola Vila Nova..."},
+        ),
+    )
+    prazo_tipo = forms.ChoiceField(
+        label="Tipo de prazo",
+        choices=OS.PRAZO_TIPO_CHOICES,
+        initial="SEM_PRIORIDADE",
+    )
+    prazo_data = forms.DateField(
+        label="Data do prazo",
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if "natureza" in self.data:
+            try:
+                natureza_id = int(self.data.get("natureza"))
+            except (TypeError, ValueError):
+                natureza_id = None
+            if natureza_id:
+                self.fields["tipo_demanda"].queryset = TipoDemanda.objects.filter(
+                    combinacoes_validas__natureza_id=natureza_id,
+                    ativa=True,
+                ).distinct()
+
+        if "tipo_demanda" in self.data:
+            try:
+                tipo_demanda_id = int(self.data.get("tipo_demanda"))
+            except (TypeError, ValueError):
+                tipo_demanda_id = None
+            if tipo_demanda_id:
+                self.fields["finalidade"].queryset = Finalidade.objects.filter(
+                    combinacoes_validas__tipo_demanda_id=tipo_demanda_id,
+                    ativa=True,
+                ).distinct()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        natureza = cleaned_data.get("natureza")
+        tipo_demanda = cleaned_data.get("tipo_demanda")
+        finalidade = cleaned_data.get("finalidade")
+
+        if natureza and tipo_demanda and finalidade:
+            if not CombinacaoValida.objects.filter(
+                natureza=natureza,
+                tipo_demanda=tipo_demanda,
+                finalidade=finalidade,
+            ).exists():
+                raise ValidationError("Combinação inválida para esta natureza.")
+
+        if cleaned_data.get("prazo_tipo") == "SEM_PRIORIDADE":
+            cleaned_data["prazo_data"] = None
+
+        return cleaned_data
+
+    def clean_numero_processo(self):
+        numero = self.cleaned_data.get("numero_processo", "").strip()
+        if numero:
+            valido = any(re.match(padrao, numero) for padrao in PADROES_SEI)
+            if not valido:
+                raise ValidationError(
+                    "Número de processo inválido. "
+                    "Formatos aceitos: 20.0.000011172-5 (16 dígitos), "
+                    "22.15.000005831-1 (17 dígitos) ou "
+                    "002.078002.16.8.00000 (21 dígitos).",
+                )
+        return numero
+
+
+class OSWizardPasso2RelacionadoForm(forms.Form):
+    numero_processo = forms.CharField(
+        label="Número do processo SEI",
+        max_length=255,
+    )
+    data_abertura_sei = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de criação no SEI",
+        required=True,
+    )
+    data_entrada_divisao = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de entrada na Divisão",
+        required=True,
+    )
+
+    def clean_numero_processo(self):
+        numero = self.cleaned_data.get("numero_processo", "").strip()
+        if numero:
+            valido = any(re.match(padrao, numero) for padrao in PADROES_SEI)
+            if not valido:
+                raise ValidationError(
+                    "Número de processo inválido. "
+                    "Formatos aceitos: 20.0.000011172-5 (16 dígitos), "
+                    "22.15.000005831-1 (17 dígitos) ou "
+                    "002.078002.16.8.00000 (21 dígitos).",
+                )
+        return numero
+
+
+class OSWizardPasso3Form(forms.Form):
+    unidade_interna_destino = forms.ModelChoiceField(
+        label="Unidade interna destino",
+        queryset=UnidadeInterna.objects.filter(tipo="OPERACIONAL").order_by("sigla"),
+    )
+    servidor_destino = forms.ModelChoiceField(
+        label="Servidor destino",
+        queryset=Servidor.objects.all().order_by("nome"),
+        required=False,
+    )
+    observacao = forms.CharField(
+        label="Observação",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+
 class EncaminhamentoForm(forms.Form):
     tipo_destino = forms.ChoiceField(
         label="Tipo de destino",

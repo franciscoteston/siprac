@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+
+{% block title %}Nova OS — Passo 1 — SIPRAC{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <nav aria-label="Progresso do wizard" class="small text-muted">
+    <span class="fw-semibold text-primary">Passo 1</span>
+    <span class="mx-1">→</span>
+    <span>Passo 2</span>
+    <span class="mx-1">→</span>
+    <span>Passo 3</span>
+  </nav>
+  <h1 class="h3 mb-1 text-dark">Nova OS — Inscrições</h1>
+  <p class="text-muted mb-0">Busque inscrições no SIAT e verifique se já existem OSs ativas.</p>
+</div>
+
+<div class="card siprac-card mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-6">
+        <label for="input-inscricao" class="form-label">Inscrição cadastral</label>
+        <input type="text" id="input-inscricao" class="form-control"
+               placeholder="Ex: 2720" autocomplete="off">
+      </div>
+      <div class="col-md-auto">
+        <button type="button" id="btn-adicionar" class="btn btn-outline-primary">Adicionar</button>
+      </div>
+      <div class="col-md-auto">
+        <label for="upload-xlsx" class="btn btn-outline-secondary mb-0">Upload .xlsx</label>
+        <input type="file" id="upload-xlsx" accept=".xlsx,.xlsm" class="d-none">
+      </div>
+    </div>
+    <div id="wizard-erro" class="alert alert-danger mt-3 d-none"></div>
+    <div id="wizard-alerta-os" class="alert alert-warning mt-3 d-none">
+      Há inscrição(ões) com OS ativa. Você pode criar uma nova OS ou incluir processo relacionado.
+    </div>
+  </div>
+</div>
+
+<div class="card siprac-card mb-4">
+  <div class="card-header bg-white">
+    <strong>Inscrições adicionadas</strong>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Inscrição</th>
+            <th>Endereço</th>
+            <th>Bairro</th>
+            <th>OS ativas</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="lista-inscricoes">
+          {% for item in wizard_inscricoes %}
+          <tr data-inscricao="{{ item.inscricao }}">
+            <td class="fw-semibold">{{ item.inscricao }}</td>
+            <td>{% if item.encontrada %}{{ item.endereco|default:"—" }}{% else %}<span class="text-danger">Não encontrada no SIAT</span>{% endif %}</td>
+            <td>{{ item.bairro|default:"—" }}</td>
+            <td>
+              {% if item.os_ativas %}
+                {% for os in item.os_ativas %}
+                <div class="small">
+                  <a href="{% url 'os_detalhe' os.pk %}">{{ os.numero_os }}</a>
+                  {% if os.processo %}<span class="text-muted">({{ os.processo }})</span>{% endif %}
+                  <a class="ms-1" href="{% url 'os_nova_passo2' %}?relacionado={{ os.pk }}">Relacionar →</a>
+                </div>
+                {% endfor %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-danger btn-remover">Remover</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr id="linha-vazia">
+            <td colspan="5" class="text-muted text-center py-4">Nenhuma inscrição adicionada.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between">
+  <a href="{% url 'os_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+  <button type="button" id="btn-proximo" class="btn btn-primary siprac-btn-primary">Próximo →</button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const input = document.getElementById('input-inscricao');
+  const lista = document.getElementById('lista-inscricoes');
+  const erro = document.getElementById('wizard-erro');
+  const alertaOs = document.getElementById('wizard-alerta-os');
+  const csrf = '{{ csrf_token }}';
+  const urlBusca = '{% url "os_nova" %}';
+  const urlUpload = '{% url "os_upload_inscricoes" %}';
+  const urlPasso2 = '{% url "os_nova_passo2" %}';
+
+  function mostrarErro(msg) {
+    erro.textContent = msg;
+    erro.classList.remove('d-none');
+  }
+
+  function limparErro() {
+    erro.classList.add('d-none');
+    erro.textContent = '';
+  }
+
+  function inscricoesAtuais() {
+    return Array.from(lista.querySelectorAll('tr[data-inscricao]'))
+      .map(tr => tr.dataset.inscricao);
+  }
+
+  function atualizarAlerta() {
+    const temOs = lista.querySelector('tr[data-inscricao] a[href*="relacionado"]');
+    alertaOs.classList.toggle('d-none', !temOs);
+  }
+
+  function renderResultados(itens) {
+    const vazia = document.getElementById('linha-vazia');
+    if (vazia) vazia.remove();
+    lista.innerHTML = '';
+    if (!itens.length) {
+      lista.innerHTML = '<tr id="linha-vazia"><td colspan="5" class="text-muted text-center py-4">Nenhuma inscrição adicionada.</td></tr>';
+      atualizarAlerta();
+      return;
+    }
+    itens.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.dataset.inscricao = item.inscricao;
+      let osHtml = '<span class="text-muted">—</span>';
+      if (item.os_ativas && item.os_ativas.length) {
+        osHtml = item.os_ativas.map(os => {
+          const proc = os.processo ? ` <span class="text-muted">(${os.processo})</span>` : '';
+          return `<div class="small"><a href="/os/${os.pk}/">${os.numero_os}</a>${proc}
+            <a class="ms-1" href="${urlPasso2}?relacionado=${os.pk}">Relacionar →</a></div>`;
+        }).join('');
+      }
+      const endereco = item.encontrada
+        ? (item.endereco || '—')
+        : '<span class="text-danger">Não encontrada no SIAT</span>';
+      tr.innerHTML = `
+        <td class="fw-semibold">${item.inscricao}</td>
+        <td>${endereco}</td>
+        <td>${item.bairro || '—'}</td>
+        <td>${osHtml}</td>
+        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger btn-remover">Remover</button></td>`;
+      lista.appendChild(tr);
+    });
+    atualizarAlerta();
+  }
+
+  async function buscarInscricoes(listaInsc) {
+    limparErro();
+    const body = new URLSearchParams();
+    listaInsc.forEach(i => body.append('inscricoes[]', i));
+    const resp = await fetch(urlBusca, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'X-CSRFToken': csrf,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    });
+    if (!resp.ok) {
+      mostrarErro('Falha ao buscar inscrições.');
+      return;
+    }
+    const data = await resp.json();
+    renderResultados(data.inscricoes_encontradas || []);
+  }
+
+  document.getElementById('btn-adicionar').addEventListener('click', async function () {
+    const valor = (input.value || '').trim();
+    if (!valor) {
+      mostrarErro('Informe uma inscrição.');
+      return;
+    }
+    const atuais = inscricoesAtuais();
+    if (!atuais.includes(valor)) atuais.push(valor);
+    input.value = '';
+    await buscarInscricoes(atuais);
+  });
+
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      document.getElementById('btn-adicionar').click();
+    }
+  });
+
+  lista.addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('.btn-remover');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    const insc = tr.dataset.inscricao;
+    const restantes = inscricoesAtuais().filter(i => i !== insc);
+    await buscarInscricoes(restantes);
+  });
+
+  document.getElementById('upload-xlsx').addEventListener('change', async function (ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    limparErro();
+    const formData = new FormData();
+    formData.append('arquivo', file);
+    const resp = await fetch(urlUpload, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRFToken': csrf,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      mostrarErro(data.error || 'Falha no upload.');
+      return;
+    }
+    renderResultados(data.inscricoes_encontradas || []);
+    ev.target.value = '';
+  });
+
+  document.getElementById('btn-proximo').addEventListener('click', async function () {
+    const atuais = inscricoesAtuais();
+    if (!atuais.length) {
+      mostrarErro('Adicione ao menos uma inscrição.');
+      return;
+    }
+    await buscarInscricoes(atuais);
+    window.location.href = urlPasso2;
+  });
+
+  atualizarAlerta();
+});
+</script>
+{% endblock %}

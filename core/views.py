@@ -2,6 +2,7 @@ import json
 import logging
 import threading
 from collections import defaultdict
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.views import LoginView, LogoutView
@@ -35,6 +36,9 @@ from core.forms import (
     OSEncerramentoForm,
     OSForm,
     OSVincularProcessoForm,
+    OSWizardPasso2Form,
+    OSWizardPasso2RelacionadoForm,
+    OSWizardPasso3Form,
     ProducaoForm,
     RelatorioProducaoForm,
     RelatorioTempoRegistroForm,
@@ -1459,54 +1463,595 @@ class RelatorioTempoRegistroView(RequerLoginMixin, View):
 
 
 class OSCreateView(RequerLoginMixin, FormView):
+    """Mantida por compatibilidade; a criação oficial usa o wizard."""
+
     template_name = "os_form.html"
     form_class = OSForm
 
     def dispatch(self, request, *args, **kwargs):
-        perfil = getattr(request, "perfil_acesso", None)
-        if perfil is None or not perfil.pode_criar_os:
-            messages.error(request, MSG_SEM_PERMISSAO)
+        return redirect("os_nova")
+
+
+def _wizard_requer_departamento(request):
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+    return visibilidade in ("DEPARTAMENTO", "TOTAL")
+
+
+def _wizard_json_safe(obj):
+    if isinstance(obj, dict):
+        return {chave: _wizard_json_safe(valor) for chave, valor in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_wizard_json_safe(valor) for valor in obj]
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return str(obj)
+    return obj
+
+
+def _buscar_dados_siat_inscricao(inscricao):
+    try:
+        inscricao_int = int(str(inscricao).strip())
+    except (TypeError, ValueError):
+        return None
+    dados = siat_index.buscar_por_inscricao(inscricao_int)
+    if dados:
+        return dados
+    return buscar_inscricao_no_arquivo(inscricao_int, SIAT_ARQUIVO_PATH)
+
+
+def _os_ativas_para_inscricao(inscricao):
+    try:
+        inscricao_int = int(str(inscricao).strip())
+    except (TypeError, ValueError):
+        return []
+
+    vinculos = (
+        OsImovel.objects.filter(
+            imovel__inscricao_cadastral=inscricao_int,
+            os__encerrada=False,
+        )
+        .select_related("os")
+        .order_by("-os__data_criacao_sgbd")
+    )
+    resultado = []
+    vistos = set()
+    for vinculo in vinculos:
+        if vinculo.os_id in vistos:
+            continue
+        vistos.add(vinculo.os_id)
+        processo = (
+            OsProcesso.objects.filter(os=vinculo.os, tipo_vinculo="PRINCIPAL")
+            .select_related("processo_sei")
+            .first()
+        )
+        resultado.append(
+            {
+                "pk": vinculo.os.pk,
+                "numero_os": vinculo.os.numero_os,
+                "processo": (
+                    processo.processo_sei.numero_processo if processo else ""
+                ),
+            },
+        )
+    return resultado
+
+
+def _montar_resultado_wizard_inscricao(inscricao):
+    inscricao_str = str(inscricao).strip()
+    dados = _buscar_dados_siat_inscricao(inscricao_str)
+    os_ativas = _os_ativas_para_inscricao(inscricao_str)
+
+    if not dados:
+        return {
+            "inscricao": inscricao_str,
+            "encontrada": False,
+            "endereco": "",
+            "bairro": "",
+            "os_ativas": os_ativas,
+            "dados_completos": None,
+        }
+
+    montado = _montar_resultado_busca(dados, "siat")
+    return {
+        "inscricao": str(dados.get("inscricao_cadastral") or inscricao_str),
+        "encontrada": True,
+        "endereco": montado["endereco"],
+        "bairro": montado["bairro"] or "",
+        "os_ativas": os_ativas,
+        "dados_completos": _wizard_json_safe(dados),
+    }
+
+
+def _limpar_sessao_wizard(request):
+    for chave in (
+        "wizard_inscricoes",
+        "wizard_dados_os",
+        "wizard_relacionado_os_pk",
+    ):
+        request.session.pop(chave, None)
+
+
+class OSWizardView(RequerLoginMixin, TemplateView):
+    template_name = "os_wizard_passo1.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _wizard_requer_departamento(request):
+            messages.error(
+                request,
+                "A criação de OS pelo wizard é restrita ao perfil DEPARTAMENTO.",
+            )
             return redirect("os_list")
         return super().dispatch(request, *args, **kwargs)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["wizard_inscricoes"] = self.request.session.get(
+            "wizard_inscricoes",
+            [],
+        )
+        context["passo"] = 1
+        return context
+
+    def post(self, request, *args, **kwargs):
+        inscricoes = request.POST.getlist("inscricoes[]") or request.POST.getlist(
+            "inscricoes",
+        )
+        if not inscricoes and request.content_type and "json" in request.content_type:
+            try:
+                payload = json.loads(request.body.decode("utf-8") or "{}")
+            except (TypeError, ValueError, UnicodeDecodeError):
+                payload = {}
+            inscricoes = payload.get("inscricoes") or []
+
+        resultados = []
+        for inscricao in inscricoes:
+            if not str(inscricao).strip():
+                continue
+            resultados.append(_montar_resultado_wizard_inscricao(inscricao))
+
+        request.session["wizard_inscricoes"] = resultados
+        request.session.modified = True
+
+        payload = {
+            "inscricoes_encontradas": resultados,
+            "ha_os_ativa": any(item.get("os_ativas") for item in resultados),
+        }
+
+        wants_json = (
+            request.headers.get("X-Requested-With") == "XMLHttpRequest"
+            or "application/json" in (request.headers.get("Accept") or "")
+            or request.GET.get("format") == "json"
+        )
+        if wants_json:
+            return JsonResponse(payload)
+
+        if not resultados:
+            messages.error(request, "Informe ao menos uma inscrição cadastral.")
+            return redirect("os_nova")
+
+        return redirect("os_nova_passo2")
+
+
+class OSUploadInscricoesView(RequerLoginMixin, View):
+    def dispatch(self, request, *args, **kwargs):
+        if not _wizard_requer_departamento(request):
+            return JsonResponse({"error": "Sem permissão."}, status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        arquivo = request.FILES.get("arquivo") or request.FILES.get("file")
+        if not arquivo:
+            return JsonResponse({"error": "Arquivo não enviado."}, status=400)
+        if not arquivo.name.lower().endswith((".xlsx", ".xlsm")):
+            return JsonResponse(
+                {"error": "Envie um arquivo .xlsx."},
+                status=400,
+            )
+
+        try:
+            from openpyxl import load_workbook
+
+            workbook = load_workbook(arquivo, read_only=True, data_only=True)
+            sheet = workbook.active
+            inscricoes = []
+            for idx, row in enumerate(sheet.iter_rows(min_col=1, max_col=1, values_only=True)):
+                valor = row[0]
+                if valor is None:
+                    continue
+                texto = str(valor).strip()
+                if not texto:
+                    continue
+                if idx == 0 and not any(ch.isdigit() for ch in texto):
+                    continue
+                digitos = "".join(ch for ch in texto if ch.isdigit())
+                if digitos:
+                    inscricoes.append(digitos)
+            workbook.close()
+        except Exception as exc:  # noqa: BLE001
+            return JsonResponse(
+                {"error": f"Falha ao ler planilha: {exc}"},
+                status=400,
+            )
+
+        # remove duplicadas preservando ordem
+        vistos = set()
+        unicos = []
+        for insc in inscricoes:
+            if insc in vistos:
+                continue
+            vistos.add(insc)
+            unicos.append(insc)
+
+        resultados = [_montar_resultado_wizard_inscricao(insc) for insc in unicos]
+        request.session["wizard_inscricoes"] = resultados
+        request.session.modified = True
+        return JsonResponse(
+            {
+                "inscricoes_encontradas": resultados,
+                "ha_os_ativa": any(item.get("os_ativas") for item in resultados),
+            },
+        )
+
+
+class OSWizardPasso2View(RequerLoginMixin, FormView):
+    template_name = "os_wizard_passo2.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _wizard_requer_departamento(request):
+            messages.error(
+                request,
+                "A criação de OS pelo wizard é restrita ao perfil DEPARTAMENTO.",
+            )
+            return redirect("os_list")
+        if not request.session.get("wizard_inscricoes"):
+            messages.error(request, "Adicione ao menos uma inscrição no passo 1.")
+            return redirect("os_nova")
+
+        relacionado = request.GET.get("relacionado") or request.session.get(
+            "wizard_relacionado_os_pk",
+        )
+        self.os_relacionada = None
+        if relacionado:
+            self.os_relacionada = get_object_or_404(OS, pk=relacionado)
+            request.session["wizard_relacionado_os_pk"] = self.os_relacionada.pk
+        else:
+            request.session.pop("wizard_relacionado_os_pk", None)
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_class(self):
+        if self.os_relacionada:
+            return OSWizardPasso2RelacionadoForm
+        return OSWizardPasso2Form
+
+    def get_initial(self):
+        initial = super().get_initial()
+        dados = self.request.session.get("wizard_dados_os") or {}
+        for campo in (
+            "numero_processo",
+            "data_abertura_sei",
+            "data_entrada_divisao",
+            "prioridade",
+            "observacao",
+            "apelido",
+            "prazo_tipo",
+            "prazo_data",
+        ):
+            if dados.get(campo) not in (None, ""):
+                initial[campo] = dados[campo]
+        if not self.os_relacionada:
+            for campo in ("natureza", "tipo_demanda", "finalidade"):
+                if dados.get(campo):
+                    initial[campo] = dados[campo]
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["passo"] = 2
+        context["wizard_inscricoes"] = self.request.session.get(
+            "wizard_inscricoes",
+            [],
+        )
+        context["os_relacionada"] = self.os_relacionada
+        context["modo_relacionado"] = bool(self.os_relacionada)
+        return context
+
     def form_valid(self, form):
-        servidor = _obter_servidor(self.request.user)
+        cleaned = form.cleaned_data
+        dados = {
+            "numero_processo": cleaned["numero_processo"],
+            "data_abertura_sei": cleaned["data_abertura_sei"].isoformat(),
+            "data_entrada_divisao": cleaned["data_entrada_divisao"].isoformat(),
+        }
+        if self.os_relacionada:
+            dados["relacionado_os_pk"] = self.os_relacionada.pk
+        else:
+            dados.update(
+                {
+                    "natureza": cleaned["natureza"].pk,
+                    "tipo_demanda": cleaned["tipo_demanda"].pk,
+                    "finalidade": cleaned["finalidade"].pk,
+                    "prioridade": cleaned["prioridade"],
+                    "observacao": cleaned.get("observacao") or "",
+                    "apelido": cleaned.get("apelido") or "",
+                    "prazo_tipo": cleaned.get("prazo_tipo") or "SEM_PRIORIDADE",
+                    "prazo_data": (
+                        cleaned["prazo_data"].isoformat()
+                        if cleaned.get("prazo_data")
+                        else None
+                    ),
+                },
+            )
+        self.request.session["wizard_dados_os"] = dados
+        self.request.session.modified = True
+        return redirect("os_nova_passo3")
+
+
+class OSWizardPasso3View(RequerLoginMixin, FormView):
+    template_name = "os_wizard_passo3.html"
+    form_class = OSWizardPasso3Form
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _wizard_requer_departamento(request):
+            messages.error(
+                request,
+                "A criação de OS pelo wizard é restrita ao perfil DEPARTAMENTO.",
+            )
+            return redirect("os_list")
+        if not request.session.get("wizard_inscricoes"):
+            messages.error(request, "Adicione ao menos uma inscrição no passo 1.")
+            return redirect("os_nova")
+        if not request.session.get("wizard_dados_os"):
+            messages.error(request, "Preencha os dados da OS no passo 2.")
+            return redirect("os_nova_passo2")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields["unidade_interna_destino"].queryset = (
+            UnidadeInterna.objects.filter(tipo="OPERACIONAL").order_by("sigla")
+        )
+        form.fields["unidade_interna_destino"].required = False
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        dados = self.request.session.get("wizard_dados_os") or {}
+        context["passo"] = 3
+        context["wizard_inscricoes"] = self.request.session.get(
+            "wizard_inscricoes",
+            [],
+        )
+        context["wizard_dados_os"] = dados
+        relacionado_pk = dados.get("relacionado_os_pk") or self.request.session.get(
+            "wizard_relacionado_os_pk",
+        )
+        context["os_relacionada"] = (
+            OS.objects.filter(pk=relacionado_pk).first() if relacionado_pk else None
+        )
+        context["modo_relacionado"] = bool(context["os_relacionada"])
+        if not context["modo_relacionado"]:
+            context["natureza"] = Natureza.objects.filter(
+                pk=dados.get("natureza"),
+            ).first()
+            context["tipo_demanda"] = TipoDemanda.objects.filter(
+                pk=dados.get("tipo_demanda"),
+            ).first()
+            context["finalidade"] = Finalidade.objects.filter(
+                pk=dados.get("finalidade"),
+            ).first()
+        return context
+
+    def post(self, request, *args, **kwargs):
+        encaminhar = request.POST.get("encaminhar") == "True"
+        if not encaminhar:
+            return self._concluir(request, encaminhar=False)
+
+        form = self.get_form()
+        if form.is_valid():
+            if not form.cleaned_data.get("unidade_interna_destino"):
+                form.add_error(
+                    "unidade_interna_destino",
+                    "Selecione a unidade destino para encaminhar.",
+                )
+                return self.form_invalid(form)
+            return self._concluir(
+                request,
+                encaminhar=True,
+                dados_encaminhamento=form.cleaned_data,
+            )
+        return self.form_invalid(form)
+
+    def _concluir(self, request, encaminhar, dados_encaminhamento=None):
+        servidor = _obter_servidor(request.user)
         if servidor is None:
-            raise PermissionDenied
+            messages.error(request, MSG_SEM_PERMISSAO)
+            return redirect("os_list")
+
+        dados = request.session.get("wizard_dados_os") or {}
+        inscricoes = request.session.get("wizard_inscricoes") or []
+        relacionado_pk = dados.get("relacionado_os_pk") or request.session.get(
+            "wizard_relacionado_os_pk",
+        )
+
+        try:
+            data_abertura = datetime.date.fromisoformat(dados["data_abertura_sei"])
+            data_entrada = datetime.date.fromisoformat(dados["data_entrada_divisao"])
+        except (KeyError, TypeError, ValueError):
+            messages.error(request, "Dados do passo 2 incompletos.")
+            return redirect("os_nova_passo2")
 
         with transaction.atomic():
-            os_obj = OS.objects.create(
-                numero_os=_gerar_numero_os(),
-                data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada_divisao"],
-                natureza=form.cleaned_data["natureza"],
-                tipo_demanda=form.cleaned_data["tipo_demanda"],
-                finalidade=form.cleaned_data["finalidade"],
-                prioridade=form.cleaned_data["prioridade"],
-                observacao=form.cleaned_data.get("observacao") or None,
-                apelido=form.cleaned_data.get("apelido") or None,
-                prazo_tipo=form.cleaned_data.get("prazo_tipo") or "SEM_PRIORIDADE",
-                prazo_data=form.cleaned_data.get("prazo_data"),
-                criado_por=servidor,
-            )
-
             processo_sei, _ = ProcessoSei.objects.get_or_create(
-                numero_processo=form.cleaned_data["processo_sei_numero"],
+                numero_processo=dados["numero_processo"],
             )
-            processo_sei.data_abertura_sei = form.cleaned_data["processo_sei_data_criacao_sei"]
-            processo_sei.save(update_fields=["data_abertura_sei"])
+            if not processo_sei.data_abertura_sei:
+                processo_sei.data_abertura_sei = data_abertura
+                processo_sei.save(update_fields=["data_abertura_sei"])
 
-            OsProcesso.objects.create(
-                os=os_obj,
-                processo_sei=processo_sei,
-                tipo_vinculo="PRINCIPAL",
-                data_entrada_divisao=form.cleaned_data["processo_sei_data_entrada_divisao"],
+            if relacionado_pk:
+                os_obj = get_object_or_404(OS, pk=relacionado_pk)
+                OsProcesso.objects.create(
+                    os=os_obj,
+                    processo_sei=processo_sei,
+                    tipo_vinculo="RELACIONADO",
+                    data_entrada_divisao=data_entrada,
+                    registrado_por=servidor,
+                )
+            else:
+                natureza = get_object_or_404(Natureza, pk=dados["natureza"])
+                tipo_demanda = get_object_or_404(TipoDemanda, pk=dados["tipo_demanda"])
+                finalidade = get_object_or_404(Finalidade, pk=dados["finalidade"])
+                prazo_data = None
+                if dados.get("prazo_data"):
+                    prazo_data = datetime.date.fromisoformat(dados["prazo_data"])
+
+                os_obj = OS.objects.create(
+                    numero_os=_gerar_numero_os(),
+                    data_entrada_divisao=data_entrada,
+                    natureza=natureza,
+                    tipo_demanda=tipo_demanda,
+                    finalidade=finalidade,
+                    prioridade=dados.get("prioridade") or "NORMAL",
+                    observacao=dados.get("observacao") or None,
+                    apelido=dados.get("apelido") or None,
+                    prazo_tipo=dados.get("prazo_tipo") or "SEM_PRIORIDADE",
+                    prazo_data=prazo_data,
+                    criado_por=servidor,
+                    pendente_encaminhamento=not encaminhar,
+                )
+                OsProcesso.objects.create(
+                    os=os_obj,
+                    processo_sei=processo_sei,
+                    tipo_vinculo="PRINCIPAL",
+                    data_entrada_divisao=data_entrada,
+                    registrado_por=servidor,
+                )
+
+            for item in inscricoes:
+                dados_siat = item.get("dados_completos")
+                if not dados_siat:
+                    continue
+                inscricao = dados_siat.get("inscricao_cadastral")
+                if inscricao is None:
+                    continue
+                imovel = Imovel.objects.filter(
+                    inscricao_cadastral=inscricao,
+                ).first()
+                if imovel and OsImovel.objects.filter(os=os_obj, imovel=imovel).exists():
+                    continue
+                vincular_imovel_a_os(os_obj, dados_siat, servidor=servidor)
+
+            if encaminhar and dados_encaminhamento:
+                unidade_destino = dados_encaminhamento["unidade_interna_destino"]
+                servidor_destino = dados_encaminhamento.get("servidor_destino")
+                agora = timezone.now()
+                encaminhamento = Encaminhamento.objects.create(
+                    os=os_obj,
+                    unidade_interna_origem=None,
+                    servidor_origem=servidor,
+                    unidade_interna_destino=unidade_destino,
+                    servidor_destino=servidor_destino,
+                    etapa_interna="ENTRADA",
+                    tipo_macroetapa=Encaminhamento.TIPO_MACROETAPA_ATENDIMENTO_INTERNO,
+                    automatico=False,
+                    aguarda_retorno=False,
+                    observacao=dados_encaminhamento.get("observacao") or None,
+                    manter_aberta_na_unidade=False,
+                )
+                TarefaInterna.objects.create(
+                    os=os_obj,
+                    encaminhamento=encaminhamento,
+                    unidade=unidade_destino,
+                    servidor=servidor_destino or servidor,
+                    etapa_interna="ENTRADA",
+                    status="PENDENTE",
+                    data_inicio=agora,
+                )
+                _atualizar_status_unidade_encaminhamento(
+                    os_obj,
+                    None,
+                    servidor,
+                    False,
+                    unidade_destino=unidade_destino,
+                )
+                if os_obj.pendente_encaminhamento:
+                    os_obj.pendente_encaminhamento = False
+                    os_obj.save(update_fields=["pendente_encaminhamento"])
+
+        _limpar_sessao_wizard(request)
+
+        if encaminhar:
+            messages.success(
+                request,
+                f"{os_obj.numero_os} criada e encaminhada com sucesso.",
             )
-
-        messages.success(
-            self.request,
-            f"{os_obj.numero_os} criada com sucesso.",
-        )
+        elif relacionado_pk:
+            messages.success(
+                request,
+                f"Processo relacionado registrado em {os_obj.numero_os}.",
+            )
+        else:
+            messages.warning(
+                request,
+                f"{os_obj.numero_os} salva sem encaminhamento. "
+                "Encaminhe para uma unidade operacional quando estiver pronto.",
+            )
         return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
+
+
+class ProcessoSeiAPIView(RequerLoginJSONMixin, View):
+    def get(self, request, *args, **kwargs):
+        numero = (request.GET.get("numero") or "").strip()
+        if not numero:
+            return JsonResponse(
+                {
+                    "encontrado": False,
+                    "data_abertura_sei": None,
+                    "os_ativas": [],
+                },
+            )
+
+        processo = ProcessoSei.objects.filter(numero_processo=numero).first()
+        if not processo:
+            return JsonResponse(
+                {
+                    "encontrado": False,
+                    "data_abertura_sei": None,
+                    "os_ativas": [],
+                },
+            )
+
+        os_ativas = []
+        vinculos = (
+            OsProcesso.objects.filter(
+                processo_sei=processo,
+                os__encerrada=False,
+            )
+            .select_related("os")
+            .order_by("-os__data_criacao_sgbd")
+        )
+        for vinculo in vinculos:
+            os_ativas.append(
+                {
+                    "pk": vinculo.os.pk,
+                    "numero_os": vinculo.os.numero_os,
+                    "tipo_vinculo": vinculo.tipo_vinculo,
+                },
+            )
+
+        return JsonResponse(
+            {
+                "encontrado": True,
+                "data_abertura_sei": (
+                    processo.data_abertura_sei.isoformat()
+                    if processo.data_abertura_sei
+                    else None
+                ),
+                "os_ativas": os_ativas,
+            },
+        )
 
 
 COLUNAS_GERENCIAL_CONFIG = {
@@ -2220,6 +2765,7 @@ def _serializar_linhas_gerencial(
         "os_pk": os_obj.pk,
         "numero_os": os_obj.numero_os,
         "apelido": os_obj.apelido or "",
+        "pendente_encaminhamento": bool(os_obj.pendente_encaminhamento),
         "processos": numeros_processos,
         "macroetapa": macroetapa,
         "macroetapa_label": _label_macroetapa_gerencial(macroetapa),
@@ -2980,6 +3526,9 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
                 manter_aberta,
                 unidade_destino=dados.get("unidade_interna_destino"),
             )
+            if self.os_obj.pendente_encaminhamento:
+                self.os_obj.pendente_encaminhamento = False
+                self.os_obj.save(update_fields=["pendente_encaminhamento"])
 
         messages.success(self.request, "Encaminhamento registrado.")
         return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))

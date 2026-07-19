@@ -377,6 +377,10 @@ class OS(models.Model):
     data_entrada_divisao = models.DateField(null=True, blank=True)
     os_interna = models.BooleanField(default=False)
     pendente_confirmacao = models.BooleanField(default=False)
+    pendente_encaminhamento = models.BooleanField(
+        default=False,
+        verbose_name="Pendente de encaminhamento",
+    )
     prioridade = models.CharField(max_length=255, default="NORMAL")
     natureza = models.ForeignKey(
         Natureza,
