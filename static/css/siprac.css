@@ -353,3 +353,28 @@ body.gerencial-mode .siprac-content {
   font-size: 0.65rem;
   line-height: 1;
 }
+
+.gerencial-popover {
+    position: fixed;
+    z-index: 1050;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    padding: 12px;
+    min-width: 260px;
+    max-width: 360px;
+}
+
+.gerencial-popover-titulo {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.gerencial-popover .btn {
+    font-size: 12px;
+    padding: 3px 8px;
+}

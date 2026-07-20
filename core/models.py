@@ -1043,6 +1043,11 @@ class Producao(models.Model):
         blank=True,
         verbose_name="Prazo interno",
     )
+    prazo_rev = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Prazo do revisor",
+    )
     mes_cronograma = models.DateField(
         null=True,
         blank=True,

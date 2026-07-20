@@ -283,11 +283,29 @@ body.gerencial-mode .siprac-content {
         <tbody>
           {% for linha in linhas_gerencial %}
           <tr data-os-pk="{{ linha.os_pk }}"
-              data-producao-pk="{{ linha.producao_pk|default:'' }}">
+              data-producao-pk="{{ linha.producao_pk|default:'' }}"
+              data-os-editavel="{{ linha.os_editavel|yesno:'true,false' }}"
+              data-pode-criar-producao="{{ linha.pode_criar_producao|yesno:'true,false' }}"
+              data-status-producao="{{ linha.status_producao|default:'' }}"
+              data-etapa-interna="{{ linha.etapa_interna|default:'' }}"
+              data-status-unidade="{{ linha.status_unidade|default:'' }}"
+              data-etapa-choices="{{ linha.etapa_interna_choices_json|escape }}"
+              data-status-transicoes="{{ linha.status_transicoes_json|default:'[]'|escape }}">
             <td class="gerencial-col-fixa">
               <div class="fw-bold">
                 <a href="{% url 'os_detalhe' linha.os_pk %}" class="text-decoration-none"
                    onclick="event.stopPropagation();">{{ linha.numero_os }}</a>
+                <a href="#"
+                   onclick="abrirPopoverComentario(event, '{{ linha.os_pk }}')"
+                   class="ms-1 text-muted gerencial-popover-trigger"
+                   title="Comentários">
+                  <i class="bi bi-chat-dots"></i>
+                  {% if linha.total_comentarios > 0 %}
+                  <span class="badge bg-secondary" style="font-size:9px;">
+                    {{ linha.total_comentarios }}
+                  </span>
+                  {% endif %}
+                </a>
                 {% if linha.pendente_encaminhamento %}
                 <span class="badge text-bg-warning ms-1" style="font-size:9px;">Pendente</span>
                 {% endif %}
@@ -303,47 +321,61 @@ body.gerencial-mode .siprac-content {
                 {% endif %}
               </div>
               {% endfor %}
+              {% if linha.pode_criar_producao and linha.os_editavel %}
+              <small>
+                <a href="#"
+                   onclick="abrirPopoverNovaProd(event, '{{ linha.os_pk }}')"
+                   class="text-success gerencial-popover-trigger">
+                  <i class="bi bi-plus-circle"></i> Produção
+                </a>
+              </small>
+              {% endif %}
             </td>
-            <td class="gerencial-col-fixa">
+            <td class="gerencial-col-fixa gerencial-cel-etapa"
+                {% if linha.os_editavel %}
+                style="cursor:pointer;"
+                onclick="abrirPopoverEtapa(event, '{{ linha.os_pk }}', '{{ linha.etapa_interna|default:'' }}', '{{ linha.status_unidade|default:'' }}')"
+                {% endif %}>
               <div>{{ linha.macroetapa_label }}</div>
-              {% with status_unidade=linha.status_unidade %}
-              {% if status_unidade == 'CONCLUIDA' %}
-              <div class="ms-2 small">
-                <span class="text-secondary">● Concluída</span>
+              {% if linha.etapa_interna and linha.status_unidade != 'CONCLUIDA' %}
+              <div class="ms-2 small text-primary" style="text-decoration:underline dotted;">
+                {{ linha.etapa_interna_label|default:linha.etapa_interna }}
               </div>
-              {% elif status_unidade == 'ABERTA' or status_unidade == 'REABERTA' %}
-              {% if linha.etapa_interna %}
-              <div class="ms-2 small text-muted">{{ linha.etapa_interna }}</div>
+              {% elif linha.status_unidade == 'CONCLUIDA' %}
+              <div class="ms-2 small text-secondary">● Concluída</div>
+              {% elif linha.status_unidade == 'ABERTA' %}
+              <div class="ms-2 small"><span class="text-success">● Aberta</span></div>
+              {% elif linha.status_unidade == 'REABERTA' %}
+              <div class="ms-2 small"><span class="text-warning">● Reaberta</span></div>
+              {% elif linha.status_unidade == 'SOMENTE_LEITURA' %}
+              <div class="ms-2 small"><span class="text-muted">● Somente leitura</span></div>
               {% endif %}
-              <div class="ms-2 small">
-                {% if status_unidade == 'ABERTA' %}
-                <span class="text-success">● Aberta</span>
-                {% else %}
-                <span class="text-warning">● Reaberta</span>
-                {% endif %}
-              </div>
-              {% elif status_unidade == 'SOMENTE_LEITURA' %}
-              <div class="ms-2 small">
-                <span class="text-muted">● Somente leitura</span>
-              </div>
-              {% endif %}
-              {% endwith %}
             </td>
-            <td class="gerencial-col-fixa">
+            <td class="gerencial-col-fixa gerencial-cel-status"
+                {% if linha.tem_producao and linha.os_editavel %}
+                style="cursor:pointer;"
+                onclick="abrirPopoverStatus(event, '{{ linha.producao_pk }}', '{{ linha.status_producao }}')"
+                {% endif %}>
               {% if linha.tem_producao %}
               <span class="badge bg-{{ linha.status_producao_cor }}">
                 {{ linha.status_producao_label }}
               </span>
               {% else %}
-              <span class="text-muted small">{{ linha.status_producao_label }}</span>
+              <span class="text-muted small">Sem produção</span>
               {% endif %}
             </td>
             {% for col_id in colunas_gerencial_visiveis %}
             <td class="gerencial-col-config gerencial-cell"
                 data-col="{{ col_id }}"
                 data-os-pk="{{ linha.os_pk }}"
-                data-producao-pk="{{ linha.producao_pk|default:'' }}">
-              {% if col_id == 'numero_imovel' and linha.numero_imovel_extra > 0 %}
+                data-producao-pk="{{ linha.producao_pk|default:'' }}"
+                {% if col_id == 'avaliador' and linha.tem_producao and linha.status_producao == 'NAO_DISTRIBUIDO' and linha.os_editavel %}
+                style="cursor:pointer; text-decoration:underline dotted;"
+                onclick="abrirPopoverDistribuir(event, '{{ linha.producao_pk }}')"
+                {% endif %}>
+              {% if col_id == 'avaliador' and linha.tem_producao and linha.status_producao == 'NAO_DISTRIBUIDO' and linha.os_editavel %}
+                {{ linha.avaliador|default:"+ Distribuir" }}
+              {% elif col_id == 'numero_imovel' and linha.numero_imovel_extra > 0 %}
                 {{ linha.numero_imovel }}
                 <span class="badge bg-secondary ms-1"
                       data-bs-toggle="tooltip"
@@ -398,6 +430,10 @@ body.gerencial-mode .siprac-content {
     <div id="gerencialPainelConteudo"></div>
   </div>
 </div>
+
+<div id="gerencialPopover" class="gerencial-popover" style="display:none;">
+  <div id="gerencialPopoverConteudo"></div>
+</div>
 </div>
 
 <script type="application/json" id="gerencial-panels-data">{{ gerencial_panels_json|safe }}</script>
@@ -409,6 +445,30 @@ body.gerencial-mode .siprac-content {
   "podeEditarEntradaDai": {{ pode_editar_entrada_dai|yesno:"true,false" }},
   "colunasVisiveis": {{ colunas_gerencial_visiveis_json|safe }}
 }
+</script>
+
+<script type="application/json" id="gerencial-servidores-unidade">
+[
+{% for srv in servidores_unidade %}
+  {"id": {{ srv.pk }}, "nome": "{{ srv.nome|escapejs }}"}{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script type="application/json" id="gerencial-servidores-revisores">
+[
+{% for srv in servidores_revisores %}
+  {"id": {{ srv.pk }}, "nome": "{{ srv.nome|escapejs }}"}{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
+</script>
+
+<script type="application/json" id="gerencial-tipos-producao">
+[
+{% for tp in tipos_producao_unidade %}
+  {"id": {{ tp.pk }}, "label": "{{ tp.label_display|escapejs }}"}{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
 </script>
 
 <script>
@@ -780,6 +840,10 @@ body.gerencial-mode .siprac-content {
 
   document.getElementById('tabela-gerencial').addEventListener('click', function (e) {
     if (e.target.closest('a')) return;
+    if (e.target.closest('.gerencial-popover-trigger')) return;
+    if (e.target.closest('.gerencial-cel-etapa')) return;
+    if (e.target.closest('.gerencial-cel-status')) return;
+    if (e.target.closest('[onclick*="abrirPopover"]')) return;
     const tr = e.target.closest('tr[data-os-pk]');
     if (!tr) return;
     const key = tr.dataset.producaoPk
@@ -809,6 +873,333 @@ body.gerencial-mode .siprac-content {
         location.reload();
       });
     }).catch(function (e) { alert(e.message); });
+  });
+})();
+</script>
+
+<script>
+(function () {
+  const popover = document.getElementById('gerencialPopover');
+  const popoverConteudo = document.getElementById('gerencialPopoverConteudo');
+  if (!popover || !popoverConteudo) return;
+
+  const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
+  const csrfToken = csrfInput ? csrfInput.value : '';
+
+  function parseJsonEl(id) {
+    const el = document.getElementById(id);
+    if (!el) return [];
+    try { return JSON.parse(el.textContent || '[]'); }
+    catch (e) { return []; }
+  }
+
+  const servidoresUnidade = parseJsonEl('gerencial-servidores-unidade');
+  const servidoresRevisores = parseJsonEl('gerencial-servidores-revisores');
+  const tiposProducao = parseJsonEl('gerencial-tipos-producao');
+
+  function fecharPopover() {
+    popover.style.display = 'none';
+    popoverConteudo.innerHTML = '';
+  }
+
+  function posicionarPopover(anchor) {
+    const rect = (anchor.nodeType === 1 ? anchor : anchor.parentElement).getBoundingClientRect();
+    popover.style.display = 'block';
+    const pw = popover.offsetWidth || 280;
+    const ph = popover.offsetHeight || 120;
+    let left = rect.left;
+    let top = rect.bottom + 6;
+    if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    if (top + ph > window.innerHeight - 8) top = Math.max(8, rect.top - ph - 6);
+    if (left < 8) left = 8;
+    popover.style.left = left + 'px';
+    popover.style.top = top + 'px';
+  }
+
+  function abrirPopover(anchor, html) {
+    fecharPopover();
+    popoverConteudo.innerHTML = html;
+    posicionarPopover(anchor);
+  }
+
+  function postJson(url, payload) {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok || data.sucesso === false) {
+          throw new Error(data.erro || 'Erro na operação.');
+        }
+        return data;
+      });
+    });
+  }
+
+  function getJson(url) {
+    return fetch(url, {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw new Error(data.erro || 'Erro ao carregar.');
+        return data;
+      });
+    });
+  }
+
+  function hojeISO() {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function optionsHtml(lista, valueKey, labelKey, selected) {
+    return lista.map(function (item) {
+      const val = item[valueKey];
+      const sel = String(val) === String(selected || '') ? ' selected' : '';
+      return '<option value="' + val + '"' + sel + '>' + item[labelKey] + '</option>';
+    }).join('');
+  }
+
+  function parseAttrJson(tr, attr) {
+    if (!tr) return [];
+    try {
+      return JSON.parse(tr.getAttribute(attr) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  window.abrirPopoverEtapa = function (event, osPk, etapaAtual, statusUnidade) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tr = event.target.closest('tr');
+    const choices = parseAttrJson(tr, 'data-etapa-choices');
+    if (!choices.length) {
+      alert('Nenhuma etapa posterior disponível.');
+      return;
+    }
+    let html = '<div class="gerencial-popover-titulo">Avançar etapa</div>';
+    html += '<div class="d-flex flex-column gap-1">';
+    choices.forEach(function (c) {
+      html += '<button type="button" class="btn btn-outline-primary text-start btn-etapa" data-etapa="' + c.valor + '">' + c.label + '</button>';
+    });
+    html += '</div>';
+    abrirPopover(event.target, html);
+    popoverConteudo.querySelectorAll('.btn-etapa').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        postJson('/api/os/' + osPk + '/etapa/', { etapa_interna: btn.dataset.etapa })
+          .then(function (data) {
+            const cel = tr.querySelector('.gerencial-cel-etapa');
+            if (cel) {
+              let inner = '<div>' + (cel.querySelector('div') ? cel.querySelector('div').textContent : '') + '</div>';
+              const first = cel.querySelector('div');
+              const macro = first ? first.textContent : '';
+              cel.innerHTML = '<div>' + macro + '</div>' +
+                '<div class="ms-2 small text-primary" style="text-decoration:underline dotted;">' +
+                (data.etapa_label || btn.dataset.etapa) + '</div>';
+            }
+            tr.dataset.etapaInterna = btn.dataset.etapa;
+            fecharPopover();
+          })
+          .catch(function (err) { alert(err.message); });
+      });
+    });
+  };
+
+  window.abrirPopoverStatus = function (event, producaoPk, statusAtual) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tr = event.target.closest('tr');
+    const disponiveis = parseAttrJson(tr, 'data-status-transicoes');
+    if (!disponiveis.length) {
+      alert('Nenhuma transição disponível.');
+      return;
+    }
+    let html = '<div class="gerencial-popover-titulo">Alterar status</div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Data</label>';
+    html += '<input type="date" class="form-control form-control-sm" id="popoverStatusData" value="' + hojeISO() + '"></div>';
+    html += '<div class="d-flex flex-column gap-1">';
+    disponiveis.forEach(function (t) {
+      html += '<button type="button" class="btn ' + (t.botao_classe || 'btn-outline-secondary') +
+        ' text-start btn-status" data-status="' + t.destino + '">' + t.label + '</button>';
+    });
+    html += '</div>';
+    abrirPopover(event.target, html);
+
+    popoverConteudo.querySelectorAll('.btn-status').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const data = (popoverConteudo.querySelector('#popoverStatusData') || {}).value || '';
+        postJson('/api/producao/' + producaoPk + '/status/', {
+          status: btn.dataset.status,
+          data: data,
+        }).then(function (resp) {
+          const cel = tr.querySelector('.gerencial-cel-status');
+          if (cel) {
+            cel.innerHTML = '<span class="badge bg-' + (resp.cor || 'secondary') + '">' +
+              (resp.status_label || btn.dataset.status) + '</span>';
+          }
+          tr.dataset.statusProducao = resp.status || btn.dataset.status;
+          tr.setAttribute('data-status-transicoes', JSON.stringify(resp.transicoes || []));
+          fecharPopover();
+          if (resp.opcoes_pos_enviado && resp.opcoes_pos_enviado.length) {
+            mostrarOpcoesPosEnviado(event.target, resp.opcoes_pos_enviado);
+          }
+        }).catch(function (err) { alert(err.message); });
+      });
+    });
+  };
+
+  function mostrarOpcoesPosEnviado(anchor, opcoes) {
+    let html = '<div class="gerencial-popover-titulo">Após envio</div>';
+    html += '<div class="d-flex flex-column gap-1">';
+    opcoes.forEach(function (op) {
+      if (op.acao === 'manter') {
+        html += '<button type="button" class="btn btn-outline-secondary btn-pos" data-acao="manter">' + op.label + '</button>';
+      } else {
+        html += '<a class="btn btn-outline-primary" href="' + (op.url || '#') + '">' + op.label + '</a>';
+      }
+    });
+    html += '</div>';
+    abrirPopover(anchor, html);
+    const btn = popoverConteudo.querySelector('.btn-pos[data-acao="manter"]');
+    if (btn) btn.addEventListener('click', fecharPopover);
+  }
+
+  window.abrirPopoverDistribuir = function (event, producaoPk) {
+    event.preventDefault();
+    event.stopPropagation();
+    let html = '<div class="gerencial-popover-titulo">Distribuir produção</div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Avaliador</label>';
+    html += '<select class="form-select form-select-sm" id="popoverAval">' +
+      '<option value="">Selecione…</option>' +
+      optionsHtml(servidoresUnidade, 'id', 'nome') + '</select></div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Prazo avaliador</label>';
+    html += '<input type="date" class="form-control form-control-sm" id="popoverPrazoAval"></div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Revisor</label>';
+    html += '<select class="form-select form-select-sm" id="popoverRev">' +
+      '<option value="">—</option>' +
+      optionsHtml(servidoresRevisores, 'id', 'nome') + '</select></div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Prazo revisor</label>';
+    html += '<input type="date" class="form-control form-control-sm" id="popoverPrazoRev"></div>';
+    html += '<button type="button" class="btn btn-primary w-100" id="popoverDistSalvar">Distribuir</button>';
+    abrirPopover(event.target, html);
+    const tr = event.target.closest('tr');
+    popoverConteudo.querySelector('#popoverDistSalvar').addEventListener('click', function () {
+      const payload = {
+        avaliador_id: popoverConteudo.querySelector('#popoverAval').value,
+        prazo_aval: popoverConteudo.querySelector('#popoverPrazoAval').value,
+        revisor_id: popoverConteudo.querySelector('#popoverRev').value || null,
+        prazo_rev: popoverConteudo.querySelector('#popoverPrazoRev').value,
+      };
+      postJson('/api/producao/' + producaoPk + '/distribuir/', payload)
+        .then(function (resp) {
+          const celAval = tr.querySelector('[data-col="avaliador"]');
+          if (celAval) {
+            celAval.textContent = resp.avaliador || '—';
+            celAval.removeAttribute('onclick');
+            celAval.style.cursor = '';
+            celAval.style.textDecoration = '';
+          }
+          const celStatus = tr.querySelector('.gerencial-cel-status');
+          if (celStatus && resp.status_label) {
+            celStatus.innerHTML = '<span class="badge bg-' + (resp.cor || 'info') + '">' +
+              resp.status_label + '</span>';
+          }
+          tr.dataset.statusProducao = resp.status || 'DISTRIBUIDO';
+          fecharPopover();
+        })
+        .catch(function (err) { alert(err.message); });
+    });
+  };
+
+  window.abrirPopoverNovaProd = function (event, osPk) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!tiposProducao.length) {
+      alert('Nenhum tipo de produção disponível para a unidade.');
+      return;
+    }
+    let html = '<div class="gerencial-popover-titulo">Nova produção</div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Tipo</label>';
+    html += '<select class="form-select form-select-sm" id="popoverTipoProd">' +
+      optionsHtml(tiposProducao, 'id', 'label') + '</select></div>';
+    html += '<div class="mb-2"><label class="form-label small mb-1">Observação</label>';
+    html += '<textarea class="form-control form-control-sm" id="popoverObsProd" rows="2"></textarea></div>';
+    html += '<button type="button" class="btn btn-success w-100" id="popoverNovaProdSalvar">Criar</button>';
+    abrirPopover(event.target, html);
+    popoverConteudo.querySelector('#popoverNovaProdSalvar').addEventListener('click', function () {
+      postJson('/os/' + osPk + '/producao/nova/', {
+        tipo_producao: popoverConteudo.querySelector('#popoverTipoProd').value,
+        observacao: popoverConteudo.querySelector('#popoverObsProd').value,
+      }).then(function () {
+        fecharPopover();
+        location.reload();
+      }).catch(function (err) { alert(err.message); });
+    });
+  };
+
+  window.abrirPopoverComentario = function (event, osPk) {
+    event.preventDefault();
+    event.stopPropagation();
+    let html = '<div class="gerencial-popover-titulo">Comentários</div>';
+    html += '<div id="popoverComentsLista" class="small mb-2 text-muted">Carregando…</div>';
+    html += '<textarea class="form-control form-control-sm mb-2" id="popoverComentTexto" rows="2" placeholder="Novo comentário"></textarea>';
+    html += '<div class="d-flex justify-content-between align-items-center">';
+    html += '<a href="/os/' + osPk + '/" class="small">Ver todos →</a>';
+    html += '<button type="button" class="btn btn-primary" id="popoverComentSalvar">Enviar</button>';
+    html += '</div>';
+    abrirPopover(event.target, html);
+
+    function renderComents(data) {
+      const lista = popoverConteudo.querySelector('#popoverComentsLista');
+      const items = (data.comentarios || []).slice(0, 3);
+      if (!items.length) {
+        lista.innerHTML = '<em>Nenhum comentário.</em>';
+        return;
+      }
+      lista.innerHTML = items.map(function (c) {
+        return '<div class="mb-1 border-bottom pb-1"><strong>' + c.servidor +
+          '</strong> <span class="text-muted">' + c.data_hora + '</span><div>' +
+          c.texto + '</div></div>';
+      }).join('');
+    }
+
+    getJson('/api/os/' + osPk + '/comentarios/').then(renderComents)
+      .catch(function (err) {
+        popoverConteudo.querySelector('#popoverComentsLista').textContent = err.message;
+      });
+
+    popoverConteudo.querySelector('#popoverComentSalvar').addEventListener('click', function () {
+      const texto = popoverConteudo.querySelector('#popoverComentTexto').value;
+      postJson('/api/os/' + osPk + '/comentarios/', { texto: texto })
+        .then(function (data) {
+          popoverConteudo.querySelector('#popoverComentTexto').value = '';
+          renderComents(data);
+        })
+        .catch(function (err) { alert(err.message); });
+    });
+  };
+
+  document.addEventListener('click', function (e) {
+    if (popover.style.display === 'none') return;
+    if (popover.contains(e.target)) return;
+    if (e.target.closest('[onclick*="abrirPopover"]')) return;
+    if (e.target.closest('.gerencial-popover-trigger')) return;
+    fecharPopover();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') fecharPopover();
   });
 })();
 </script>

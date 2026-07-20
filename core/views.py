@@ -2126,6 +2126,7 @@ COLUNAS_GERENCIAL_CONFIG = {
     "mes_cronograma": {"label": "CRONOG"},
     "avaliador": {"label": "AVALIADOR"},
     "prazo_aval": {"label": "PRAZO_AVAL"},
+    "prazo_rev": {"label": "PRAZO_REV"},
     "entrega_aval": {"label": "ENTREGA_AVAL"},
     "revisor": {"label": "REVISOR"},
     "entrega_rev": {"label": "ENTREGA_REV"},
@@ -2177,6 +2178,7 @@ GRUPOS_COLUNAS_GERENCIAL = [
         [
             "avaliador",
             "prazo_aval",
+            "prazo_rev",
             "entrega_aval",
             "revisor",
             "entrega_rev",
@@ -2209,6 +2211,7 @@ COLUNAS_GERENCIAL_NOVAS = {
     "prazo_recompra_itbi",
     "mes_cronograma",
     "prazo_aval",
+    "prazo_rev",
     "entrega_aval",
     "revisor",
     "entrega_rev",
@@ -2244,6 +2247,7 @@ COLUNAS_GERENCIAL_PADRAO = [
     "mes_cronograma",
     "avaliador",
     "prazo_aval",
+    "prazo_rev",
     "entrega_aval",
     "revisor",
     "entrega_rev",
@@ -2471,6 +2475,7 @@ def _campos_vazios_gerencial():
         "avaliador": "—",
         "revisor": "—",
         "prazo_aval": "—",
+        "prazo_rev": "—",
         "entrega_aval": "—",
         "entrega_rev": "—",
         "entrega_aju": "—",
@@ -2569,8 +2574,9 @@ def _montar_cells_gerencial(linha):
         "dias_sei": linha.get("dias_sei"),
         "prazo_recompra_itbi": linha.get("prazo_recompra_itbi", "—"),
         "mes_cronograma": linha.get("mes_cronograma", "—"),
-        "avaliador": linha.get("avaliador", "—"),
+        "avaliador": linha.get("avaliador") or "—",
         "prazo_aval": linha.get("prazo_aval", "—"),
+        "prazo_rev": linha.get("prazo_rev", "—"),
         "entrega_aval": linha.get("entrega_aval", "—"),
         "revisor": linha.get("revisor", "—"),
         "entrega_rev": linha.get("entrega_rev", "—"),
@@ -2655,6 +2661,16 @@ def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai
         "avaliador_id": producao.servidor_responsavel_id if producao else None,
         "prazo_aval": prazo_interno_display,
         "prazo_aval_iso": prazo_interno_iso,
+        "prazo_rev": (
+            _formatar_data_br(producao.prazo_rev)
+            if producao and producao.prazo_rev
+            else "—"
+        ),
+        "prazo_rev_iso": (
+            producao.prazo_rev.isoformat()
+            if producao and producao.prazo_rev
+            else ""
+        ),
         "entrega_aval": (
             _formatar_data_br(producao.data_entrega_avaliacao)
             if producao and producao.data_entrega_avaliacao
@@ -2736,13 +2752,46 @@ def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai
     }
 
 
+ETAPAS_FLUXO_GERENCIAL = ["ENTRADA", "TRIAGEM", "EM_ATENDIMENTO"]
+
+
+def _etapas_posteriores_gerencial(etapa_atual):
+    from core.os_service import ETAPAS_INTERNAS_LABELS
+
+    if not etapa_atual:
+        posteriores = list(ETAPAS_FLUXO_GERENCIAL)
+    else:
+        try:
+            idx = ETAPAS_FLUXO_GERENCIAL.index(etapa_atual)
+            posteriores = ETAPAS_FLUXO_GERENCIAL[idx + 1 :]
+        except ValueError:
+            posteriores = list(ETAPAS_FLUXO_GERENCIAL)
+    return [
+        {"valor": etapa, "label": ETAPAS_INTERNAS_LABELS.get(etapa, etapa)}
+        for etapa in posteriores
+    ]
+
+
+def _pode_criar_producao_gerencial(os_obj, status_unidade):
+    if status_unidade not in ("ABERTA", "REABERTA"):
+        return False
+    return not (
+        os_obj.producoes.exclude(
+            status__in=[Producao.STATUS_ENVIADO, Producao.STATUS_CANCELADO],
+        ).exists()
+    )
+
+
 def _serializar_linhas_gerencial(
     os_obj,
     unidade_logada=None,
     servidor_logado=None,
     perfil_pode_homologar=False,
+    request=None,
 ):
     """Retorna lista de linhas gerenciais (uma por produção, ou sem produção)."""
+    from core.os_service import ETAPAS_INTERNAS_LABELS
+
     processos = os_obj.processos_vinculados.select_related(
         "processo_sei",
     ).order_by("tipo_vinculo", "data_entrada_divisao")
@@ -2764,6 +2813,7 @@ def _serializar_linhas_gerencial(
     macroetapa = macroetapa_atual_os(os_obj)
     status_unidade = None
     etapa_interna = None
+    etapa_interna_label = None
     if unidade_logada:
         status_unidade = (
             OsUnidadeStatus.objects.filter(
@@ -2784,7 +2834,18 @@ def _serializar_linhas_gerencial(
             )
             if tarefa:
                 etapa_interna = tarefa.etapa_interna
-        # CONCLUIDA / SOMENTE_LEITURA: não exibir etapa interna
+                etapa_interna_label = ETAPAS_INTERNAS_LABELS.get(
+                    etapa_interna,
+                    etapa_interna,
+                )
+
+    os_editavel = False
+    if request is not None:
+        os_editavel = os_editavel_para_usuario(os_obj, request)
+
+    total_comentarios = Comentario.objects.filter(os=os_obj).count()
+    etapa_interna_choices = _etapas_posteriores_gerencial(etapa_interna)
+    pode_criar_producao = _pode_criar_producao_gerencial(os_obj, status_unidade)
 
     processo_principal = next(
         (p for p in processos if p.tipo_vinculo == "PRINCIPAL"),
@@ -2817,6 +2878,8 @@ def _serializar_linhas_gerencial(
         "macroetapa": macroetapa,
         "macroetapa_label": _label_macroetapa_gerencial(macroetapa),
         "etapa_interna": etapa_interna,
+        "etapa_interna_label": etapa_interna_label or etapa_interna or "",
+        "etapa_interna_choices": etapa_interna_choices,
         "entrada_dai": _formatar_data_br(entrada_dai),
         "entrada_eav": entrada_eav,
         "requerimento": os_obj.tipo_demanda.descricao,
@@ -2825,6 +2888,14 @@ def _serializar_linhas_gerencial(
         "dias_sei": dias_sei,
         "prazo_recompra_itbi": "—",
         "status_unidade": status_unidade,
+        "os_editavel": os_editavel,
+        "total_comentarios": total_comentarios,
+        "pode_criar_producao": pode_criar_producao,
+        "etapa_interna_choices_json": json.dumps(
+            etapa_interna_choices,
+            ensure_ascii=False,
+        ),
+        "status_transicoes_json": "[]",
     }
 
     outra_equipe = False
@@ -2939,11 +3010,25 @@ def _serializar_linhas_gerencial(
                 "avaliador": (
                     producao.servidor_responsavel.nome
                     if producao.servidor_responsavel
-                    else "—"
+                    else ""
                 ),
                 "revisor": producao.revisor.nome if producao.revisor else "—",
                 "prazo_aval": _formatar_data_br(producao.prazo_interno),
+                "prazo_rev": _formatar_data_br(producao.prazo_rev),
                 "entrega_aval": _formatar_data_br(producao.data_entrega_avaliacao),
+                "status_transicoes": (
+                    _transicoes_status_disponiveis(producao, request)
+                    if request is not None
+                    else []
+                ),
+                "status_transicoes_json": json.dumps(
+                    (
+                        _transicoes_status_disponiveis(producao, request)
+                        if request is not None
+                        else []
+                    ),
+                    ensure_ascii=False,
+                ),
                 "entrega_rev": _formatar_data_br(producao.data_entrega_revisao),
                 "entrega_aju": _formatar_data_br(producao.data_entrega_ajustes),
                 "data_ajustes_ok": _formatar_data_br(producao.data_ajustes_ok),
@@ -2968,6 +3053,7 @@ def _montar_linhas_gerencial(
     unidade,
     servidor_logado=None,
     perfil_pode_homologar=False,
+    request=None,
 ):
     os_list = list(
         os_queryset.select_related("natureza", "tipo_demanda", "finalidade"),
@@ -2983,6 +3069,7 @@ def _montar_linhas_gerencial(
                 unidade,
                 servidor_logado=servidor_logado,
                 perfil_pode_homologar=perfil_pode_homologar,
+                request=request,
             ),
         )
     return linhas
@@ -3050,6 +3137,7 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
         unidade,
         servidor_logado=servidor,
         perfil_pode_homologar=pode_homologar,
+        request=request,
     )
     linhas_filtradas = _filtrar_linhas_coluna_gerencial(linhas_base, request)
     os_ids_filtrados = {linha["os_pk"] for linha in linhas_filtradas}
@@ -3096,8 +3184,28 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
         "pode_homologar": pode_homologar,
         "pode_editar_entrada_dai": _pode_editar_entrada_dai(request),
         "servidores": Servidor.objects.order_by("nome"),
+        "servidores_unidade": (
+            Servidor.objects.filter(
+                vinculos_unidade__unidade=unidade,
+                vinculos_unidade__data_fim__isnull=True,
+            )
+            .distinct()
+            .order_by("nome")
+            if unidade
+            else Servidor.objects.none()
+        ),
         "servidores_revisores": (
             _servidores_revisores_da_unidade(servidor) if pode_homologar else Servidor.objects.none()
+        ),
+        "tipos_producao_unidade": (
+            TipoProducao.objects.filter(
+                ativo=True,
+                unidades_competentes__unidade_interna=unidade,
+            )
+            .distinct()
+            .order_by("prefixo", "subtipo")
+            if unidade
+            else TipoProducao.objects.none()
         ),
         "prioridades_os": ["NORMAL", "PRIORITARIO", "URGENTE"],
         "prazo_tipo_opcoes": OS.PRAZO_TIPO_CHOICES,
@@ -3190,6 +3298,7 @@ class OSListView(RequerLoginMixin, ListView):
                 unidade,
                 servidor_logado=servidor,
                 perfil_pode_homologar=pode_homologar,
+                request=self.request,
             )
             linhas = _filtrar_linhas_coluna_gerencial(linhas, self.request)
             os_ids = [linha["os_pk"] for linha in linhas]
@@ -3243,6 +3352,7 @@ class OSListView(RequerLoginMixin, ListView):
                 unidade,
                 servidor_logado=servidor,
                 perfil_pode_homologar=pode_homologar,
+                request=self.request,
             )
             context.update(
                 _contexto_gerencial_os_list(
@@ -4491,13 +4601,11 @@ TRANSICOES_PERMITIDAS_PRODUCAO = {
     ],
     Producao.STATUS_DISTRIBUIDO: [
         (Producao.STATUS_REVISAR, False),
-        (Producao.STATUS_NAO_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_REVISAR: [
         (Producao.STATUS_REVISADO, True),
         (Producao.STATUS_VER_AJUSTES, True),
-        (Producao.STATUS_DISTRIBUIDO, True),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_REVISADO: [
@@ -4511,17 +4619,14 @@ TRANSICOES_PERMITIDAS_PRODUCAO = {
     ],
     Producao.STATUS_ENTREGA_AJUSTES: [
         (Producao.STATUS_AJUSTES_OK, True),
-        (Producao.STATUS_REVISAR, False),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_AJUSTES_OK: [
         (Producao.STATUS_HOMOLOGAR, True),
-        (Producao.STATUS_REVISAR, False),
         (Producao.STATUS_CANCELADO, True),
     ],
     Producao.STATUS_HOMOLOGAR: [
         (Producao.STATUS_ENVIADO, True),
-        (Producao.STATUS_VER_AJUSTES, True),
         (Producao.STATUS_CANCELADO, True),
     ],
 }
@@ -5005,8 +5110,7 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
                 campos_atualizar.append("numero_producao")
             self.producao_obj.autor_trabalho = autor_trabalho
             self.producao_obj.homologado_por = servidor
-            self.producao_obj.data_enviado = timezone.localdate()
-            campos_atualizar.extend(["autor_trabalho", "homologado_por", "data_enviado"])
+            campos_atualizar.extend(["autor_trabalho", "homologado_por"])
 
         perfil = getattr(request, "perfil_acesso", None)
         if (
@@ -5040,31 +5144,31 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             campos_atualizar.append("numero_ajustes")
 
         hoje = timezone.localdate()
-        if status_novo == Producao.STATUS_REVISAR:
-            if not self.producao_obj.data_entrega_avaliacao:
-                self.producao_obj.data_entrega_avaliacao = hoje
-                campos_atualizar.append("data_entrega_avaliacao")
-        elif status_novo == Producao.STATUS_REVISADO:
-            if not self.producao_obj.data_entrega_revisao:
-                self.producao_obj.data_entrega_revisao = hoje
-                campos_atualizar.append("data_entrega_revisao")
-        elif status_novo == Producao.STATUS_ENTREGA_AJUSTES:
-            if not self.producao_obj.data_entrega_ajustes:
-                self.producao_obj.data_entrega_ajustes = hoje
-                campos_atualizar.append("data_entrega_ajustes")
-        elif status_novo == Producao.STATUS_AJUSTES_OK:
-            if not self.producao_obj.data_ajustes_ok:
-                self.producao_obj.data_ajustes_ok = hoje
-                campos_atualizar.append("data_ajustes_ok")
-        elif status_novo == Producao.STATUS_HOMOLOGAR:
-            if not self.producao_obj.data_homologar:
-                self.producao_obj.data_homologar = hoje
-                campos_atualizar.append("data_homologar")
-        elif status_novo == Producao.STATUS_ENVIADO:
-            if not self.producao_obj.data_enviado:
-                self.producao_obj.data_enviado = hoje
-                if "data_enviado" not in campos_atualizar:
-                    campos_atualizar.append("data_enviado")
+        data_post = (request.POST.get("data") or "").strip()
+        if data_post:
+            try:
+                hoje = datetime.date.fromisoformat(data_post)
+            except ValueError:
+                erro = "Data inválida."
+                if _request_wants_json(request):
+                    return self._resposta_status_json(
+                        request,
+                        sucesso=False,
+                        erro=erro,
+                        status=400,
+                    )
+                messages.error(request, erro)
+                return redirect(
+                    reverse(
+                        "producao_alterar_status",
+                        kwargs={"pk": self.producao_obj.pk},
+                    ),
+                )
+
+        campos_atualizar.extend(
+            _aplicar_datas_status_producao(self.producao_obj, status_novo, hoje),
+        )
+        # VER_AJUSTES: não preenche data (decisão do revisor)
 
         self.producao_obj.save(update_fields=campos_atualizar)
 
@@ -5495,6 +5599,476 @@ class ComentarioCreateView(RequerLoginJSONMixin, View):
             {
                 "sucesso": True,
                 "comentario": _serializar_comentario(comentario),
+            },
+        )
+
+
+def _parse_json_ou_post(request):
+    if request.content_type and "application/json" in request.content_type:
+        try:
+            return json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return {}
+    return request.POST
+
+
+def _aplicar_datas_status_producao(producao, status_novo, data_ref):
+    """Preenche datas de status se vazias. Não preenche em VER_AJUSTES."""
+    campos = []
+    if status_novo == Producao.STATUS_REVISAR:
+        if not producao.data_entrega_avaliacao:
+            producao.data_entrega_avaliacao = data_ref
+            campos.append("data_entrega_avaliacao")
+    elif status_novo == Producao.STATUS_REVISADO:
+        if not producao.data_entrega_revisao:
+            producao.data_entrega_revisao = data_ref
+            campos.append("data_entrega_revisao")
+    elif status_novo == Producao.STATUS_ENTREGA_AJUSTES:
+        if not producao.data_entrega_ajustes:
+            producao.data_entrega_ajustes = data_ref
+            campos.append("data_entrega_ajustes")
+    elif status_novo == Producao.STATUS_AJUSTES_OK:
+        if not producao.data_ajustes_ok:
+            producao.data_ajustes_ok = data_ref
+            campos.append("data_ajustes_ok")
+    elif status_novo == Producao.STATUS_HOMOLOGAR:
+        if not producao.data_homologar:
+            producao.data_homologar = data_ref
+            campos.append("data_homologar")
+    elif status_novo == Producao.STATUS_ENVIADO:
+        if not producao.data_enviado:
+            producao.data_enviado = data_ref
+            campos.append("data_enviado")
+    return campos
+
+
+def _opcoes_pos_enviado(os_obj):
+    return [
+        {"label": "Manter em atendimento", "acao": "manter"},
+        {
+            "label": "Encaminhar para unidade",
+            "acao": "encaminhar",
+            "url": reverse("os_encaminhar", kwargs={"pk": os_obj.pk}),
+        },
+        {
+            "label": "Encerrar na Divisão",
+            "acao": "encerrar",
+            "url": reverse("os_encerrar", kwargs={"pk": os_obj.pk}),
+        },
+    ]
+
+
+class OSEtapaAPIView(RequerLoginJSONMixin, View):
+    def post(self, request, pk):
+        from core.os_service import ETAPAS_INTERNAS_LABELS
+
+        os_obj = get_object_or_404(OS, pk=pk)
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+        if not os_editavel_para_usuario(os_obj, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+
+        dados = _parse_json_ou_post(request)
+        etapa = (dados.get("etapa_interna") or "").strip()
+        if etapa not in ETAPAS_FLUXO_GERENCIAL:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Etapa interna inválida."},
+                status=400,
+            )
+
+        unidade = _obter_unidade_principal_servidor(servidor)
+        if unidade is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Unidade do servidor não encontrada."},
+                status=400,
+            )
+
+        tarefa = (
+            TarefaInterna.objects.filter(
+                os=os_obj,
+                unidade=unidade,
+                status="PENDENTE",
+            )
+            .order_by("-data_inicio")
+            .first()
+        )
+        etapa_atual = tarefa.etapa_interna if tarefa else None
+        permitidas = {
+            item["valor"] for item in _etapas_posteriores_gerencial(etapa_atual)
+        }
+        if etapa not in permitidas:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Etapa não disponível a partir da atual."},
+                status=400,
+            )
+
+        with transaction.atomic():
+            encaminhamento = Encaminhamento.objects.create(
+                os=os_obj,
+                unidade_interna_origem=unidade,
+                servidor_origem=servidor,
+                unidade_interna_destino=unidade,
+                servidor_destino=None,
+                etapa_interna=etapa,
+                tipo_macroetapa=None,
+                aguarda_retorno=False,
+                automatico=True,
+                observacao=f"Etapa interna alterada para {etapa} via gerencial.",
+                manter_aberta_na_unidade=True,
+            )
+            if tarefa:
+                tarefa.etapa_interna = etapa
+                tarefa.save(update_fields=["etapa_interna"])
+            else:
+                TarefaInterna.objects.create(
+                    os=os_obj,
+                    encaminhamento=encaminhamento,
+                    unidade=unidade,
+                    servidor=servidor,
+                    etapa_interna=etapa,
+                    status="PENDENTE",
+                    data_inicio=timezone.now(),
+                )
+
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "etapa_label": ETAPAS_INTERNAS_LABELS.get(etapa, etapa),
+                "etapa_interna": etapa,
+            },
+        )
+
+
+class ProducaoStatusAPIView(RequerLoginJSONMixin, View):
+    def post(self, request, pk):
+        producao = get_object_or_404(
+            Producao.objects.select_related("os", "tipo_producao", "servidor_responsavel"),
+            pk=pk,
+        )
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+        if not os_editavel_para_usuario(producao.os, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+
+        dados = _parse_json_ou_post(request)
+        status_novo = (dados.get("status") or "").strip()
+        transicao = _transicao_status_permitida(producao, request, status_novo)
+        if transicao is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Transição de status não permitida."},
+                status=400,
+            )
+
+        if (
+            status_novo == Producao.STATUS_DISTRIBUIDO
+            and not producao.servidor_responsavel_id
+        ):
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": "Distribua a produção antes de alterar o status.",
+                },
+                status=400,
+            )
+
+        data_ref = timezone.localdate()
+        data_raw = (dados.get("data") or "").strip()
+        if data_raw:
+            try:
+                data_ref = datetime.date.fromisoformat(data_raw)
+            except ValueError:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Data inválida."},
+                    status=400,
+                )
+
+        status_anterior = producao.status
+        campos = ["status"]
+        producao.status = status_novo
+
+        if status_novo == Producao.STATUS_REVISAR:
+            producao.numero_revisao += 1
+            campos.append("numero_revisao")
+        if status_novo == Producao.STATUS_VER_AJUSTES:
+            producao.numero_ajustes += 1
+            campos.append("numero_ajustes")
+        if status_novo == Producao.STATUS_ENVIADO:
+            if not producao.numero_producao and producao.tipo_producao_id:
+                producao.numero_producao = _gerar_numero_producao(producao.tipo_producao)
+                campos.append("numero_producao")
+            producao.homologado_por = servidor
+            campos.append("homologado_por")
+
+        campos.extend(_aplicar_datas_status_producao(producao, status_novo, data_ref))
+        producao.save(update_fields=campos)
+
+        _criar_producao_status_log(
+            producao,
+            status_anterior,
+            status_novo,
+            servidor,
+            servidor_destino=producao.servidor_responsavel,
+        )
+        ativar_atendimento_interno_se_necessario(producao.os, servidor=servidor)
+
+        resposta = {
+            "sucesso": True,
+            "status": status_novo,
+            "status_label": _label_status_producao_gerencial(status_novo),
+            "cor": _cor_status_producao_gerencial(status_novo),
+            "transicoes": _transicoes_status_disponiveis(producao, request),
+        }
+        if status_novo == Producao.STATUS_ENVIADO:
+            resposta["opcoes_pos_enviado"] = _opcoes_pos_enviado(producao.os)
+        return JsonResponse(resposta)
+
+
+class ProducaoDistribuirAPIView(RequerLoginJSONMixin, View):
+    def post(self, request, pk):
+        producao = get_object_or_404(
+            Producao.objects.select_related("os"),
+            pk=pk,
+        )
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+        if not os_editavel_para_usuario(producao.os, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+        perfil = getattr(request, "perfil_acesso", None)
+        if perfil is None or not perfil.pode_homologar:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        dados = _parse_json_ou_post(request)
+        avaliador_id = dados.get("avaliador_id")
+        if not avaliador_id:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Selecione o avaliador."},
+                status=400,
+            )
+        try:
+            avaliador = Servidor.objects.get(pk=int(avaliador_id))
+        except (Servidor.DoesNotExist, ValueError, TypeError):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Avaliador inválido."},
+                status=400,
+            )
+
+        revisor = None
+        revisor_id = dados.get("revisor_id")
+        if revisor_id:
+            try:
+                revisor = _servidores_revisores_da_unidade(servidor).get(
+                    pk=int(revisor_id),
+                )
+            except (Servidor.DoesNotExist, ValueError, TypeError):
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Revisor inválido."},
+                    status=400,
+                )
+
+        prazo_aval = None
+        prazo_aval_raw = (dados.get("prazo_aval") or "").strip()
+        if prazo_aval_raw:
+            try:
+                prazo_aval = datetime.date.fromisoformat(prazo_aval_raw)
+            except ValueError:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Prazo do avaliador inválido."},
+                    status=400,
+                )
+
+        prazo_rev = None
+        prazo_rev_raw = (dados.get("prazo_rev") or "").strip()
+        if prazo_rev_raw:
+            try:
+                prazo_rev = datetime.date.fromisoformat(prazo_rev_raw)
+            except ValueError:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Prazo do revisor inválido."},
+                    status=400,
+                )
+
+        status_anterior = producao.status
+        campos = ["servidor_responsavel", "prazo_interno", "prazo_rev", "revisor"]
+        producao.servidor_responsavel = avaliador
+        producao.prazo_interno = prazo_aval
+        producao.prazo_rev = prazo_rev
+        producao.revisor = revisor
+
+        mudou_status = False
+        if producao.status == Producao.STATUS_NAO_DISTRIBUIDO:
+            producao.status = Producao.STATUS_DISTRIBUIDO
+            campos.append("status")
+            mudou_status = True
+
+        producao.save(update_fields=campos)
+
+        if mudou_status:
+            _criar_producao_status_log(
+                producao,
+                status_anterior,
+                Producao.STATUS_DISTRIBUIDO,
+                servidor,
+                servidor_destino=avaliador,
+            )
+
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "status": producao.status,
+                "status_label": _label_status_producao_gerencial(producao.status),
+                "cor": _cor_status_producao_gerencial(producao.status),
+                "avaliador": avaliador.nome,
+                "revisor": revisor.nome if revisor else "",
+                "prazo_aval": (
+                    prazo_aval.strftime("%d/%m/%Y") if prazo_aval else "—"
+                ),
+                "prazo_rev": (
+                    prazo_rev.strftime("%d/%m/%Y") if prazo_rev else "—"
+                ),
+            },
+        )
+
+
+class OSComentariosAPIView(RequerLoginJSONMixin, View):
+    def get(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        qs = (
+            Comentario.objects.filter(os=os_obj)
+            .select_related("servidor", "producao", "producao__tipo_producao")
+            .order_by("-data_hora")
+        )
+        total = qs.count()
+        comentarios = [_serializar_comentario(c) for c in qs[:5]]
+        return JsonResponse({"comentarios": comentarios, "total": total})
+
+    def post(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+        dados = _parse_json_ou_post(request)
+        texto = (dados.get("texto") or "").strip()
+        if not texto:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Texto do comentário é obrigatório."},
+                status=400,
+            )
+        comentario = Comentario.objects.create(
+            os=os_obj,
+            origem="OS",
+            texto=texto,
+            servidor=servidor,
+        )
+        comentario = Comentario.objects.select_related("servidor").get(pk=comentario.pk)
+        qs = Comentario.objects.filter(os=os_obj)
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "comentario": _serializar_comentario(comentario),
+                "comentarios": [
+                    _serializar_comentario(c)
+                    for c in qs.select_related(
+                        "servidor",
+                        "producao",
+                        "producao__tipo_producao",
+                    ).order_by("-data_hora")[:5]
+                ],
+                "total": qs.count(),
+            },
+        )
+
+
+class ProducaoNovaAPIView(RequerLoginJSONMixin, View):
+    def post(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+        if not os_editavel_para_usuario(os_obj, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+        if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": "Perfil DEPARTAMENTO não pode registrar produção.",
+                },
+                status=403,
+            )
+
+        unidade = _obter_unidade_principal_servidor(servidor)
+        dados = _parse_json_ou_post(request)
+        tipo_id = dados.get("tipo_producao") or dados.get("tipo_producao_id")
+        if not tipo_id:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Selecione o tipo de produção."},
+                status=400,
+            )
+        try:
+            tipo_qs = TipoProducao.objects.filter(ativo=True)
+            if unidade:
+                tipo_qs = tipo_qs.filter(
+                    unidades_competentes__unidade_interna=unidade,
+                )
+            tipo_producao = tipo_qs.distinct().get(pk=int(tipo_id))
+        except (TipoProducao.DoesNotExist, ValueError, TypeError):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Tipo de produção inválido."},
+                status=400,
+            )
+
+        observacao = (dados.get("observacao") or "").strip() or None
+        producao = Producao.objects.create(
+            os=os_obj,
+            tipo_producao=tipo_producao,
+            numero_producao=None,
+            ano=timezone.localdate().year,
+            status=Producao.STATUS_NAO_DISTRIBUIDO,
+            unidade=unidade,
+            criado_por=servidor,
+            observacao=observacao,
+        )
+        ativar_atendimento_interno_se_necessario(os_obj, servidor=servidor)
+        if unidade:
+            registrar_em_atendimento_na_unidade(os_obj, unidade, servidor=servidor)
+
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "producao_pk": producao.pk,
+                "status_label": _label_status_producao_gerencial(producao.status),
             },
         )
 
