@@ -3638,6 +3638,21 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
+    def _unidade_logada(self):
+        vinculo = getattr(self.request, "vinculo_ativo", None)
+        if vinculo:
+            return vinculo.unidade
+        servidor = _obter_servidor(self.request.user)
+        if servidor is None:
+            return None
+        vinculo = obter_vinculo_unidade_ativo(servidor)
+        return vinculo.unidade if vinculo else None
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["unidade"] = self._unidade_logada()
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["os"] = self.os_obj
@@ -3651,18 +3666,12 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
 
         dados = form.cleaned_data
         ano = timezone.localdate().year
-
+        tipo_producao = dados["tipo_producao_obj"]
+        numero_sei = dados.get("numero_sei") or None
         if dados.get("is_despacho"):
-            tipo_producao = _obter_tipo_producao_despacho()
             numero_sei = dados["numero_sei"]
-        else:
-            tipo_producao = dados["tipo_producao_obj"]
-            numero_sei = dados.get("numero_sei") or None
 
-        unidade_logada = None
-        vinculo = servidor.vinculos_unidade.filter(data_fim__isnull=True).first()
-        if vinculo:
-            unidade_logada = vinculo.unidade
+        unidade_logada = self._unidade_logada()
 
         producao = Producao.objects.create(
             os=self.os_obj,
@@ -5106,7 +5115,14 @@ CAMPOS_EDITAVEIS_PRODUCAO = frozenset(
 ) | CAMPOS_DATA_PRODUCAO
 
 CAMPOS_EDITAVEIS_OS = frozenset(
-    {"apelido", "prioridade", "prazo_tipo", "prazo_data", "data_entrada_divisao"},
+    {
+        "apelido",
+        "prioridade",
+        "prazo_tipo",
+        "prazo_data",
+        "data_entrada_divisao",
+        "data_entrada_notificacao",
+    },
 )
 
 
@@ -5286,6 +5302,34 @@ class OSEditarCampoView(RequerLoginMixin, View):
             if vinculo:
                 vinculo.data_entrada_divisao = data_valor
                 vinculo.save(update_fields=["data_entrada_divisao"])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    **_formatar_data_resposta_json(data_valor),
+                },
+            )
+
+        if campo == "data_entrada_notificacao":
+            if not os_editavel_para_usuario(os_obj, request):
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                    status=403,
+                )
+            if not valor:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Informe a data."},
+                    status=400,
+                )
+            try:
+                data_valor = datetime.date.fromisoformat(valor)
+            except ValueError:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Data inválida."},
+                    status=400,
+                )
+            os_obj.data_entrada_notificacao = data_valor
+            os_obj.save(update_fields=["data_entrada_notificacao"])
             return JsonResponse(
                 {
                     "sucesso": True,

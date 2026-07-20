@@ -43,7 +43,6 @@ document.addEventListener('DOMContentLoaded', function () {
   const tipoSelect = document.getElementById('id_tipo_producao');
   const previewBox = document.getElementById('preview-numero');
   const previewValor = document.getElementById('preview-numero-valor');
-  const despachoValue = 'DESPACHO';
 
   function atualizarPreview() {
     const tipoId = tipoSelect.value;
@@ -51,7 +50,9 @@ document.addEventListener('DOMContentLoaded', function () {
       previewBox.classList.add('d-none');
       return;
     }
-    if (tipoId === despachoValue) {
+    const selected = tipoSelect.options[tipoSelect.selectedIndex];
+    const label = selected ? (selected.textContent || '') : '';
+    if (label.indexOf('Despacho') === 0 || label.indexOf('Despacho -') === 0) {
       previewValor.textContent = 'Despacho (sem numeração própria — use o número SEI)';
     } else {
       previewValor.textContent = 'Será gerada na homologação';

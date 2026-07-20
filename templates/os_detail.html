@@ -127,6 +127,29 @@
               {{ os.data_entrada_divisao|date:"d/m/Y" }}
             {% else %}—{% endif %}
           </dd>
+          {% if macroetapa_atual == 'NOTIFICACAO' or os.data_entrada_notificacao %}
+          <dt class="col-sm-4">Data de entrada em notificação</dt>
+          <dd class="col-sm-8">
+            {% if os.data_entrada_notificacao %}
+              {{ os.data_entrada_notificacao|date:"d/m/Y" }}
+            {% elif macroetapa_atual == 'NOTIFICACAO' and os_editavel %}
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <input type="date"
+                     id="data-entrada-notificacao-input"
+                     class="form-control form-control-sm"
+                     style="max-width: 180px">
+              <button type="button"
+                      class="btn btn-outline-primary btn-sm"
+                      id="btn-salvar-data-notificacao">
+                Salvar
+              </button>
+            </div>
+            <div class="text-danger small mt-1 d-none" id="erro-data-notificacao"></div>
+            {% else %}
+              —
+            {% endif %}
+          </dd>
+          {% endif %}
           <dt class="col-sm-4">Data de criação no SIPRAC</dt>
           <dd class="col-sm-8">
             {% if os.data_criacao_sgbd %}{{ os.data_criacao_sgbd|date:"d/m/Y H:i" }}{% else %}—{% endif %}
@@ -501,6 +524,61 @@
 document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
   new bootstrap.Tooltip(el);
 });
+
+(function () {
+  var btn = document.getElementById('btn-salvar-data-notificacao');
+  var input = document.getElementById('data-entrada-notificacao-input');
+  var erro = document.getElementById('erro-data-notificacao');
+  if (!btn || !input) return;
+  btn.addEventListener('click', function () {
+    if (erro) {
+      erro.classList.add('d-none');
+      erro.textContent = '';
+    }
+    var valor = (input.value || '').trim();
+    if (!valor) {
+      if (erro) {
+        erro.textContent = 'Informe a data.';
+        erro.classList.remove('d-none');
+      }
+      return;
+    }
+    var body = new URLSearchParams();
+    body.append('campo', 'data_entrada_notificacao');
+    body.append('valor', valor);
+    fetch('{% url "os_editar_campo" os.pk %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+    })
+      .then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok || !data.sucesso) {
+            throw new Error((data && data.erro) || 'Erro ao salvar.');
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        var dd = input.closest('dd');
+        if (dd) {
+          dd.textContent = data.valor_display || valor;
+        }
+      })
+      .catch(function (err) {
+        if (erro) {
+          erro.textContent = err.message || 'Erro ao salvar.';
+          erro.classList.remove('d-none');
+        }
+      });
+  });
+})();
 </script>
 <script>
 (function () {

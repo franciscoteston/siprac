@@ -435,9 +435,9 @@ DESPACHO_VALUE = "DESPACHO"
 
 
 class ProducaoForm(forms.Form):
-    tipo_producao = forms.ChoiceField(
+    tipo_producao = forms.ModelChoiceField(
         label="Tipo de produção",
-        choices=[],
+        queryset=TipoProducao.objects.none(),
     )
     numero_sei = forms.CharField(
         label="Número SEI",
@@ -450,39 +450,42 @@ class ProducaoForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, unidade=None, **kwargs):
         super().__init__(*args, **kwargs)
-        choices = [
-            (str(tipo.pk), f"{tipo.prefixo} — {tipo.descricao}")
-            for tipo in TipoProducao.objects.filter(ativo=True)
-            .exclude(prefixo="Despacho")
-            .order_by("prefixo")
-        ]
-        choices.append((DESPACHO_VALUE, "Despacho"))
-        self.fields["tipo_producao"].choices = [("", "---------")] + choices
+        if unidade:
+            qs = (
+                TipoProducao.objects.filter(
+                    ativo=True,
+                    unidades_competentes__unidade_interna=unidade,
+                )
+                .distinct()
+                .order_by("prefixo", "subtipo")
+            )
+        else:
+            qs = TipoProducao.objects.filter(ativo=True).order_by(
+                "prefixo",
+                "subtipo",
+            )
+        self.fields["tipo_producao"].queryset = qs
+        self.fields["tipo_producao"].label_from_instance = (
+            lambda obj: obj.label_display
+        )
 
     def clean(self):
         cleaned_data = super().clean()
-        tipo_valor = cleaned_data.get("tipo_producao")
+        tipo = cleaned_data.get("tipo_producao")
         numero_sei = cleaned_data.get("numero_sei")
 
-        if not tipo_valor:
+        if not tipo:
             return cleaned_data
 
-        if tipo_valor == DESPACHO_VALUE:
+        cleaned_data["tipo_producao_obj"] = tipo
+        if tipo.prefixo == "Despacho":
             cleaned_data["is_despacho"] = True
-            cleaned_data["tipo_producao_obj"] = None
             if not numero_sei:
                 self.add_error("numero_sei", "Obrigatório para despacho.")
         else:
             cleaned_data["is_despacho"] = False
-            try:
-                cleaned_data["tipo_producao_obj"] = TipoProducao.objects.get(
-                    pk=int(tipo_valor),
-                    ativo=True,
-                )
-            except (TipoProducao.DoesNotExist, TypeError, ValueError):
-                self.add_error("tipo_producao", "Tipo de produção inválido.")
 
         return cleaned_data
 

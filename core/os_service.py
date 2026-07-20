@@ -167,6 +167,7 @@ def _icone_macroetapa(tipo):
         "RETORNO_EXTERNO": "bi-arrow-return-left",
         "INCLUSAO_PROCESSO": "bi-plus-circle",
         "INCLUSAO_PROCESSO_RELACIONADO": "bi-plus-circle",
+        "NOTIFICACAO": "bi-bell",
         "ENCERRADO": "bi-check-circle",
         "ENCERRAMENTO": "bi-check-circle",
     }.get(tipo, "bi-circle")
@@ -180,6 +181,7 @@ def _cor_macroetapa(tipo):
         "RETORNO_EXTERNO": "info",
         "INCLUSAO_PROCESSO": "success",
         "INCLUSAO_PROCESSO_RELACIONADO": "success",
+        "NOTIFICACAO": "info",
         "ENCERRADO": "success",
         "ENCERRAMENTO": "success",
     }.get(tipo, "secondary")
@@ -234,6 +236,7 @@ def timeline_os(os):
         "RETORNO_EXTERNO": "Retorno de encaminhamento externo",
         "INCLUSAO_PROCESSO": "Inclusão de processo relacionado",
         "INCLUSAO_PROCESSO_RELACIONADO": "Inclusão de processo relacionado",
+        "NOTIFICACAO": "Notificação",
         "ENCERRAMENTO": "Encerrado na Divisão",
     }
 

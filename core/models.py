@@ -290,6 +290,20 @@ class TipoProducao(models.Model):
 
     prefixo = models.CharField(max_length=50)
     descricao = models.CharField(max_length=255)
+    subtipo = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name="Subtipo",
+    )
+    tem_numeracao_sequencial = models.BooleanField(
+        default=True,
+        verbose_name="Tem numeração sequencial",
+    )
+    numero_manual = models.BooleanField(
+        default=True,
+        verbose_name="Numeração manual (transição)",
+    )
     ativo = models.BooleanField(default=True)
 
     class Meta:
@@ -298,7 +312,17 @@ class TipoProducao(models.Model):
         verbose_name_plural = "tipos de produção"
 
     def __str__(self):
-        return f"{self.prefixo} — {self.descricao}"
+        return self.label_display
+
+    @property
+    def label_display(self):
+        if self.subtipo:
+            return f"{self.prefixo} - {self.subtipo}"
+        return (
+            f"{self.prefixo} - {self.descricao}"
+            if self.descricao != self.prefixo
+            else self.prefixo
+        )
 
 
 class TipoProducaoUnidade(models.Model):
@@ -375,6 +399,11 @@ class OS(models.Model):
         verbose_name="Data de criação no SIPRAC",
     )
     data_entrada_divisao = models.DateField(null=True, blank=True)
+    data_entrada_notificacao = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de entrada em notificação",
+    )
     os_interna = models.BooleanField(default=False)
     pendente_confirmacao = models.BooleanField(default=False)
     pendente_encaminhamento = models.BooleanField(
@@ -579,6 +608,7 @@ class Encaminhamento(models.Model):
     TIPO_MACROETAPA_ATENDIMENTO_EXTERNO = "ATENDIMENTO_EXTERNO"
     TIPO_MACROETAPA_RETORNO_EXTERNO = "RETORNO_EXTERNO"
     TIPO_MACROETAPA_INCLUSAO_PROCESSO = "INCLUSAO_PROCESSO"
+    TIPO_MACROETAPA_NOTIFICACAO = "NOTIFICACAO"
     TIPO_MACROETAPA_ENCERRAMENTO = "ENCERRAMENTO"
 
     TIPO_MACROETAPA_CHOICES = [
@@ -587,6 +617,7 @@ class Encaminhamento(models.Model):
         (TIPO_MACROETAPA_ATENDIMENTO_EXTERNO, "Atendimento Externo"),
         (TIPO_MACROETAPA_RETORNO_EXTERNO, "Retorno Externo"),
         (TIPO_MACROETAPA_INCLUSAO_PROCESSO, "Inclusão de Processo"),
+        (TIPO_MACROETAPA_NOTIFICACAO, "Notificação"),
         (TIPO_MACROETAPA_ENCERRAMENTO, "Encerramento"),
     ]
 

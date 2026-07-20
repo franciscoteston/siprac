@@ -533,10 +533,17 @@ class ProducaoAtributoAdmin(admin.ModelAdmin):
 class TipoProducaoAdmin(admin.ModelAdmin):
     """Tipos de produção técnica."""
 
-    list_display = ("prefixo", "descricao", "ativo")
-    list_filter = ("ativo",)
-    search_fields = ("prefixo", "descricao")
-    ordering = ("prefixo",)
+    list_display = (
+        "prefixo",
+        "descricao",
+        "subtipo",
+        "tem_numeracao_sequencial",
+        "numero_manual",
+        "ativo",
+    )
+    list_filter = ("ativo", "tem_numeracao_sequencial", "numero_manual")
+    search_fields = ("prefixo", "descricao", "subtipo")
+    ordering = ("prefixo", "subtipo")
 
 
 @admin.register(TipoProducaoUnidade)
