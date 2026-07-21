@@ -104,84 +104,89 @@
       label,
       '<input type="date" data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
       escapeHtml(valor || '') + '">' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
+      '<button type="button" class="btn-salvar" data-salvar-prod="' +
       prodPk + '" data-campo="' + campo + '">Salvar</button>',
       secaoId || '',
     );
   }
 
-  function renderTransicoes(prod, osPk) {
+  function renderCampoTexto(prodPk, campo, label, valor, tipo) {
+    tipo = tipo || 'text';
+    return renderCampo(
+      label,
+      '<input type="' + tipo + '" data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
+      escapeHtml(valor || '') + '">' +
+      '<button type="button" class="btn-salvar" data-salvar-prod="' +
+      prodPk + '" data-campo="' + campo + '">Salvar</button>',
+    );
+  }
+
+  function renderCampoSelect(prodPk, campo, label, optionsHtmlStr, secaoId) {
+    return renderCampo(
+      label,
+      '<select data-prod="' + prodPk + '" data-campo="' + campo + '">' + optionsHtmlStr + '</select>' +
+      '<button type="button" class="btn-salvar" data-salvar-prod="' +
+      prodPk + '" data-campo="' + campo + '">Salvar</button>',
+      secaoId || '',
+    );
+  }
+
+  function renderTransicoes(prod) {
     return (prod.transicoes || []).map(function (t) {
-      const cls = t.botao_classe || 'btn-outline-secondary';
-      return '<button type="button" class="btn painel-btn-transicao ' + cls +
-        '" data-transicao-prod="' + prod.pk + '" data-status="' + t.destino + '">→ ' +
+      return '<button type="button" class="painel-btn-transicao"' +
+        ' data-transicao-prod="' + prod.pk + '" data-status="' + t.destino + '">→ ' +
         escapeHtml(t.label) + '</button>';
-    }).join(' ');
+    }).join('');
   }
 
   function renderProducaoAccordion(prod, data, expandido) {
     const bodyStyle = expandido ? '' : ' style="display:none;"';
+    const headerClass = expandido ? 'painel-accordion-header aberto' : 'painel-accordion-header';
     const arrow = expandido ? '▼' : '▶';
     let html = '<div class="painel-accordion" id="painel-prod-' + prod.pk + '">';
-    html += '<div class="painel-accordion-header" data-toggle-prod="' + prod.pk + '">';
+    html += '<div class="' + headerClass + '" data-toggle-prod="' + prod.pk + '">';
     html += '<span>' + arrow + '</span>';
-    html += '<span class="flex-grow-1">' + escapeHtml(prod.prefixo + ' — ' + prod.label) + '</span>';
+    html += '<span class="prod-label">' + escapeHtml(prod.prefixo + ' — ' + prod.label) + '</span>';
     html += '<span class="badge bg-' + prod.status_cor + '">' + escapeHtml(prod.status_label) + '</span>';
     html += '</div>';
     html += '<div class="painel-accordion-body"' + bodyStyle + ' id="painel-secao-prod-' + prod.pk + '">';
-    html += '<div class="d-flex flex-wrap gap-1 mb-2" id="painel-transicoes-' + prod.pk + '">';
-    html += renderTransicoes(prod, data.os_pk);
+    html += '<div class="painel-transicoes" id="painel-transicoes-' + prod.pk + '">';
+    html += renderTransicoes(prod);
     html += '</div>';
     html += '<div id="painel-sugestao-' + prod.pk + '"></div>';
 
     html += '<div class="small fw-semibold text-muted mb-1">Triagem</div>';
     html += renderCampoData(prod.pk, 'prazo_interno', 'Prazo EAV', prod.prazo_eav_iso,
       'painel-campo-prazo-eav-' + prod.pk);
-    html += renderCampo('Cronograma',
-      '<input type="month" data-prod="' + prod.pk + '" data-campo="mes_cronograma" value="' +
-      escapeHtml(prod.mes_cronograma_iso || '') + '">' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
-      prod.pk + '" data-campo="mes_cronograma">Salvar</button>');
-    html += renderCampo('Modelo sug.',
-      '<input type="text" data-prod="' + prod.pk + '" data-campo="modelo_sugerido" value="' +
-      escapeHtml(prod.modelo_sugerido || '') + '">' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
-      prod.pk + '" data-campo="modelo_sugerido">Salvar</button>');
+    html += renderCampoTexto(prod.pk, 'mes_cronograma', 'Cronograma', prod.mes_cronograma_iso, 'month');
+    html += renderCampoTexto(prod.pk, 'modelo_sugerido', 'Modelo sug.', prod.modelo_sugerido);
 
     html += '<div class="small fw-semibold text-muted mb-1 mt-2">Distribuição</div>';
-    html += renderCampo('Avaliador',
-      '<select data-prod="' + prod.pk + '" data-campo="servidor_responsavel">' +
-      '<option value="">—</option>' + optionsHtml(data.servidores_unidade, prod.avaliador_id) +
-      '</select>' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
-      prod.pk + '" data-campo="servidor_responsavel">Salvar</button>',
-      'painel-campo-avaliador-' + prod.pk);
+    html += renderCampoSelect(
+      prod.pk,
+      'servidor_responsavel',
+      'Avaliador',
+      '<option value="">—</option>' + optionsHtml(data.servidores_unidade, prod.avaliador_id),
+      'painel-campo-avaliador-' + prod.pk,
+    );
     html += renderCampoData(prod.pk, 'prazo_aval', 'Prazo aval', prod.prazo_aval_iso);
     html += renderCampoData(prod.pk, 'data_entrega_avaliacao', 'Entrega aval', prod.entrega_aval_iso);
 
     html += '<div class="small fw-semibold text-muted mb-1 mt-2">Revisão</div>';
-    html += renderCampo('Revisor',
-      '<select data-prod="' + prod.pk + '" data-campo="revisor">' +
-      '<option value="">—</option>' + optionsHtml(data.revisores_unidade, prod.revisor_id) +
-      '</select>' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
-      prod.pk + '" data-campo="revisor">Salvar</button>');
+    html += renderCampoSelect(
+      prod.pk,
+      'revisor',
+      'Revisor',
+      '<option value="">—</option>' + optionsHtml(data.revisores_unidade, prod.revisor_id),
+    );
     html += renderCampoData(prod.pk, 'prazo_rev', 'Prazo rev', prod.prazo_rev_iso);
     html += renderCampoData(prod.pk, 'data_entrega_revisao', 'Entrega rev', prod.entrega_rev_iso);
     html += renderCampoData(prod.pk, 'data_entrega_ajustes', 'Entrega aju', prod.entrega_aju_iso);
 
     html += '<div class="small fw-semibold text-muted mb-1 mt-2">Homologação</div>';
     html += renderCampoData(prod.pk, 'data_ajustes_ok', 'Ajustes OK', prod.data_ajustes_ok_iso);
-    html += renderCampo('Nº trabalho',
-      '<input type="text" data-prod="' + prod.pk + '" data-campo="numero_producao" value="' +
-      escapeHtml(prod.numero_producao || '') + '">' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
-      prod.pk + '" data-campo="numero_producao">Salvar</button>');
-    html += renderCampo('DOC SEI',
-      '<input type="text" data-prod="' + prod.pk + '" data-campo="numero_sei" value="' +
-      escapeHtml(prod.numero_sei || '') + '">' +
-      '<button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-salvar-prod="' +
-      prod.pk + '" data-campo="numero_sei">Salvar</button>');
+    html += renderCampoTexto(prod.pk, 'numero_producao', 'Nº trabalho', prod.numero_producao);
+    html += renderCampoTexto(prod.pk, 'numero_sei', 'DOC SEI', prod.numero_sei);
     html += renderCampoData(prod.pk, 'data_enviado', 'Envio SEI', prod.enviado_iso);
 
     if (prod.status === 'ENVIADO' && prod.opcoes_pos_enviado && prod.opcoes_pos_enviado.length) {
@@ -190,22 +195,22 @@
         if (op.acao === 'manter') {
           html += '<span class="text-muted me-2">Manter em atendimento</span>';
         } else if (op.url) {
-          html += '<a href="' + escapeHtml(op.url) + '" class="btn btn-outline-primary btn-sm me-1">' +
+          html += '<a href="' + escapeHtml(op.url) + '" class="btn-painel me-1" style="display:inline-block;background:#1a3a5c;">' +
             escapeHtml(op.label) + '</a>';
         }
       });
       html += '</div>';
     }
 
-    html += '<div class="mt-2">';
-    html += '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-expand-coment="' +
+    html += '<div class="painel-expansivel">';
+    html += '<button type="button" class="painel-expansivel-header" data-expand-coment="' +
       prod.pk + '">+ Comentários (' + (prod.total_comentarios || 0) + ')</button>';
-    html += '<div id="painel-coment-prod-' + prod.pk + '" style="display:none;" class="mt-1"></div>';
+    html += '<div id="painel-coment-prod-' + prod.pk + '" class="painel-expansivel-body" style="display:none;"></div>';
     html += '</div>';
-    html += '<div class="mt-1">';
-    html += '<button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" data-expand-log="' +
+    html += '<div class="painel-expansivel">';
+    html += '<button type="button" class="painel-expansivel-header" data-expand-log="' +
       prod.pk + '">+ Histórico de status (' + (prod.status_log || []).length + ')</button>';
-    html += '<div id="painel-log-prod-' + prod.pk + '" style="display:none;" class="mt-1 small"></div>';
+    html += '<div id="painel-log-prod-' + prod.pk + '" class="painel-expansivel-body" style="display:none;"></div>';
     html += '</div>';
 
     html += '</div></div>';
@@ -214,30 +219,34 @@
 
   function renderPanel(data) {
     let html = '';
-    html += '<div class="painel-secao painel-cabecalho" id="painel-secao-topo">';
-    html += '<div class="d-flex justify-content-between align-items-start mb-2">';
-    html += '<div>';
-    html += '<div class="fw-bold fs-6"><a href="/os/' + data.os_pk + '/" class="text-decoration-none">' +
-      escapeHtml(data.numero_os) + '</a></div>';
+    html += '<div class="painel-header" id="painel-secao-topo">';
+    html += '<div class="d-flex align-items-start">';
+    html += '<div class="flex-grow-1">';
+    html += '<a href="/os/' + data.os_pk + '/" class="painel-os-numero">' +
+      escapeHtml(data.numero_os) + '</a>';
     (data.processos || []).forEach(function (p) {
-      html += '<div class="small text-muted">' + escapeHtml(p.numero) + '</div>';
+      html += '<div class="painel-processo">' + escapeHtml(p.numero) + '</div>';
     });
     if (!data.processos || !data.processos.length) {
-      html += '<div class="small text-muted">' + escapeHtml(data.processo_sei || '—') + '</div>';
+      html += '<div class="painel-processo">' + escapeHtml(data.processo_sei || '—') + '</div>';
     }
     html += '</div>';
-    html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="painelBtnFechar">✕ Fechar</button>';
+    html += '<button type="button" class="btn-fechar" id="painelBtnFechar" title="Fechar">✕</button>';
     html += '</div>';
+    html += '<div class="painel-actions">';
+    html += '<a href="/os/' + data.os_pk + '/" class="btn-painel">Ver OS completa →</a>';
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" class="btn btn-success btn-sm mb-2" id="painelBtnNovaProd">+ Nova produção</button>';
+      html += '<button type="button" class="btn-painel" id="painelBtnNovaProd">+ Nova produção</button>';
     }
-    html += '<div id="painelNovaProdForm" style="display:none;" class="border rounded p-2 mb-2 bg-light"></div>';
-    html += '<a href="/os/' + data.os_pk + '/" class="small">Ver OS completa →</a>';
     html += '</div>';
+    html += '<div id="painelNovaProdForm" class="painel-nova-producao mt-2" style="display:none;"></div>';
+    html += '</div>';
+
+    html += '<div class="painel-body">';
 
     html += '<div class="painel-secao" id="painel-secao-macroetapa">';
     html += '<div class="painel-secao-titulo">Macroetapa</div>';
-    html += '<span class="badge bg-' + (data.macroetapa_cor || 'secondary') + '">' +
+    html += '<span class="painel-macroetapa">' +
       escapeHtml(data.macroetapa_label || '—') + '</span>';
     html += '</div>';
 
@@ -246,9 +255,9 @@
     html += '<span class="badge bg-primary mb-2" id="painelEtapaBadge">' +
       escapeHtml(data.etapa_interna_label || data.etapa_interna || '—') + '</span>';
     if (data.os_editavel && (data.etapa_interna_choices || []).length) {
-      html += '<div class="d-flex flex-wrap gap-1" id="painelEtapaTransicoes">';
+      html += '<div class="painel-transicoes" id="painelEtapaTransicoes">';
       data.etapa_interna_choices.forEach(function (c) {
-        html += '<button type="button" class="btn btn-outline-primary btn-sm painel-btn-transicao" data-etapa="' +
+        html += '<button type="button" class="painel-btn-transicao" data-etapa="' +
           c.valor + '">→ ' + escapeHtml(c.label) + '</button>';
       });
       html += '</div>';
@@ -257,9 +266,9 @@
 
     html += '<div class="painel-secao" id="painel-secao-producoes">';
     html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-    html += '<div class="painel-secao-titulo mb-0">② Produções</div>';
+    html += '<div class="painel-secao-titulo mb-0 flex-grow-1">② Produções</div>';
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" class="btn btn-success btn-sm py-0" id="painelBtnNovaProd2">+ Nova</button>';
+      html += '<button type="button" class="painel-btn-transicao" id="painelBtnNovaProd2">+ Nova</button>';
     }
     html += '</div>';
     if (!(data.producoes || []).length) {
@@ -284,9 +293,10 @@
     }
     html += '</div>';
     html += '<textarea class="form-control form-control-sm mb-1" id="painelComentarioOsTexto" rows="2" placeholder="Novo comentário…"></textarea>';
-    html += '<button type="button" class="btn btn-primary btn-sm" id="painelComentarioOsBtn">Comentar</button>';
+    html += '<button type="button" class="btn-salvar" id="painelComentarioOsBtn">Comentar</button>';
     html += '</div>';
 
+    html += '</div>';
     return html;
   }
 
@@ -295,9 +305,9 @@
     if (!regra || prod.status !== regra.de) return;
     const el = document.getElementById('painel-sugestao-' + prodPk);
     if (!el) return;
-    el.innerHTML = '<div class="painel-sugestao-status">' +
+    el.innerHTML = '<div class="painel-sugestao">' +
       escapeHtml(regra.msg) +
-      ' <button type="button" class="btn btn-warning btn-sm py-0" data-sugestao-prod="' + prodPk +
+      ' <button type="button" class="btn-sugestao-sim" data-sugestao-prod="' + prodPk +
       '" data-status="' + regra.para + '">→ ' + (STATUS_LABELS[regra.para] || regra.para) +
       '</button> <button type="button" class="btn btn-link btn-sm py-0" data-dismiss-sugestao="' +
       prodPk + '">Não</button></div>';
@@ -312,14 +322,14 @@
     function abrirFormNovaProd() {
       const formEl = conteudo.querySelector('#painelNovaProdForm');
       if (!formEl) return;
-      let fh = '<label class="form-label small">Tipo de produção</label>';
+      let fh = '<label class="form-label small mb-0">Tipo de produção</label>';
       fh += '<select class="form-select form-select-sm mb-2" id="painelTipoProd">';
       (window.gerencialTiposProducao || []).forEach(function (tp) {
         fh += '<option value="' + tp.id + '">' + escapeHtml(tp.label) + '</option>';
       });
-      fh += '</select><label class="form-label small">Observação</label>';
+      fh += '</select><label class="form-label small mb-0">Observação</label>';
       fh += '<textarea class="form-control form-control-sm mb-2" id="painelObsProd" rows="2"></textarea>';
-      fh += '<button type="button" class="btn btn-success btn-sm me-1" id="painelSalvarNovaProd">Registrar</button>';
+      fh += '<button type="button" class="btn-salvar me-1" id="painelSalvarNovaProd">Registrar</button>';
       fh += '<button type="button" class="btn btn-outline-secondary btn-sm" id="painelCancelNovaProd">Cancelar</button>';
       formEl.innerHTML = fh;
       formEl.style.display = 'block';
@@ -357,6 +367,7 @@
         if (!body) return;
         const vis = body.style.display !== 'none';
         body.style.display = vis ? 'none' : 'block';
+        hdr.classList.toggle('aberto', !vis);
         hdr.querySelector('span').textContent = vis ? '▶' : '▼';
       });
     });

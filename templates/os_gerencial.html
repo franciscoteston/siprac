@@ -8,7 +8,7 @@ body { overflow-x: hidden !important; }
 .gerencial-view {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 330px);
+    height: calc(100vh - 260px);
     overflow: hidden;
 }
 
@@ -134,37 +134,23 @@ body { overflow-x: hidden !important; }
     background: #dbeafe !important;
 }
 
-.gerencial-painel {
-    overflow-y: auto;
-    overflow-x: hidden;
-    background: white;
-    border-left: 2px solid #1a3a5c;
-    min-width: 0;
-    min-height: 0;
-}
-
 #gerencialPainel {
     display: flex;
     flex-direction: column;
     width: 100%;
     height: 100%;
-}
-
-/* Compactar elementos acima da tabela */
-.gerencial-view .card {
-    margin-bottom: 4px !important;
-}
-
-.gerencial-view .row.g-2 {
-    margin-bottom: 4px !important;
+    min-width: 0;
+    min-height: 0;
 }
 
 .gerencial-cards-status {
-    padding: 0 16px 4px !important;
+    padding: 0 0 6px !important;
+    margin-bottom: 4px !important;
 }
 
 .gerencial-toolbar {
-    padding: 4px 16px !important;
+    padding: 0 0 6px !important;
+    margin-bottom: 4px !important;
 }
 
 /* Título e abas mais compactos em modo gerencial */
@@ -191,14 +177,57 @@ body.gerencial-mode .siprac-content {
 <form class="d-none" id="gerencial-csrf">{% csrf_token %}</form>
 
 <div class="gerencial-view">
-<div class="gerencial-toolbar d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <div class="d-flex flex-wrap gap-2 align-items-center">
-    {% if filtros_coluna_ativos %}
-    <a href="?{{ query_string_gerencial_base }}"
-       class="btn btn-outline-secondary btn-sm">Limpar filtros de coluna</a>
-    {% endif %}
+<form method="get" class="gerencial-toolbar d-flex align-items-center gap-2 flex-wrap">
+  <input type="hidden" name="view" value="{{ view_mode|default:'gerencial' }}">
+  <div class="d-flex align-items-center gap-1">
+    <label class="small text-muted mb-0" style="white-space:nowrap;" for="macroetapa">Macroetapa</label>
+    <select name="macroetapa" id="macroetapa" class="form-select form-select-sm" style="width:140px;">
+      <option value="">Todas</option>
+      <option value="ativas"{% if filtro_macroetapa == 'ativas' %} selected{% endif %}>Ativas</option>
+      {% for macro in macroetapas %}
+      <option value="{{ macro }}"{% if filtro_macroetapa == macro %} selected{% endif %}>{{ macro|macroetapa_display }}</option>
+      {% endfor %}
+    </select>
   </div>
-  <div class="dropdown">
+  <div class="d-flex align-items-center gap-1">
+    <label class="small text-muted mb-0" for="natureza">Natureza</label>
+    <select name="natureza" id="natureza" class="form-select form-select-sm" style="width:130px;">
+      <option value="">Todas</option>
+      {% for natureza in naturezas %}
+      <option value="{{ natureza.pk }}"{% if filtro_natureza == natureza.pk|stringformat:"s" %} selected{% endif %}>
+        {{ natureza.descricao }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="d-flex align-items-center gap-1">
+    <label class="small text-muted mb-0" for="prioridade">Prioridade</label>
+    <select name="prioridade" id="prioridade" class="form-select form-select-sm" style="width:110px;">
+      <option value="">Todas</option>
+      {% for prioridade in prioridades %}
+      <option value="{{ prioridade }}"{% if filtro_prioridade == prioridade %} selected{% endif %}>{{ prioridade|prioridade_display }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="d-flex align-items-center gap-1">
+    <label class="small text-muted mb-0" for="status_producao">Status</label>
+    <select name="status_producao" id="status_producao" class="form-select form-select-sm" style="width:130px;">
+      <option value="">Todos</option>
+      {% for valor, label in status_producao_opcoes %}
+      <option value="{{ valor }}"{% if filtro_status_producao == valor %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="d-flex align-items-center gap-1">
+    <label class="small text-muted mb-0" for="q">Processo SEI</label>
+    <input type="search" name="q" id="q" class="form-control form-control-sm" style="width:140px;"
+           value="{{ filtro_q }}" placeholder="Nº processo">
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+  {% if filtros_coluna_ativos %}
+  <a href="?{{ query_string_gerencial_base }}" class="btn btn-outline-secondary btn-sm">Limpar colunas</a>
+  {% endif %}
+  <div class="dropdown ms-1">
     <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button"
             id="btn-colunas-gerencial" data-bs-toggle="dropdown" aria-expanded="false">
       Colunas ▼
@@ -218,21 +247,19 @@ body.gerencial-mode .siprac-content {
       <button type="button" class="btn btn-primary btn-sm siprac-btn-primary w-100 mt-2" id="btn-salvar-colunas">Aplicar</button>
     </div>
   </div>
-</div>
+</form>
 
-<div class="gerencial-cards-status row g-2 mb-3">
+<div class="gerencial-cards-status d-flex gap-2 flex-wrap">
   {% for status in status_gerencial_cards %}
-  <div class="col-6 col-md-4 col-xl-2">
-    <a href="?{{ urls_status_gerencial|get_item:status }}"
-       class="text-decoration-none">
-      <div class="card siprac-card gerencial-status-card h-100{% if filtro_status_producao == status %} border-primary{% endif %}">
-        <div class="card-body py-2 px-3 text-center">
-          <div class="small text-muted">{{ status|status_producao_display }}</div>
-          <div class="fw-bold fs-5">{{ contagens_status_gerencial|get_item:status|default:0 }}</div>
-        </div>
+  <a href="?{{ urls_status_gerencial|get_item:status }}" class="text-decoration-none">
+    <div class="gerencial-status-card card border-0 shadow-sm{% if filtro_status_producao == status %} border-primary{% endif %}"
+         style="min-width:90px;">
+      <div class="card-body py-1 px-2 text-center">
+        <div class="small text-muted" style="font-size:10px;">{{ status|status_producao_display }}</div>
+        <div class="fw-bold" style="font-size:16px;">{{ contagens_status_gerencial|get_item:status|default:0 }}</div>
       </div>
-    </a>
-  </div>
+    </div>
+  </a>
   {% endfor %}
 </div>
 
@@ -428,7 +455,7 @@ body.gerencial-mode .siprac-content {
   </div>
 
   <div class="gerencial-painel" id="gerencialPainel">
-    <div id="gerencialPainelConteudo" class="flex-grow-1 overflow-auto"></div>
+    <div id="gerencialPainelConteudo" style="display:flex; flex-direction:column; height:100%; overflow:hidden;"></div>
   </div>
 </div>
 
