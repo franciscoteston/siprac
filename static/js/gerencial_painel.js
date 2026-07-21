@@ -104,7 +104,7 @@
       label,
       '<input type="date" data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
       escapeHtml(valor || '') + '">' +
-      '<button type="button" class="btn-salvar" data-salvar-prod="' +
+      '<button type="button" class="btn-salvar-campo" data-salvar-prod="' +
       prodPk + '" data-campo="' + campo + '">Salvar</button>',
       secaoId || '',
     );
@@ -116,7 +116,7 @@
       label,
       '<input type="' + tipo + '" data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
       escapeHtml(valor || '') + '">' +
-      '<button type="button" class="btn-salvar" data-salvar-prod="' +
+      '<button type="button" class="btn-salvar-campo" data-salvar-prod="' +
       prodPk + '" data-campo="' + campo + '">Salvar</button>',
     );
   }
@@ -125,7 +125,7 @@
     return renderCampo(
       label,
       '<select data-prod="' + prodPk + '" data-campo="' + campo + '">' + optionsHtmlStr + '</select>' +
-      '<button type="button" class="btn-salvar" data-salvar-prod="' +
+      '<button type="button" class="btn-salvar-campo" data-salvar-prod="' +
       prodPk + '" data-campo="' + campo + '">Salvar</button>',
       secaoId || '',
     );
@@ -195,7 +195,7 @@
         if (op.acao === 'manter') {
           html += '<span class="text-muted me-2">Manter em atendimento</span>';
         } else if (op.url) {
-          html += '<a href="' + escapeHtml(op.url) + '" class="btn-painel me-1" style="display:inline-block;background:#1a3a5c;">' +
+          html += '<a href="' + escapeHtml(op.url) + '" class="btn-painel-header me-1" style="background:#1a3a5c;">' +
             escapeHtml(op.label) + '</a>';
         }
       });
@@ -231,12 +231,12 @@
       html += '<div class="painel-processo">' + escapeHtml(data.processo_sei || '—') + '</div>';
     }
     html += '</div>';
-    html += '<button type="button" class="btn-fechar" id="painelBtnFechar" title="Fechar">✕</button>';
+    html += '<button type="button" class="btn-fechar-painel" id="painelBtnFechar" title="Fechar">✕</button>';
     html += '</div>';
     html += '<div class="painel-actions">';
-    html += '<a href="/os/' + data.os_pk + '/" class="btn-painel">Ver OS completa →</a>';
+    html += '<a href="/os/' + data.os_pk + '/" class="btn-painel-header">Ver OS completa →</a>';
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" class="btn-painel" id="painelBtnNovaProd">+ Nova produção</button>';
+      html += '<button type="button" class="btn-painel-header" id="painelBtnNovaProd">+ Nova produção</button>';
     }
     html += '</div>';
     html += '<div id="painelNovaProdForm" class="painel-nova-producao mt-2" style="display:none;"></div>';
@@ -246,7 +246,7 @@
 
     html += '<div class="painel-secao" id="painel-secao-macroetapa">';
     html += '<div class="painel-secao-titulo">Macroetapa</div>';
-    html += '<span class="painel-macroetapa">' +
+    html += '<span class="painel-macroetapa-badge">' +
       escapeHtml(data.macroetapa_label || '—') + '</span>';
     html += '</div>';
 
@@ -282,18 +282,19 @@
 
     html += '<div class="painel-secao" id="painel-secao-comentarios">';
     html += '<div class="painel-secao-titulo">③ Comentários da OS</div>';
-    html += '<div id="painelComentariosOs" class="small mb-2">';
+    html += '<div id="painelComentariosOs" class="mb-2">';
     (data.comentarios_os || []).forEach(function (c) {
-      html += '<div class="border-bottom pb-1 mb-1"><strong>' + escapeHtml(c.servidor) +
-        '</strong> <span class="text-muted">' + escapeHtml(c.data_hora) + '</span><div>' +
-        escapeHtml(c.texto) + '</div></div>';
+      html += '<div class="painel-comentario-item">' +
+        '<div class="painel-comentario-autor">' + escapeHtml(c.servidor) +
+        ' · ' + escapeHtml(c.data_hora) + '</div>' +
+        '<div>' + escapeHtml(c.texto) + '</div></div>';
     });
     if (!(data.comentarios_os || []).length) {
-      html += '<em class="text-muted">Nenhum comentário.</em>';
+      html += '<em class="text-muted small">Nenhum comentário.</em>';
     }
     html += '</div>';
     html += '<textarea class="form-control form-control-sm mb-1" id="painelComentarioOsTexto" rows="2" placeholder="Novo comentário…"></textarea>';
-    html += '<button type="button" class="btn-salvar" id="painelComentarioOsBtn">Comentar</button>';
+    html += '<button type="button" class="btn-salvar-campo" id="painelComentarioOsBtn">Comentar</button>';
     html += '</div>';
 
     html += '</div>';
@@ -329,7 +330,7 @@
       });
       fh += '</select><label class="form-label small mb-0">Observação</label>';
       fh += '<textarea class="form-control form-control-sm mb-2" id="painelObsProd" rows="2"></textarea>';
-      fh += '<button type="button" class="btn-salvar me-1" id="painelSalvarNovaProd">Registrar</button>';
+      fh += '<button type="button" class="btn-salvar-campo me-1" id="painelSalvarNovaProd">Registrar</button>';
       fh += '<button type="button" class="btn btn-outline-secondary btn-sm" id="painelCancelNovaProd">Cancelar</button>';
       formEl.innerHTML = fh;
       formEl.style.display = 'block';
@@ -489,10 +490,11 @@
           const lista = conteudo.querySelector('#painelComentariosOs');
           if (lista) {
             lista.innerHTML = (resp.comentarios || []).map(function (c) {
-              return '<div class="border-bottom pb-1 mb-1"><strong>' + escapeHtml(c.servidor) +
-                '</strong> <span class="text-muted">' + escapeHtml(c.data_hora) + '</span><div>' +
-                escapeHtml(c.texto) + '</div></div>';
-            }).join('') || '<em class="text-muted">Nenhum comentário.</em>';
+              return '<div class="painel-comentario-item">' +
+                '<div class="painel-comentario-autor">' + escapeHtml(c.servidor) +
+                ' · ' + escapeHtml(c.data_hora) + '</div>' +
+                '<div>' + escapeHtml(c.texto) + '</div></div>';
+            }).join('') || '<em class="text-muted small">Nenhum comentário.</em>';
           }
           conteudo.querySelector('#painelComentarioOsTexto').value = '';
         })
