@@ -1,4 +1,5 @@
 {% load siprac_filters %}
+{% load static %}
 {% block extra_css %}
 <style>
 /* Gerencial - estilos críticos inline */
@@ -21,7 +22,7 @@ body { overflow-x: hidden !important; }
 }
 
 .gerencial-wrap.painel-aberto {
-    grid-template-columns: 1fr 390px;
+    grid-template-columns: 1fr 420px;
 }
 
 .gerencial-tabela-wrap {
@@ -296,7 +297,7 @@ body.gerencial-mode .siprac-content {
                 <a href="{% url 'os_detalhe' linha.os_pk %}" class="text-decoration-none"
                    onclick="event.stopPropagation();">{{ linha.numero_os }}</a>
                 <a href="#"
-                   onclick="abrirPopoverComentario(event, '{{ linha.os_pk }}')"
+                   onclick="abrirPainelSecao(event, 'comentarios')"
                    class="ms-1 text-muted gerencial-popover-trigger"
                    title="Comentários">
                   <i class="bi bi-chat-dots"></i>
@@ -334,7 +335,7 @@ body.gerencial-mode .siprac-content {
             <td class="gerencial-col-fixa gerencial-cel-etapa"
                 {% if linha.os_editavel %}
                 style="cursor:pointer;"
-                onclick="abrirPopoverEtapa(event, '{{ linha.os_pk }}', '{{ linha.etapa_interna|default:'' }}', '{{ linha.status_unidade|default:'' }}')"
+                onclick="abrirPainelSecao(event, 'etapa')"
                 {% endif %}>
               <div>{{ linha.macroetapa_label }}</div>
               {% if linha.etapa_interna and linha.status_unidade != 'CONCLUIDA' %}
@@ -354,7 +355,7 @@ body.gerencial-mode .siprac-content {
             <td class="gerencial-col-fixa gerencial-cel-status"
                 {% if linha.tem_producao and linha.os_editavel %}
                 style="cursor:pointer;"
-                onclick="abrirPopoverStatus(event, '{{ linha.producao_pk }}', '{{ linha.status_producao }}')"
+                onclick="abrirPainelSecao(event, 'producoes')"
                 {% endif %}>
               {% if linha.tem_producao %}
               <span class="badge bg-{{ linha.status_producao_cor }}">
@@ -369,9 +370,12 @@ body.gerencial-mode .siprac-content {
                 data-col="{{ col_id }}"
                 data-os-pk="{{ linha.os_pk }}"
                 data-producao-pk="{{ linha.producao_pk|default:'' }}"
-                {% if col_id == 'avaliador' and linha.tem_producao and linha.status_producao == 'NAO_DISTRIBUIDO' and linha.os_editavel %}
+                {% if col_id == 'avaliador' and linha.tem_producao and linha.os_editavel %}
                 style="cursor:pointer; text-decoration:underline dotted;"
-                onclick="abrirPopoverDistribuir(event, '{{ linha.producao_pk }}')"
+                onclick="abrirPainelSecao(event, 'avaliador')"
+                {% elif col_id == 'prazo_eav' and linha.tem_producao and linha.os_editavel %}
+                style="cursor:pointer;"
+                onclick="abrirPainelSecao(event, 'prazo-eav')"
                 {% endif %}>
               {% if col_id == 'avaliador' and linha.tem_producao and linha.status_producao == 'NAO_DISTRIBUIDO' and linha.os_editavel %}
                 {{ linha.avaliador|default:"+ Distribuir" }}
@@ -424,10 +428,7 @@ body.gerencial-mode .siprac-content {
   </div>
 
   <div class="gerencial-painel" id="gerencialPainel">
-    <div style="padding:8px; border-bottom:1px solid #dee2e6; text-align:right;">
-      <button id="gerencialFechar" type="button">✕ Fechar</button>
-    </div>
-    <div id="gerencialPainelConteudo"></div>
+    <div id="gerencialPainelConteudo" class="flex-grow-1 overflow-auto"></div>
   </div>
 </div>
 
@@ -442,6 +443,7 @@ body.gerencial-mode .siprac-content {
 {
   "preferenciasUrl": "{% url 'api_preferencias_gerencial' %}",
   "podeHomologar": {{ pode_homologar|yesno:"true,false" }},
+  "gerencialModoB": {{ gerencial_modo_b|default:False|yesno:"true,false" }},
   "podeEditarEntradaDai": {{ pode_editar_entrada_dai|yesno:"true,false" }},
   "colunasVisiveis": {{ colunas_gerencial_visiveis_json|safe }}
 }
@@ -471,6 +473,7 @@ body.gerencial-mode .siprac-content {
 ]
 </script>
 
+<script src="{% static 'js/gerencial_painel.js' %}"></script>
 <script>
 (function () {
   const configEl = document.getElementById('gerencial-config');
@@ -492,14 +495,19 @@ body.gerencial-mode .siprac-content {
 
   const csrfInput = document.querySelector('#gerencial-csrf [name=csrfmiddlewaretoken]');
   const csrfToken = csrfInput ? csrfInput.value : '';
+  window.gerencialCsrfToken = csrfToken;
+
+  function parseJsonEl(id) {
+    const el = document.getElementById(id);
+    if (!el) return [];
+    try { return JSON.parse(el.textContent || '[]'); }
+    catch (e) { return []; }
+  }
+  window.gerencialTiposProducao = parseJsonEl('gerencial-tipos-producao');
+
   const wrap = document.getElementById('gerencialWrap');
-  const painel = document.getElementById('gerencialPainel');
-  const fechar = document.getElementById('gerencialFechar');
   const painelConteudo = document.getElementById('gerencialPainelConteudo');
-  const podeHomologar = {{ pode_homologar|yesno:"true,false" }};
-  const podeEditarEntradaDai = {{ pode_editar_entrada_dai|yesno:"true,false" }};
   let linhaSelecionada = null;
-  let panelData = null;
 
   function escapeHtml(text) {
     const div = document.createElement('div');
@@ -507,330 +515,10 @@ body.gerencial-mode .siprac-content {
     return div.innerHTML;
   }
 
-  function postCampo(url, campo, valor) {
-    const formData = new FormData();
-    formData.append('campo', campo);
-    formData.append('valor', valor || '');
-    formData.append('csrfmiddlewaretoken', csrfToken);
-    return fetch(url, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-      body: formData,
-    }).then(function (r) {
-      return r.json().then(function (data) {
-        if (!r.ok || !data.sucesso) throw new Error(data.erro || 'Erro ao salvar.');
-        return data;
-      });
-    });
-  }
-
   function atualizarCelula(osPk, colId, html, producaoPk) {
     var seletor = '.gerencial-cell[data-os-pk="' + osPk + '"][data-col="' + colId + '"]';
-    if (producaoPk) {
-      seletor += '[data-producao-pk="' + producaoPk + '"]';
-    }
-    document.querySelectorAll(seletor).forEach(function (td) {
-      td.innerHTML = html;
-    });
-  }
-
-  function diasSeiHtml(dias) {
-    if (dias == null) return '—';
-    var cls = 'text-success';
-    var label = dias + ' dia(s)';
-    if (dias < 0) { cls = 'text-danger fw-bold'; label = 'Vencido há ' + Math.abs(dias) + ' dia(s)'; }
-    else if (dias === 0) { cls = 'text-danger'; label = 'Vence hoje'; }
-    else if (dias <= 7) cls = 'text-danger';
-    else if (dias <= 15) cls = 'text-warning';
-    return '<span class="' + cls + '">' + label + '</span>';
-  }
-
-  function blocoComentario(secao, usaProducao) {
-    return ''
-      + '<div class="gerencial-secao-comentario">'
-      + '<textarea class="form-control form-control-sm" rows="2" placeholder="Comentário…" data-comentario-texto="' + secao + '"></textarea>'
-      + '<button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-comentario="' + secao + '"'
-      + (usaProducao ? ' data-comentario-prod="1"' : '')
-      + '>Comentar</button></div>';
-  }
-
-  function bindPanelEvents() {
-    if (!panelData) return;
-    const osPk = panelData.os_pk;
-    const prodPk = panelData.producao_pk;
-
-    painelConteudo.querySelectorAll('[data-save-os]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const campo = btn.dataset.saveOs;
-        const input = painelConteudo.querySelector('[data-field-os="' + campo + '"]');
-        const valor = input ? input.value : '';
-        postCampo('/os/' + osPk + '/editar-campo/', campo, valor).then(function (data) {
-          if (campo === 'apelido') {
-            panelData.apelido = data.valor || '';
-            atualizarCelula(osPk, 'apelido', escapeHtml(data.valor || '—'), prodPk);
-          }
-          if (campo === 'data_entrada_divisao') {
-            panelData.entrada_dai = data.valor_display || '—';
-            atualizarCelula(osPk, 'entrada_dai', escapeHtml(data.valor_display || '—'), prodPk);
-          }
-            if (campo === 'prioridade') {
-            panelData.prioridade = valor;
-            atualizarCelula(osPk, 'prioridade', escapeHtml(valor), prodPk);
-          }
-        }).catch(function (e) { alert(e.message); });
-      });
-    });
-
-    if (prodPk) {
-      painelConteudo.querySelectorAll('[data-save-prod]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          const campo = btn.dataset.saveProd;
-          const input = painelConteudo.querySelector('[data-field-prod="' + campo + '"]');
-          const valor = input ? input.value : '';
-          postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor).then(function (data) {
-            if (campo === 'modelo_sugerido') {
-              panelData.modelo_sugerido = data.valor || '';
-              atualizarCelula(osPk, 'modelo_sugerido', escapeHtml(data.valor || '—'), prodPk);
-            }
-            if (campo === 'servidor_responsavel') {
-              panelData.avaliador_nome = data.valor || '—';
-              atualizarCelula(osPk, 'avaliador', escapeHtml(data.valor || '—'), prodPk);
-            }
-            if (campo === 'revisor') {
-              panelData.revisor_nome = data.valor || '—';
-              atualizarCelula(osPk, 'revisor', escapeHtml(data.valor || '—'), prodPk);
-            }
-            if (campo === 'mes_cronograma') {
-              panelData.mes_cronograma = data.valor_display || '—';
-              atualizarCelula(osPk, 'mes_cronograma', escapeHtml(data.valor_display || '—'), prodPk);
-            }
-            if (campo === 'prazo_interno') {
-              const display = data.valor_display || '—';
-              panelData.prazo_eav = display;
-              panelData.prazo_eav_iso = data.valor || '';
-              atualizarCelula(osPk, 'prazo_eav', escapeHtml(display), prodPk);
-            }
-            if (campo === 'prazo_aval') {
-              const display = data.valor_display || '—';
-              panelData.prazo_aval = display;
-              panelData.prazo_aval_iso = data.valor || '';
-              atualizarCelula(osPk, 'prazo_aval', escapeHtml(display), prodPk);
-            }
-            if (campo === 'data_entrega_avaliacao') {
-              panelData.entrega_aval = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_aval', escapeHtml(data.valor_display || '—'), prodPk);
-            }
-            if (campo === 'data_entrega_revisao') {
-              panelData.entrega_rev = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_rev', escapeHtml(data.valor_display || '—'), prodPk);
-            }
-            if (campo === 'data_entrega_ajustes') {
-              panelData.entrega_aju = data.valor_display || '—';
-              atualizarCelula(osPk, 'entrega_aju', escapeHtml(data.valor_display || '—'), prodPk);
-            }
-          }).catch(function (e) { alert(e.message); });
-        });
-      });
-
-      const statusSelect = painelConteudo.querySelector('#panel-status-producao');
-      if (statusSelect && podeHomologar) {
-        statusSelect.addEventListener('change', function () {
-          const formData = new FormData();
-          formData.append('acao', 'transicao');
-          formData.append('novo_status', statusSelect.value);
-          formData.append('csrfmiddlewaretoken', csrfToken);
-          fetch('/producoes/' + prodPk + '/status/', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-            body: formData,
-          }).then(function (r) {
-            return r.json().then(function (data) {
-              if (!r.ok || !data.sucesso) throw new Error(data.erro || 'Erro ao alterar status.');
-              location.reload();
-            });
-          }).catch(function (e) { alert(e.message); });
-        });
-      }
-    }
-
-    painelConteudo.querySelectorAll('[data-comentario]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const secao = btn.dataset.comentario;
-        const textarea = painelConteudo.querySelector('[data-comentario-texto="' + secao + '"]');
-        const texto = textarea ? textarea.value.trim() : '';
-        if (!texto) return;
-        const usaProd = btn.dataset.comentarioProd === '1' && prodPk;
-        const url = usaProd
-          ? '/producoes/' + prodPk + '/comentarios/'
-          : '/os/' + osPk + '/comentarios/';
-        const formData = new FormData();
-        formData.append('texto', texto);
-        formData.append('csrfmiddlewaretoken', csrfToken);
-        fetch(url, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-          body: formData,
-        }).then(function (r) {
-          return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.erro || 'Erro ao comentar.');
-            textarea.value = '';
-            alert('Comentário registrado.');
-          });
-        }).catch(function (e) { alert(e.message); });
-      });
-    });
-  }
-
-  function renderPanel(data) {
-    panelData = data;
-    const titulo = data.numero_os + (data.apelido ? ' <span class="badge bg-light text-dark border">' + escapeHtml(data.apelido) + '</span>' : '');
-    let html = '';
-    html += '<div class="gerencial-panel-header mb-3 pb-2 border-bottom">';
-    html += '<div class="fw-semibold">' + titulo + '</div>';
-    html += '<div class="mt-1"><span class="badge bg-secondary">' + escapeHtml(data.status_label || '—') + '</span></div>';
-    html += '<a href="/os/' + data.os_pk + '/" class="small d-inline-block mt-2">Ver OS completa →</a>';
-    html += '</div>';
-
-    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Informações de Entrada</h6><dl class="row mb-0 small gerencial-dl">';
-    html += '<dt class="col-5">Processo SEI</dt><dd class="col-7">' + escapeHtml(data.processo_sei) + '</dd>';
-    html += '<dt class="col-5">Entrada DAI</dt><dd class="col-7">';
-    if (podeEditarEntradaDai) {
-      html += '<input type="date" class="form-control form-control-sm d-inline-block w-auto" data-field-os="data_entrada_divisao" value="' + escapeHtml(data.entrada_dai_iso) + '">';
-      html += ' <button type="button" class="btn btn-outline-primary btn-sm py-0" data-save-os="data_entrada_divisao">Salvar</button>';
-    } else {
-      html += escapeHtml(data.entrada_dai);
-    }
-    html += '</dd>';
-    html += '<dt class="col-5">Entrada EAV</dt><dd class="col-7">' + escapeHtml(data.entrada_eav) + '</dd>';
-    html += '<dt class="col-5">Origem</dt><dd class="col-7">' + escapeHtml(data.origem) + '</dd>';
-    html += '<dt class="col-5">Requerimento</dt><dd class="col-7">' + escapeHtml(data.requerimento) + '</dd>';
-    html += '<dt class="col-5">Finalidade</dt><dd class="col-7">' + escapeHtml(data.finalidade) + '</dd>';
-    html += '</dl>' + blocoComentario('entrada', false) + '</section>';
-
-    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Informações do Imóvel</h6><dl class="row mb-0 small gerencial-dl">';
-    html += '<dt class="col-5">CTM</dt><dd class="col-7">' + escapeHtml(data.ctm) + '</dd>';
-    html += '<dt class="col-5">Logradouro</dt><dd class="col-7">' + escapeHtml(data.logradouro) + '</dd>';
-    html += '<dt class="col-5">Nº</dt><dd class="col-7">' + escapeHtml(data.num_endereco) + '</dd>';
-    html += '<dt class="col-5">Unidade</dt><dd class="col-7">' + escapeHtml(data.num_unidade) + '</dd>';
-    html += '<dt class="col-5">Lote Fiscal</dt><dd class="col-7">' + escapeHtml(data.num_bloco) + '</dd>';
-    html += '<dt class="col-5">Nº Imóvel</dt><dd class="col-7">' + escapeHtml(data.numero_imovel) + '</dd>';
-    html += '<dt class="col-5">Finalidade Imóvel</dt><dd class="col-7">' + escapeHtml(data.finalidade_imovel) + '</dd>';
-    html += '<dt class="col-5">Área Territorial</dt><dd class="col-7">' + escapeHtml(data.area_territorial) + '</dd>';
-    html += '<dt class="col-5">Área Construída</dt><dd class="col-7">' + escapeHtml(data.area_construida) + '</dd>';
-    html += '<dt class="col-5">Bairro</dt><dd class="col-7">' + escapeHtml(data.bairro) + '</dd>';
-    html += '<dt class="col-5">RH_VALOR</dt><dd class="col-7">' + escapeHtml(data.rh_valor) + '</dd>';
-    html += '</dl>' + blocoComentario('imovel', false) + '</section>';
-
-    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Triagem</h6>';
-    if (podeHomologar && data.producao_pk) {
-      html += '<label class="form-label small mb-0">Apelido</label>';
-      html += '<input type="text" class="form-control form-control-sm mb-2" data-field-os="apelido" value="' + escapeHtml(data.apelido) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-os="apelido">Salvar</button>';
-      html += '<label class="form-label small mb-0">MOD_SUGERIDO</label>';
-      html += '<input type="text" class="form-control form-control-sm mb-2" data-field-prod="modelo_sugerido" value="' + escapeHtml(data.modelo_sugerido) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="modelo_sugerido">Salvar</button>';
-      html += '<label class="form-label small mb-0">PRIORIDADE</label>';
-      html += '<select class="form-select form-select-sm mb-2" data-field-os="prioridade">';
-      {% for pr in prioridades_os %}
-      html += '<option value="{{ pr }}"' + (data.prioridade === '{{ pr }}' ? ' selected' : '') + '>{{ pr|prioridade_display }}</option>';
-      {% endfor %}
-      html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-os="prioridade">Salvar</button>';
-      html += '<label class="form-label small mb-0">Prazo EAV</label>';
-      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="prazo_interno" value="' + escapeHtml(data.prazo_eav_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="prazo_interno">Salvar</button>';
-      html += '<label class="form-label small mb-0">CRONOG</label>';
-      html += '<input type="month" class="form-control form-control-sm mb-2" data-field-prod="mes_cronograma" value="' + escapeHtml(data.mes_cronograma_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="mes_cronograma">Salvar</button>';
-    } else {
-      html += '<dl class="row mb-0 small gerencial-dl">';
-      html += '<dt class="col-5">Apelido</dt><dd class="col-7">' + escapeHtml(data.apelido || '—') + '</dd>';
-      html += '<dt class="col-5">MOD_SUGERIDO</dt><dd class="col-7">' + escapeHtml(data.modelo_sugerido || '—') + '</dd>';
-      html += '<dt class="col-5">PRIORIDADE</dt><dd class="col-7">' + escapeHtml(data.prioridade || '—') + '</dd>';
-      html += '<dt class="col-5">Prazo EAV</dt><dd class="col-7">' + escapeHtml(data.prazo_eav) + '</dd>';
-      html += '<dt class="col-5">CRONOG</dt><dd class="col-7">' + escapeHtml(data.mes_cronograma) + '</dd>';
-      html += '</dl>';
-    }
-    html += '<dl class="row mb-0 small gerencial-dl mt-2">';
-    html += '<dt class="col-5">DIAS_SEI</dt><dd class="col-7">' + diasSeiHtml(data.dias_sei) + '</dd>';
-    html += '<dt class="col-5">Prazo Recompra ou ITBI</dt><dd class="col-7">—</dd>';
-    html += '</dl>' + blocoComentario('triagem', true) + '</section>';
-
-    html += '<section class="mb-3"><h6 class="small fw-semibold text-muted">Prazos</h6>';
-    if (podeHomologar && data.producao_pk) {
-      html += '<label class="form-label small">AVALIADOR</label>';
-      html += '<select class="form-select form-select-sm mb-2" data-field-prod="servidor_responsavel">';
-      html += '<option value="">—</option>';
-      {% for srv in servidores %}
-      html += '<option value="{{ srv.pk }}"' + (String(data.avaliador_id) === '{{ srv.pk }}' ? ' selected' : '') + '>{{ srv.nome|escapejs }}</option>';
-      {% endfor %}
-      html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="servidor_responsavel">Salvar</button>';
-      html += '<label class="form-label small">PRAZO_AVAL</label>';
-      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="prazo_aval" value="' + escapeHtml(data.prazo_aval_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="prazo_aval">Salvar</button>';
-      html += '<label class="form-label small">ENTREGA_AVAL</label>';
-      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="data_entrega_avaliacao" value="' + escapeHtml(data.entrega_aval_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="data_entrega_avaliacao">Salvar</button>';
-      html += '<label class="form-label small">REVISOR</label>';
-      html += '<select class="form-select form-select-sm mb-2" data-field-prod="revisor">';
-      html += '<option value="">—</option>';
-      {% for srv in servidores_revisores %}
-      html += '<option value="{{ srv.pk }}"' + (String(data.revisor_id) === '{{ srv.pk }}' ? ' selected' : '') + '>{{ srv.nome|escapejs }}</option>';
-      {% endfor %}
-      html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="revisor">Salvar</button>';
-      html += '<label class="form-label small">ENTREGA_REV</label>';
-      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="data_entrega_revisao" value="' + escapeHtml(data.entrega_rev_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="data_entrega_revisao">Salvar</button>';
-      html += '<label class="form-label small">ENTREGA_AJU</label>';
-      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="data_entrega_ajustes" value="' + escapeHtml(data.entrega_aju_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="data_entrega_ajustes">Salvar</button>';
-    } else if (data.producao_pk) {
-      html += '<dl class="row mb-0 small gerencial-dl">';
-      html += '<dt class="col-5">AVALIADOR</dt><dd class="col-7">' + escapeHtml(data.avaliador_nome) + '</dd>';
-      html += '<dt class="col-5">PRAZO_AVAL</dt><dd class="col-7">' + escapeHtml(data.prazo_aval) + '</dd>';
-      html += '<dt class="col-5">ENTREGA_AVAL</dt><dd class="col-7">' + escapeHtml(data.entrega_aval) + '</dd>';
-      html += '<dt class="col-5">REVISOR</dt><dd class="col-7">' + escapeHtml(data.revisor_nome) + '</dd>';
-      html += '<dt class="col-5">ENTREGA_REV</dt><dd class="col-7">' + escapeHtml(data.entrega_rev) + '</dd>';
-      html += '<dt class="col-5">ENTREGA_AJU</dt><dd class="col-7">' + escapeHtml(data.entrega_aju) + '</dd>';
-      html += '</dl>';
-    }
-    html += '<dl class="row mb-0 small gerencial-dl mt-2">';
-    html += '<dt class="col-5">AJUSTES_OK</dt><dd class="col-7">—</dd>';
-    html += '<dt class="col-5">AJUSTES_OK</dt><dd class="col-7">' + escapeHtml(data.data_ajustes_ok) + '</dd>';
-    html += '<dt class="col-5">HOMOLOGAR</dt><dd class="col-7">' + escapeHtml(data.data_homologar) + '</dd>';
-    html += '<dt class="col-5">ENVIADO</dt><dd class="col-7">' + escapeHtml(data.enviado) + '</dd>';
-    html += '<dt class="col-5">STATUS</dt><dd class="col-7">';
-    if (podeHomologar && data.producao_pk) {
-      html += '<select class="form-select form-select-sm" id="panel-status-producao">';
-      {% for valor, label in status_producao_opcoes_gerencial %}
-      html += '<option value="{{ valor }}"' + (data.status === '{{ valor }}' ? ' selected' : '') + '>{{ label }}</option>';
-      {% endfor %}
-      html += '</select>';
-    } else {
-      html += escapeHtml(data.status_label || '—');
-    }
-    html += '</dd></dl>' + blocoComentario('prazos', true) + '</section>';
-
-    html += '<section class="mb-2"><h6 class="small fw-semibold text-muted">Produtos</h6>';
-    html += '<dl class="row small gerencial-dl mb-0">';
-    html += '<dt class="col-5">LA_PT_PTF</dt><dd class="col-7">' + escapeHtml(data.la_pt_ptf) + '</dd>';
-    html += '<dt class="col-5">TIPO_TRABALHO</dt><dd class="col-7">' + escapeHtml(data.tipo_trabalho) + '</dd>';
-    html += '<dt class="col-5">DOC_SEI</dt><dd class="col-7">' + escapeHtml(data.doc_sei) + '</dd>';
-    html += '<dt class="col-5">DESTINO</dt><dd class="col-7">' + escapeHtml(data.destino) + '</dd>';
-    html += '</dl>' + blocoComentario('produtos', true) + '</section>';
-
-    return html;
-  }
-
-  function abrirPainel(dados, tr) {
-    if (linhaSelecionada) linhaSelecionada.classList.remove('table-active');
-    linhaSelecionada = tr;
-    tr.classList.add('table-active');
-    painelConteudo.innerHTML = renderPanel(dados);
-    wrap.classList.add('painel-aberto');
-    bindPanelEvents();
+    if (producaoPk) seletor += '[data-producao-pk="' + producaoPk + '"]';
+    document.querySelectorAll(seletor).forEach(function (td) { td.innerHTML = html; });
   }
 
   function fecharPainel() {
@@ -841,21 +529,55 @@ body.gerencial-mode .siprac-content {
     }
   }
 
-  fechar.addEventListener('click', fecharPainel);
+  function abrirPainel(dados, tr, secao) {
+    if (!window.GerencialPainel) return;
+    if (linhaSelecionada) linhaSelecionada.classList.remove('table-active');
+    linhaSelecionada = tr;
+    tr.classList.add('table-active');
+    painelConteudo.innerHTML = window.GerencialPainel.renderPanel(dados);
+    wrap.classList.add('painel-aberto');
+    window.GerencialPainel.bindPanelEvents(dados, {
+      painelConteudo: painelConteudo,
+      fecharPainel: fecharPainel,
+      atualizarCelula: atualizarCelula,
+      colMap: {
+        prazo_interno: 'prazo_eav', prazo_aval: 'prazo_aval',
+        servidor_responsavel: 'avaliador', revisor: 'revisor',
+        mes_cronograma: 'mes_cronograma', modelo_sugerido: 'modelo_sugerido',
+        data_entrega_avaliacao: 'entrega_aval', data_entrega_revisao: 'entrega_rev',
+        data_entrega_ajustes: 'entrega_aju', data_ajustes_ok: 'data_ajustes_ok',
+        data_homologar: 'data_homologar', data_enviado: 'enviado',
+      },
+    });
+    if (secao) {
+      setTimeout(function () {
+        window.GerencialPainel.scrollParaSecao(secao, dados);
+      }, 80);
+    }
+  }
+
+  window.abrirPainelSecao = function (event, secao) {
+    event.preventDefault();
+    event.stopPropagation();
+    const tr = event.target.closest('tr[data-os-pk]');
+    if (!tr) return;
+    const key = tr.dataset.producaoPk ? tr.dataset.producaoPk : ('os-' + tr.dataset.osPk);
+    const dados = painelDados[key];
+    if (dados) abrirPainel(dados, tr, secao || 'topo');
+  };
 
   document.getElementById('tabela-gerencial').addEventListener('click', function (e) {
     if (e.target.closest('a')) return;
     if (e.target.closest('.gerencial-popover-trigger')) return;
     if (e.target.closest('.gerencial-cel-etapa')) return;
     if (e.target.closest('.gerencial-cel-status')) return;
+    if (e.target.closest('[onclick*="abrirPainelSecao"]')) return;
     if (e.target.closest('[onclick*="abrirPopover"]')) return;
     const tr = e.target.closest('tr[data-os-pk]');
     if (!tr) return;
-    const key = tr.dataset.producaoPk
-      ? tr.dataset.producaoPk
-      : ('os-' + tr.dataset.osPk);
+    const key = tr.dataset.producaoPk ? tr.dataset.producaoPk : ('os-' + tr.dataset.osPk);
     const dados = painelDados[key];
-    if (dados) abrirPainel(dados, tr);
+    if (dados) abrirPainel(dados, tr, 'topo');
   });
 
   document.getElementById('btn-salvar-colunas').addEventListener('click', function () {

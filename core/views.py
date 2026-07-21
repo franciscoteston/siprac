@@ -2591,172 +2591,242 @@ def _montar_cells_gerencial(linha):
     }
 
 
-def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai, entrada_eav):
+def _cor_macroetapa_gerencial(macroetapa):
+    return {
+        "ENTRADA_DIVISAO": "secondary",
+        "ATENDIMENTO_INTERNO": "primary",
+        "ATENDIMENTO_EXTERNO": "info",
+        "RETORNO_EXTERNO": "warning",
+        "NOTIFICACAO": "dark",
+        "ENCERRADO": "dark",
+        "ENCERRAMENTO": "dark",
+    }.get(macroetapa, "secondary")
+
+
+def _serializar_producao_painel_gerencial(producao, request):
+    logs = (
+        ProducaoStatusLog.objects.filter(producao=producao)
+        .select_related("servidor_origem", "servidor_destino")
+        .order_by("-data_hora")[:10]
+    )
+    total_comentarios = Comentario.objects.filter(producao=producao).count()
+    return {
+        "pk": producao.pk,
+        "label": (
+            producao.tipo_producao.label_display
+            if producao.tipo_producao
+            else "—"
+        ),
+        "prefixo": (
+            producao.tipo_producao.prefixo if producao.tipo_producao else "—"
+        ),
+        "status": producao.status,
+        "status_label": _label_status_producao_gerencial(producao.status),
+        "status_cor": _cor_status_producao_gerencial(producao.status),
+        "transicoes": (
+            _transicoes_status_disponiveis(producao, request)
+            if request is not None
+            else []
+        ),
+        "modelo_sugerido": producao.modelo_sugerido or "",
+        "prazo_eav_iso": (
+            producao.prazo_interno.isoformat() if producao.prazo_interno else ""
+        ),
+        "prazo_aval_iso": (
+            producao.prazo_aval.isoformat() if producao.prazo_aval else ""
+        ),
+        "prazo_rev_iso": (
+            producao.prazo_rev.isoformat() if producao.prazo_rev else ""
+        ),
+        "mes_cronograma_iso": (
+            producao.mes_cronograma.strftime("%Y-%m")
+            if producao.mes_cronograma
+            else ""
+        ),
+        "avaliador_id": producao.servidor_responsavel_id,
+        "avaliador_nome": (
+            producao.servidor_responsavel.nome
+            if producao.servidor_responsavel
+            else "—"
+        ),
+        "revisor_id": producao.revisor_id,
+        "revisor_nome": producao.revisor.nome if producao.revisor else "—",
+        "entrega_aval_iso": (
+            producao.data_entrega_avaliacao.isoformat()
+            if producao.data_entrega_avaliacao
+            else ""
+        ),
+        "entrega_rev_iso": (
+            producao.data_entrega_revisao.isoformat()
+            if producao.data_entrega_revisao
+            else ""
+        ),
+        "entrega_aju_iso": (
+            producao.data_entrega_ajustes.isoformat()
+            if producao.data_entrega_ajustes
+            else ""
+        ),
+        "data_ajustes_ok_iso": (
+            producao.data_ajustes_ok.isoformat()
+            if producao.data_ajustes_ok
+            else ""
+        ),
+        "data_homologar_iso": (
+            producao.data_homologar.isoformat() if producao.data_homologar else ""
+        ),
+        "enviado_iso": (
+            producao.data_enviado.isoformat() if producao.data_enviado else ""
+        ),
+        "numero_producao": producao.numero_producao or "",
+        "numero_sei": producao.numero_sei or "",
+        "status_log": [_serializar_status_log(log) for log in logs],
+        "total_comentarios": total_comentarios,
+        "opcoes_pos_enviado": (
+            _opcoes_pos_enviado(producao.os)
+            if producao.status == Producao.STATUS_ENVIADO
+            else []
+        ),
+    }
+
+
+def _producoes_painel_gerencial(
+    os_obj,
+    unidade,
+    servidor_logado,
+    perfil_pode_homologar,
+    request,
+    producao_ativa=None,
+    modo_b=False,
+):
+    if unidade:
+        servidores_unidade_ids = ServidorUnidade.objects.filter(
+            unidade=unidade,
+            data_fim__isnull=True,
+        ).values_list("servidor_id", flat=True)
+        producoes = (
+            os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
+            .filter(
+                Q(servidor_responsavel_id__in=servidores_unidade_ids)
+                | Q(criado_por_id__in=servidores_unidade_ids),
+            )
+            .select_related("tipo_producao", "servidor_responsavel", "revisor")
+            .order_by("-data_criacao")
+        )
+        if servidor_logado and not perfil_pode_homologar:
+            producoes = producoes.filter(servidor_responsavel=servidor_logado)
+    else:
+        producoes = (
+            os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
+            .select_related("tipo_producao", "servidor_responsavel", "revisor")
+            .order_by("-data_criacao")
+        )
+
+    producoes = list(producoes)
+    if not modo_b and producao_ativa is not None:
+        producoes = [p for p in producoes if p.pk == producao_ativa.pk]
+
+    return [
+        _serializar_producao_painel_gerencial(producao, request)
+        for producao in producoes
+    ]
+
+
+def _montar_panel_gerencial(
+    os_obj,
+    producao,
+    unidade,
+    dados_imovel,
+    entrada_dai,
+    entrada_eav,
+    *,
+    request=None,
+    servidor_logado=None,
+    perfil_pode_homologar=False,
+    modo_b=False,
+    etapa_interna=None,
+    etapa_interna_choices=None,
+    os_editavel=False,
+    pode_criar_producao=False,
+    processos_list=None,
+    macroetapa=None,
+    status_unidade=None,
+):
+    from core.os_service import ETAPAS_INTERNAS_LABELS
+
     dias_sei = _calcular_dias_sei_gerencial(os_obj)
+    macroetapa = macroetapa or macroetapa_atual_os(os_obj)
+    processos = processos_list or []
     processo_principal = (
         os_obj.processos_vinculados.filter(tipo_vinculo="PRINCIPAL")
         .select_related("processo_sei")
         .first()
     )
     processo_sei = "—"
-    processo_pk = None
     if processo_principal and processo_principal.processo_sei:
         processo_sei = processo_principal.processo_sei.numero_processo
-        processo_pk = processo_principal.processo_sei_id
 
-    prazo_interno_iso = (
-        producao.prazo_interno.isoformat()
-        if producao and producao.prazo_interno
-        else ""
+    servidores_unidade = []
+    revisores_unidade = []
+    if unidade:
+        servidores_unidade = [
+            {"pk": s.pk, "nome": s.nome}
+            for s in Servidor.objects.filter(
+                vinculos_unidade__unidade=unidade,
+                vinculos_unidade__data_fim__isnull=True,
+            )
+            .distinct()
+            .order_by("nome")
+        ]
+    if servidor_logado:
+        revisores_unidade = [
+            {"pk": s.pk, "nome": s.nome}
+            for s in _servidores_revisores_da_unidade(servidor_logado)
+        ]
+
+    comentarios_os_qs = (
+        Comentario.objects.filter(os=os_obj, origem="OS")
+        .select_related("servidor")
+        .order_by("-data_hora")
     )
-    prazo_interno_display = (
-        _formatar_data_br(producao.prazo_interno)
-        if producao and producao.prazo_interno
-        else "—"
-    )
+
     return {
         "os_pk": os_obj.pk,
         "producao_pk": producao.pk if producao else None,
+        "producao_pk_ativa": producao.pk if producao else None,
         "numero_os": os_obj.numero_os,
         "processo_sei": processo_sei,
-        "processo_pk": processo_pk,
-        "entrada_dai": _formatar_data_br(entrada_dai),
-        "entrada_dai_iso": entrada_dai.isoformat() if entrada_dai else "",
+        "processos": processos,
+        "macroetapa": macroetapa,
+        "macroetapa_label": _label_macroetapa_gerencial(macroetapa),
+        "macroetapa_cor": _cor_macroetapa_gerencial(macroetapa),
+        "etapa_interna": etapa_interna or "",
+        "etapa_interna_label": ETAPAS_INTERNAS_LABELS.get(
+            etapa_interna or "",
+            etapa_interna or "—",
+        ),
+        "etapa_interna_choices": etapa_interna_choices or [],
+        "status_unidade": status_unidade,
+        "os_editavel": os_editavel,
+        "pode_criar_producao": pode_criar_producao,
+        "producoes": _producoes_painel_gerencial(
+            os_obj,
+            unidade,
+            servidor_logado,
+            perfil_pode_homologar,
+            request,
+            producao_ativa=producao,
+            modo_b=modo_b,
+        ),
+        "servidores_unidade": servidores_unidade,
+        "revisores_unidade": revisores_unidade,
+        "comentarios_os": [
+            _serializar_comentario(c) for c in comentarios_os_qs[:5]
+        ],
+        "total_comentarios_os": comentarios_os_qs.count(),
         "entrada_eav": entrada_eav,
-        "origem": "—",
-        "requerimento": os_obj.tipo_demanda.descricao,
-        "finalidade": os_obj.finalidade.descricao,
-        "ctm": dados_imovel.get("ctm", "—"),
-        "logradouro": dados_imovel.get("logradouro", "—"),
-        "num_endereco": dados_imovel.get("num_endereco", "—"),
-        "num_unidade": dados_imovel.get("num_unidade", "—"),
-        "num_bloco": dados_imovel.get("num_bloco", "—"),
-        "numero_imovel": dados_imovel.get("numero_imovel", "—"),
-        "finalidade_imovel": dados_imovel.get("finalidade_imovel", "—"),
-        "area_territorial": dados_imovel.get("area_territorial", "—"),
-        "area_construida": dados_imovel.get("area_construida", "—"),
-        "bairro": dados_imovel.get("bairro", "—"),
-        "rh_valor": dados_imovel.get("rh_valor", "—"),
-        "apelido": os_obj.apelido or "",
-        "modelo_sugerido": (
-            producao.modelo_sugerido if producao and producao.modelo_sugerido else ""
-        ),
-        "prioridade": os_obj.prioridade or "NORMAL",
-        "prazo_eav": prazo_interno_display,
-        "prazo_eav_iso": prazo_interno_iso,
         "dias_sei": dias_sei,
-        "mes_cronograma": (
-            _formatar_mes_cronograma(producao.mes_cronograma) if producao else "—"
-        ),
-        "mes_cronograma_iso": (
-            producao.mes_cronograma.strftime("%Y-%m")
-            if producao and producao.mes_cronograma
-            else ""
-        ),
-        "avaliador_nome": (
-            producao.servidor_responsavel.nome
-            if producao and producao.servidor_responsavel
-            else "—"
-        ),
-        "avaliador_id": producao.servidor_responsavel_id if producao else None,
-        "prazo_aval": (
-            _formatar_data_br(producao.prazo_aval)
-            if producao and producao.prazo_aval
-            else "—"
-        ),
-        "prazo_aval_iso": (
-            producao.prazo_aval.isoformat()
-            if producao and producao.prazo_aval
-            else ""
-        ),
-        "prazo_rev": (
-            _formatar_data_br(producao.prazo_rev)
-            if producao and producao.prazo_rev
-            else "—"
-        ),
-        "prazo_rev_iso": (
-            producao.prazo_rev.isoformat()
-            if producao and producao.prazo_rev
-            else ""
-        ),
-        "entrega_aval": (
-            _formatar_data_br(producao.data_entrega_avaliacao)
-            if producao and producao.data_entrega_avaliacao
-            else "—"
-        ),
-        "entrega_aval_iso": (
-            producao.data_entrega_avaliacao.isoformat()
-            if producao and producao.data_entrega_avaliacao
-            else ""
-        ),
-        "revisor_nome": (
-            producao.revisor.nome if producao and producao.revisor else "—"
-        ),
-        "revisor_id": producao.revisor_id if producao else None,
-        "entrega_rev": (
-            _formatar_data_br(producao.data_entrega_revisao)
-            if producao and producao.data_entrega_revisao
-            else "—"
-        ),
-        "entrega_rev_iso": (
-            producao.data_entrega_revisao.isoformat()
-            if producao and producao.data_entrega_revisao
-            else ""
-        ),
-        "entrega_aju": (
-            _formatar_data_br(producao.data_entrega_ajustes)
-            if producao and producao.data_entrega_ajustes
-            else "—"
-        ),
-        "entrega_aju_iso": (
-            producao.data_entrega_ajustes.isoformat()
-            if producao and producao.data_entrega_ajustes
-            else ""
-        ),
-        "data_ajustes_ok": (
-            _formatar_data_br(producao.data_ajustes_ok)
-            if producao and producao.data_ajustes_ok
-            else "—"
-        ),
-        "data_ajustes_ok_iso": (
-            producao.data_ajustes_ok.isoformat()
-            if producao and producao.data_ajustes_ok
-            else ""
-        ),
-        "data_homologar": (
-            _formatar_data_br(producao.data_homologar)
-            if producao and producao.data_homologar
-            else "—"
-        ),
-        "data_homologar_iso": (
-            producao.data_homologar.isoformat()
-            if producao and producao.data_homologar
-            else ""
-        ),
-        "enviado": (
-            _formatar_data_br(producao.data_enviado)
-            if producao and producao.data_enviado
-            else "—"
-        ),
-        "enviado_iso": (
-            producao.data_enviado.isoformat()
-            if producao and producao.data_enviado
-            else ""
-        ),
-        "status": producao.status if producao else "",
-        "status_label": (
-            _label_status_producao_gerencial(producao.status) if producao else "—"
-        ),
-        "la_pt_ptf": (
-            producao.numero_producao if producao and producao.numero_producao else "—"
-        ),
-        "tipo_trabalho": (
-            producao.tipo_producao.descricao
-            if producao and producao.tipo_producao
-            else "—"
-        ),
-        "doc_sei": (producao.numero_sei if producao and producao.numero_sei else "—"),
-        "destino": _destino_pos_homologacao(os_obj, producao),
+        "apelido": os_obj.apelido or "",
+        "modo_b": modo_b,
     }
 
 
@@ -2768,6 +2838,13 @@ def _etapas_posteriores_gerencial(etapa_atual):
 
     if not etapa_atual:
         posteriores = list(ETAPAS_FLUXO_GERENCIAL)
+    elif etapa_atual == "EM_ATENDIMENTO":
+        return [
+            {
+                "valor": "CONCLUIDA",
+                "label": ETAPAS_INTERNAS_LABELS.get("CONCLUIDA", "Concluída"),
+            },
+        ]
     else:
         try:
             idx = ETAPAS_FLUXO_GERENCIAL.index(etapa_atual)
@@ -2796,6 +2873,7 @@ def _serializar_linhas_gerencial(
     servidor_logado=None,
     perfil_pode_homologar=False,
     request=None,
+    modo_b=False,
 ):
     """Retorna lista de linhas gerenciais (uma por produção, ou sem produção)."""
     from core.os_service import ETAPAS_INTERNAS_LABELS
@@ -2958,6 +3036,17 @@ def _serializar_linhas_gerencial(
             imovel,
             entrada_dai,
             entrada_eav,
+            request=request,
+            servidor_logado=servidor_logado,
+            perfil_pode_homologar=perfil_pode_homologar,
+            modo_b=modo_b,
+            etapa_interna=etapa_interna,
+            etapa_interna_choices=etapa_interna_choices,
+            os_editavel=os_editavel,
+            pode_criar_producao=pode_criar_producao,
+            processos_list=numeros_processos,
+            macroetapa=macroetapa,
+            status_unidade=status_unidade,
         )
         linha["panel_json"] = json.dumps(linha["panel"], default=str)
         return linha
@@ -3062,6 +3151,7 @@ def _montar_linhas_gerencial(
     servidor_logado=None,
     perfil_pode_homologar=False,
     request=None,
+    modo_b=False,
 ):
     os_list = list(
         os_queryset.select_related("natureza", "tipo_demanda", "finalidade"),
@@ -3078,6 +3168,7 @@ def _montar_linhas_gerencial(
                 servidor_logado=servidor_logado,
                 perfil_pode_homologar=perfil_pode_homologar,
                 request=request,
+                modo_b=modo_b,
             ),
         )
     return linhas
@@ -3134,7 +3225,7 @@ def _contagens_status_gerencial(os_ids):
     return contagens
 
 
-def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
+def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_b=False):
     servidor = _obter_servidor(request.user)
     unidade = _obter_unidade_principal_servidor(servidor)
     perfil = getattr(request, "perfil_acesso", None)
@@ -3146,6 +3237,7 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
         servidor_logado=servidor,
         perfil_pode_homologar=pode_homologar,
         request=request,
+        modo_b=modo_b,
     )
     linhas_filtradas = _filtrar_linhas_coluna_gerencial(linhas_base, request)
     os_ids_filtrados = {linha["os_pk"] for linha in linhas_filtradas}
@@ -3219,6 +3311,7 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina):
         "prazo_tipo_opcoes": OS.PRAZO_TIPO_CHOICES,
         "status_producao_opcoes_gerencial": Producao.STATUS_CHOICES,
         "os_ids_filtrados_count": len(os_ids_filtrados),
+        "gerencial_modo_b": modo_b,
     }
 
 
@@ -3286,7 +3379,7 @@ class OSListView(RequerLoginMixin, ListView):
     paginate_by = 20
 
     def get_paginate_by(self, queryset):
-        if self.request.GET.get("view") == "gerencial":
+        if self.request.GET.get("view") in ("gerencial", "gerencial_b"):
             return 50
         return self.paginate_by
 
@@ -3296,7 +3389,7 @@ class OSListView(RequerLoginMixin, ListView):
         queryset = _aplicar_filtros_os(queryset, self.request)
         self._qs_gerencial_completo = queryset
 
-        if self.request.GET.get("view") == "gerencial":
+        if self.request.GET.get("view") in ("gerencial", "gerencial_b"):
             servidor = _obter_servidor(self.request.user)
             unidade = _obter_unidade_principal_servidor(servidor)
             perfil = getattr(self.request, "perfil_acesso", None)
@@ -3307,6 +3400,7 @@ class OSListView(RequerLoginMixin, ListView):
                 servidor_logado=servidor,
                 perfil_pode_homologar=pode_homologar,
                 request=self.request,
+                modo_b=(self.request.GET.get("view") == "gerencial_b"),
             )
             linhas = _filtrar_linhas_coluna_gerencial(linhas, self.request)
             os_ids = [linha["os_pk"] for linha in linhas]
@@ -3348,9 +3442,13 @@ class OSListView(RequerLoginMixin, ListView):
             self.request,
             view="gerencial",
         )
+        context["query_string_gerencial_b"] = _query_string_os_list(
+            self.request,
+            view="gerencial_b",
+        )
         context["query_string_filtros"] = _query_string_filtros_os_list(self.request)
 
-        if view_mode == "gerencial":
+        if view_mode in ("gerencial", "gerencial_b"):
             servidor = _obter_servidor(self.request.user)
             unidade = _obter_unidade_principal_servidor(servidor)
             perfil = getattr(self.request, "perfil_acesso", None)
@@ -3361,12 +3459,14 @@ class OSListView(RequerLoginMixin, ListView):
                 servidor_logado=servidor,
                 perfil_pode_homologar=pode_homologar,
                 request=self.request,
+                modo_b=(view_mode == "gerencial_b"),
             )
             context.update(
                 _contexto_gerencial_os_list(
                     self.request,
                     getattr(self, "_qs_gerencial_completo", self.get_queryset()),
                     linhas_pagina,
+                    modo_b=(view_mode == "gerencial_b"),
                 ),
             )
         else:
@@ -5221,10 +5321,18 @@ CAMPOS_DATA_PRODUCAO = frozenset(
         "data_enviado",
         "prazo_interno",
         "prazo_aval",
+        "prazo_rev",
     },
 )
 CAMPOS_EDITAVEIS_PRODUCAO = frozenset(
-    {"modelo_sugerido", "revisor", "servidor_responsavel", "mes_cronograma"},
+    {
+        "modelo_sugerido",
+        "revisor",
+        "servidor_responsavel",
+        "mes_cronograma",
+        "numero_producao",
+        "numero_sei",
+    },
 ) | CAMPOS_DATA_PRODUCAO
 
 CAMPOS_EDITAVEIS_OS = frozenset(
@@ -5274,6 +5382,17 @@ class ProducaoEditarCampoView(RequerHomologarMixin, View):
                     "sucesso": True,
                     "campo": campo,
                     "valor": producao.modelo_sugerido or "",
+                },
+            )
+
+        if campo in ("numero_producao", "numero_sei"):
+            setattr(producao, campo, valor or None)
+            producao.save(update_fields=[campo])
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": getattr(producao, campo) or "",
                 },
             )
 
@@ -5686,7 +5805,7 @@ class OSEtapaAPIView(RequerLoginJSONMixin, View):
 
         dados = _parse_json_ou_post(request)
         etapa = (dados.get("etapa_interna") or "").strip()
-        if etapa not in ETAPAS_FLUXO_GERENCIAL:
+        if etapa not in ETAPAS_FLUXO_GERENCIAL and etapa != "CONCLUIDA":
             return JsonResponse(
                 {"sucesso": False, "erro": "Etapa interna inválida."},
                 status=400,
@@ -5963,13 +6082,28 @@ class ProducaoDistribuirAPIView(RequerLoginJSONMixin, View):
 
 
 class OSComentariosAPIView(RequerLoginJSONMixin, View):
-    def get(self, request, pk):
-        os_obj = get_object_or_404(OS, pk=pk)
+    def _filtrar_comentarios(self, os_obj, request):
         qs = (
             Comentario.objects.filter(os=os_obj)
             .select_related("servidor", "producao", "producao__tipo_producao")
             .order_by("-data_hora")
         )
+        producao_id = (request.GET.get("producao") or "").strip()
+        if not producao_id and request.method == "POST":
+            dados = _parse_json_ou_post(request)
+            producao_id = (dados.get("producao") or dados.get("producao_id") or "").strip()
+        if producao_id:
+            try:
+                qs = qs.filter(producao_id=int(producao_id))
+            except (ValueError, TypeError):
+                qs = qs.none()
+        else:
+            qs = qs.filter(origem="OS")
+        return qs
+
+    def get(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        qs = self._filtrar_comentarios(os_obj, request)
         total = qs.count()
         comentarios = [_serializar_comentario(c) for c in qs[:5]]
         return JsonResponse({"comentarios": comentarios, "total": total})
@@ -5989,25 +6123,29 @@ class OSComentariosAPIView(RequerLoginJSONMixin, View):
                 {"sucesso": False, "erro": "Texto do comentário é obrigatório."},
                 status=400,
             )
+        producao_id = dados.get("producao") or dados.get("producao_id")
+        producao = None
+        if producao_id:
+            producao = get_object_or_404(Producao, pk=int(producao_id), os=os_obj)
         comentario = Comentario.objects.create(
             os=os_obj,
-            origem="OS",
+            producao=producao,
+            origem="PRODUCAO" if producao else "OS",
             texto=texto,
             servidor=servidor,
         )
-        comentario = Comentario.objects.select_related("servidor").get(pk=comentario.pk)
-        qs = Comentario.objects.filter(os=os_obj)
+        comentario = Comentario.objects.select_related(
+            "servidor",
+            "producao",
+            "producao__tipo_producao",
+        ).get(pk=comentario.pk)
+        qs = self._filtrar_comentarios(os_obj, request)
         return JsonResponse(
             {
                 "sucesso": True,
                 "comentario": _serializar_comentario(comentario),
                 "comentarios": [
-                    _serializar_comentario(c)
-                    for c in qs.select_related(
-                        "servidor",
-                        "producao",
-                        "producao__tipo_producao",
-                    ).order_by("-data_hora")[:5]
+                    _serializar_comentario(c) for c in qs[:5]
                 ],
                 "total": qs.count(),
             },
