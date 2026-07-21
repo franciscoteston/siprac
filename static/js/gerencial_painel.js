@@ -93,19 +93,31 @@
     }).join('');
   }
 
-  function renderCampo(label, inner, extraId) {
-    return '<div class="painel-campo"' + (extraId ? ' id="' + extraId + '"' : '') + '>' +
-      '<label>' + escapeHtml(label) + '</label>' + inner +
-      '</div>';
+  function secaoTitulo(texto) {
+    return '<div style="font-size:10px;font-weight:700;text-transform:uppercase;' +
+      'color:#6c757d;letter-spacing:0.8px;margin-bottom:8px;">' +
+      escapeHtml(texto) + '</div>';
+  }
+
+  function renderCampo(label, inputHtml, extraId) {
+    return '<div class="d-flex align-items-center gap-2 mb-2"' +
+      (extraId ? ' id="' + extraId + '"' : '') + '>' +
+      '<label style="font-size:11px;color:#6c757d;min-width:85px;flex-shrink:0;">' +
+      escapeHtml(label) + '</label>' + inputHtml + '</div>';
+  }
+
+  function btnSalvar(prodPk, campo) {
+    return '<button type="button" class="btn btn-sm btn-outline-primary"' +
+      ' style="font-size:11px;white-space:nowrap;padding:2px 8px;"' +
+      ' data-salvar-prod="' + prodPk + '" data-campo="' + campo + '">Salvar</button>';
   }
 
   function renderCampoData(prodPk, campo, label, valor, secaoId) {
     return renderCampo(
       label,
-      '<input type="date" data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
-      escapeHtml(valor || '') + '">' +
-      '<button type="button" class="btn-salvar-campo" data-salvar-prod="' +
-      prodPk + '" data-campo="' + campo + '">Salvar</button>',
+      '<input type="date" class="form-control form-control-sm" style="font-size:11px;"' +
+      ' data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
+      escapeHtml(valor || '') + '">' + btnSalvar(prodPk, campo),
       secaoId || '',
     );
   }
@@ -114,54 +126,54 @@
     tipo = tipo || 'text';
     return renderCampo(
       label,
-      '<input type="' + tipo + '" data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
-      escapeHtml(valor || '') + '">' +
-      '<button type="button" class="btn-salvar-campo" data-salvar-prod="' +
-      prodPk + '" data-campo="' + campo + '">Salvar</button>',
+      '<input type="' + tipo + '" class="form-control form-control-sm" style="font-size:11px;"' +
+      ' data-prod="' + prodPk + '" data-campo="' + campo + '" value="' +
+      escapeHtml(valor || '') + '">' + btnSalvar(prodPk, campo),
     );
   }
 
   function renderCampoSelect(prodPk, campo, label, optionsHtmlStr, secaoId) {
     return renderCampo(
       label,
-      '<select data-prod="' + prodPk + '" data-campo="' + campo + '">' + optionsHtmlStr + '</select>' +
-      '<button type="button" class="btn-salvar-campo" data-salvar-prod="' +
-      prodPk + '" data-campo="' + campo + '">Salvar</button>',
+      '<select class="form-select form-select-sm" style="font-size:11px;"' +
+      ' data-prod="' + prodPk + '" data-campo="' + campo + '">' + optionsHtmlStr + '</select>' +
+      btnSalvar(prodPk, campo),
       secaoId || '',
     );
   }
 
   function renderTransicoes(prod) {
-    return (prod.transicoes || []).map(function (t) {
-      return '<button type="button" class="painel-btn-transicao"' +
-        ' data-transicao-prod="' + prod.pk + '" data-status="' + t.destino + '">→ ' +
-        escapeHtml(t.label) + '</button>';
-    }).join('');
+    if (!(prod.transicoes || []).length) return '';
+    return '<div class="d-flex gap-1 flex-wrap mb-2" id="painel-transicoes-' + prod.pk + '">' +
+      (prod.transicoes || []).map(function (t) {
+        return '<button type="button" class="btn btn-sm btn-outline-secondary"' +
+          ' style="font-size:11px;padding:2px 8px;"' +
+          ' data-transicao-prod="' + prod.pk + '" data-status="' + t.destino + '">→ ' +
+          escapeHtml(t.label) + '</button>';
+      }).join('') + '</div>';
   }
 
   function renderProducaoAccordion(prod, data, expandido) {
     const bodyStyle = expandido ? '' : ' style="display:none;"';
-    const headerClass = expandido ? 'painel-accordion-header aberto' : 'painel-accordion-header';
-    const arrow = expandido ? '▼' : '▶';
-    let html = '<div class="painel-accordion" id="painel-prod-' + prod.pk + '">';
-    html += '<div class="' + headerClass + '" data-toggle-prod="' + prod.pk + '">';
-    html += '<span>' + arrow + '</span>';
-    html += '<span class="prod-label">' + escapeHtml(prod.prefixo + ' — ' + prod.label) + '</span>';
+    let html = '<div class="card mb-2 border" id="painel-prod-' + prod.pk + '">';
+    html += '<div class="card-header p-2 d-flex align-items-center gap-2"' +
+      ' style="cursor:pointer;background:#f0f4f8;" data-toggle-prod="' + prod.pk + '">';
+    html += '<span style="font-size:12px;font-weight:600;color:#1a3a5c;flex:1;">' +
+      escapeHtml(prod.prefixo + ' — ' + prod.label) + '</span>';
     html += '<span class="badge bg-' + prod.status_cor + '">' + escapeHtml(prod.status_label) + '</span>';
+    html += '<i class="bi bi-chevron-' + (expandido ? 'up' : 'down') + '" style="font-size:10px;"></i>';
     html += '</div>';
-    html += '<div class="painel-accordion-body"' + bodyStyle + ' id="painel-secao-prod-' + prod.pk + '">';
-    html += '<div class="painel-transicoes" id="painel-transicoes-' + prod.pk + '">';
+    html += '<div class="card-body p-2" id="painel-secao-prod-' + prod.pk + '"' + bodyStyle + '>';
     html += renderTransicoes(prod);
-    html += '</div>';
     html += '<div id="painel-sugestao-' + prod.pk + '"></div>';
 
-    html += '<div class="small fw-semibold text-muted mb-1">Triagem</div>';
+    html += '<div class="text-muted mb-1" style="font-size:11px;font-weight:600;">Triagem</div>';
     html += renderCampoData(prod.pk, 'prazo_interno', 'Prazo EAV', prod.prazo_eav_iso,
       'painel-campo-prazo-eav-' + prod.pk);
     html += renderCampoTexto(prod.pk, 'mes_cronograma', 'Cronograma', prod.mes_cronograma_iso, 'month');
     html += renderCampoTexto(prod.pk, 'modelo_sugerido', 'Modelo sug.', prod.modelo_sugerido);
 
-    html += '<div class="small fw-semibold text-muted mb-1 mt-2">Distribuição</div>';
+    html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Distribuição</div>';
     html += renderCampoSelect(
       prod.pk,
       'servidor_responsavel',
@@ -172,7 +184,7 @@
     html += renderCampoData(prod.pk, 'prazo_aval', 'Prazo aval', prod.prazo_aval_iso);
     html += renderCampoData(prod.pk, 'data_entrega_avaliacao', 'Entrega aval', prod.entrega_aval_iso);
 
-    html += '<div class="small fw-semibold text-muted mb-1 mt-2">Revisão</div>';
+    html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Revisão</div>';
     html += renderCampoSelect(
       prod.pk,
       'revisor',
@@ -183,118 +195,129 @@
     html += renderCampoData(prod.pk, 'data_entrega_revisao', 'Entrega rev', prod.entrega_rev_iso);
     html += renderCampoData(prod.pk, 'data_entrega_ajustes', 'Entrega aju', prod.entrega_aju_iso);
 
-    html += '<div class="small fw-semibold text-muted mb-1 mt-2">Homologação</div>';
+    html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Homologação</div>';
     html += renderCampoData(prod.pk, 'data_ajustes_ok', 'Ajustes OK', prod.data_ajustes_ok_iso);
     html += renderCampoTexto(prod.pk, 'numero_producao', 'Nº trabalho', prod.numero_producao);
     html += renderCampoTexto(prod.pk, 'numero_sei', 'DOC SEI', prod.numero_sei);
     html += renderCampoData(prod.pk, 'data_enviado', 'Envio SEI', prod.enviado_iso);
 
     if (prod.status === 'ENVIADO' && prod.opcoes_pos_enviado && prod.opcoes_pos_enviado.length) {
-      html += '<div class="mt-2 small">';
+      html += '<div class="mt-2 d-flex gap-1 flex-wrap">';
       prod.opcoes_pos_enviado.forEach(function (op) {
         if (op.acao === 'manter') {
-          html += '<span class="text-muted me-2">Manter em atendimento</span>';
+          html += '<span class="text-muted" style="font-size:11px;">Manter em atendimento</span>';
         } else if (op.url) {
-          html += '<a href="' + escapeHtml(op.url) + '" class="btn-painel-header me-1" style="background:#1a3a5c;">' +
-            escapeHtml(op.label) + '</a>';
+          html += '<a href="' + escapeHtml(op.url) + '" class="btn btn-sm btn-outline-primary"' +
+            ' style="font-size:11px;padding:2px 8px;">' + escapeHtml(op.label) + '</a>';
         }
       });
       html += '</div>';
     }
 
-    html += '<div class="painel-expansivel">';
-    html += '<button type="button" class="painel-expansivel-header" data-expand-coment="' +
-      prod.pk + '">+ Comentários (' + (prod.total_comentarios || 0) + ')</button>';
-    html += '<div id="painel-coment-prod-' + prod.pk + '" class="painel-expansivel-body" style="display:none;"></div>';
-    html += '</div>';
-    html += '<div class="painel-expansivel">';
-    html += '<button type="button" class="painel-expansivel-header" data-expand-log="' +
-      prod.pk + '">+ Histórico de status (' + (prod.status_log || []).length + ')</button>';
-    html += '<div id="painel-log-prod-' + prod.pk + '" class="painel-expansivel-body" style="display:none;"></div>';
-    html += '</div>';
+    html += '<button type="button" class="btn btn-link btn-sm p-0 mt-2 text-decoration-none"' +
+      ' style="font-size:11px;" data-expand-coment="' + prod.pk +
+      '">+ Comentários (' + (prod.total_comentarios || 0) + ')</button>';
+    html += '<div id="painel-coment-prod-' + prod.pk + '" class="mt-1" style="display:none;"></div>';
+    html += '<button type="button" class="btn btn-link btn-sm p-0 mt-1 text-decoration-none d-block"' +
+      ' style="font-size:11px;" data-expand-log="' + prod.pk +
+      '">+ Histórico de status (' + (prod.status_log || []).length + ')</button>';
+    html += '<div id="painel-log-prod-' + prod.pk + '" class="mt-1 small" style="display:none;"></div>';
 
     html += '</div></div>';
     return html;
   }
 
   function renderPanel(data) {
+    const btnHeaderStyle = 'font-size:11px;padding:3px 10px;border-radius:4px;' +
+      'background:rgba(255,255,255,0.15);color:white;' +
+      'border:1px solid rgba(255,255,255,0.3);text-decoration:none;cursor:pointer;';
+
     let html = '';
     html += '<div class="painel-header" id="painel-secao-topo">';
-    html += '<div class="d-flex align-items-start">';
-    html += '<div class="flex-grow-1">';
-    html += '<a href="/os/' + data.os_pk + '/" class="painel-os-numero">' +
+    html += '<div class="d-flex justify-content-between align-items-start">';
+    html += '<div>';
+    html += '<a href="/os/' + data.os_pk + '/" class="painel-os-numero"' +
+      ' style="color:white;font-weight:700;font-size:14px;text-decoration:none;">' +
       escapeHtml(data.numero_os) + '</a>';
     (data.processos || []).forEach(function (p) {
-      html += '<div class="painel-processo">' + escapeHtml(p.numero) + '</div>';
+      html += '<div style="font-size:11px;color:#adb5bd;">' + escapeHtml(p.numero) + '</div>';
     });
     if (!data.processos || !data.processos.length) {
-      html += '<div class="painel-processo">' + escapeHtml(data.processo_sei || '—') + '</div>';
+      html += '<div style="font-size:11px;color:#adb5bd;">' +
+        escapeHtml(data.processo_sei || '—') + '</div>';
     }
     html += '</div>';
-    html += '<button type="button" class="btn-fechar-painel" id="painelBtnFechar" title="Fechar">✕</button>';
+    html += '<button type="button" id="painelBtnFechar" title="Fechar"' +
+      ' style="background:transparent;border:none;color:#adb5bd;font-size:20px;' +
+      'cursor:pointer;line-height:1;padding:0;">×</button>';
     html += '</div>';
-    html += '<div class="painel-actions">';
-    html += '<a href="/os/' + data.os_pk + '/" class="btn-painel-header">Ver OS completa →</a>';
+    html += '<div class="mt-2 d-flex gap-2 flex-wrap">';
+    html += '<a href="/os/' + data.os_pk + '/" style="' + btnHeaderStyle + '">Ver OS completa →</a>';
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" class="btn-painel-header" id="painelBtnNovaProd">+ Nova produção</button>';
+      html += '<button type="button" id="painelBtnNovaProd" style="' + btnHeaderStyle +
+        '">+ Nova produção</button>';
     }
     html += '</div>';
-    html += '<div id="painelNovaProdForm" class="painel-nova-producao mt-2" style="display:none;"></div>';
     html += '</div>';
 
     html += '<div class="painel-body">';
+    html += '<div id="painelNovaProdForm" class="painel-nova-producao m-2" style="display:none;"></div>';
 
-    html += '<div class="painel-secao" id="painel-secao-macroetapa">';
-    html += '<div class="painel-secao-titulo">Macroetapa</div>';
-    html += '<span class="painel-macroetapa-badge">' +
+    html += '<div class="p-3 border-bottom bg-white">';
+    html += secaoTitulo('Macroetapa');
+    html += '<span class="badge rounded-pill" style="background:#e8eef5;color:#1a3a5c;' +
+      'font-size:12px;font-weight:600;padding:5px 12px;">' +
       escapeHtml(data.macroetapa_label || '—') + '</span>';
     html += '</div>';
 
-    html += '<div class="painel-secao" id="painel-secao-etapa">';
-    html += '<div class="painel-secao-titulo">① Etapa na unidade</div>';
-    html += '<span class="badge bg-primary mb-2" id="painelEtapaBadge">' +
+    html += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-etapa">';
+    html += secaoTitulo('① Etapa na unidade');
+    html += '<span class="badge bg-primary" id="painelEtapaBadge">' +
       escapeHtml(data.etapa_interna_label || data.etapa_interna || '—') + '</span>';
     if (data.os_editavel && (data.etapa_interna_choices || []).length) {
-      html += '<div class="painel-transicoes" id="painelEtapaTransicoes">';
+      html += '<div class="d-flex gap-1 flex-wrap mt-2" id="painelEtapaTransicoes">';
       data.etapa_interna_choices.forEach(function (c) {
-        html += '<button type="button" class="painel-btn-transicao" data-etapa="' +
-          c.valor + '">→ ' + escapeHtml(c.label) + '</button>';
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary"' +
+          ' style="font-size:11px;padding:2px 8px;" data-etapa="' + c.valor +
+          '">→ ' + escapeHtml(c.label) + '</button>';
       });
       html += '</div>';
     }
     html += '</div>';
 
-    html += '<div class="painel-secao" id="painel-secao-producoes">';
+    html += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-producoes">';
     html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-    html += '<div class="painel-secao-titulo mb-0 flex-grow-1">② Produções</div>';
+    html += secaoTitulo('② Produções');
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" class="painel-btn-transicao" id="painelBtnNovaProd2">+ Nova</button>';
+      html += '<button type="button" class="btn btn-sm btn-outline-success"' +
+        ' style="font-size:11px;padding:2px 8px;" id="painelBtnNovaProd2">+ Nova</button>';
     }
     html += '</div>';
     if (!(data.producoes || []).length) {
       html += '<p class="small text-muted mb-0">Nenhuma produção.</p>';
     }
     (data.producoes || []).forEach(function (prod) {
-      const expandido = prod.pk === data.producao_pk_ativa;
-      html += renderProducaoAccordion(prod, data, expandido);
+      html += renderProducaoAccordion(prod, data, prod.pk === data.producao_pk_ativa);
     });
     html += '</div>';
 
-    html += '<div class="painel-secao" id="painel-secao-comentarios">';
-    html += '<div class="painel-secao-titulo">③ Comentários da OS</div>';
+    html += '<div class="p-3 bg-white mt-1" id="painel-secao-comentarios">';
+    html += secaoTitulo('③ Comentários da OS');
     html += '<div id="painelComentariosOs" class="mb-2">';
     (data.comentarios_os || []).forEach(function (c) {
-      html += '<div class="painel-comentario-item">' +
-        '<div class="painel-comentario-autor">' + escapeHtml(c.servidor) +
-        ' · ' + escapeHtml(c.data_hora) + '</div>' +
+      html += '<div class="border-bottom py-1" style="font-size:11px;color:#495057;">' +
+        '<div style="font-weight:600;color:#1a3a5c;font-size:10px;">' +
+        escapeHtml(c.servidor) + ' · ' + escapeHtml(c.data_hora) + '</div>' +
         '<div>' + escapeHtml(c.texto) + '</div></div>';
     });
     if (!(data.comentarios_os || []).length) {
       html += '<em class="text-muted small">Nenhum comentário.</em>';
     }
     html += '</div>';
-    html += '<textarea class="form-control form-control-sm mb-1" id="painelComentarioOsTexto" rows="2" placeholder="Novo comentário…"></textarea>';
-    html += '<button type="button" class="btn-salvar-campo" id="painelComentarioOsBtn">Comentar</button>';
+    html += '<textarea class="form-control form-control-sm mb-1" id="painelComentarioOsTexto"' +
+      ' rows="2" placeholder="Novo comentário…" style="font-size:11px;"></textarea>';
+    html += '<button type="button" class="btn btn-sm btn-primary" id="painelComentarioOsBtn"' +
+      ' style="font-size:11px;">Comentar</button>';
     html += '</div>';
 
     html += '</div>';
@@ -330,8 +353,10 @@
       });
       fh += '</select><label class="form-label small mb-0">Observação</label>';
       fh += '<textarea class="form-control form-control-sm mb-2" id="painelObsProd" rows="2"></textarea>';
-      fh += '<button type="button" class="btn-salvar-campo me-1" id="painelSalvarNovaProd">Registrar</button>';
-      fh += '<button type="button" class="btn btn-outline-secondary btn-sm" id="painelCancelNovaProd">Cancelar</button>';
+      fh += '<button type="button" class="btn btn-sm btn-primary me-1" id="painelSalvarNovaProd"' +
+        ' style="font-size:11px;">Registrar</button>';
+      fh += '<button type="button" class="btn btn-sm btn-outline-secondary" id="painelCancelNovaProd"' +
+        ' style="font-size:11px;">Cancelar</button>';
       formEl.innerHTML = fh;
       formEl.style.display = 'block';
       formEl.querySelector('#painelCancelNovaProd').addEventListener('click', function () {
@@ -364,12 +389,15 @@
     conteudo.querySelectorAll('[data-toggle-prod]').forEach(function (hdr) {
       hdr.addEventListener('click', function () {
         const pk = hdr.dataset.toggleProd;
-        const body = conteudo.querySelector('#painel-prod-' + pk + ' .painel-accordion-body');
+        const body = conteudo.querySelector('#painel-prod-' + pk + ' .card-body');
         if (!body) return;
         const vis = body.style.display !== 'none';
         body.style.display = vis ? 'none' : 'block';
-        hdr.classList.toggle('aberto', !vis);
-        hdr.querySelector('span').textContent = vis ? '▶' : '▼';
+        const icon = hdr.querySelector('i.bi');
+        if (icon) {
+          icon.className = vis ? 'bi bi-chevron-down' : 'bi bi-chevron-up';
+          icon.style.fontSize = '10px';
+        }
       });
     });
 
@@ -490,9 +518,9 @@
           const lista = conteudo.querySelector('#painelComentariosOs');
           if (lista) {
             lista.innerHTML = (resp.comentarios || []).map(function (c) {
-              return '<div class="painel-comentario-item">' +
-                '<div class="painel-comentario-autor">' + escapeHtml(c.servidor) +
-                ' · ' + escapeHtml(c.data_hora) + '</div>' +
+              return '<div class="border-bottom py-1" style="font-size:11px;color:#495057;">' +
+                '<div style="font-weight:600;color:#1a3a5c;font-size:10px;">' +
+                escapeHtml(c.servidor) + ' · ' + escapeHtml(c.data_hora) + '</div>' +
                 '<div>' + escapeHtml(c.texto) + '</div></div>';
             }).join('') || '<em class="text-muted small">Nenhum comentário.</em>';
           }
