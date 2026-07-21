@@ -13,31 +13,24 @@ body { overflow-x: hidden !important; }
 }
 
 .gerencial-wrap {
-    display: grid;
-    grid-template-columns: 1fr 0px;
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    transition: grid-template-columns 0.25s ease;
 }
 
-.gerencial-wrap.painel-aberto {
-    grid-template-columns: 1fr 420px;
+.gerencial-tabela {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
 }
 
-.gerencial-tabela-wrap {
-    overflow-x: auto !important;
-    overflow-y: auto !important;
-    min-width: 0;
-    min-height: 0;
-}
-
-.gerencial-tabela-wrap table {
+.gerencial-tabela table {
     min-width: max-content;
     border-collapse: collapse;
 }
 
-.gerencial-tabela-wrap thead th {
+.gerencial-tabela thead th {
     position: sticky;
     top: 0;
     z-index: 10;
@@ -48,11 +41,11 @@ body { overflow-x: hidden !important; }
     font-size: 12px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th {
+.gerencial-tabela thead tr:nth-child(2) th {
     top: 28px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(1) th:first-child {
+.gerencial-tabela thead tr:nth-child(1) th:first-child {
     position: sticky;
     left: 0;
     top: 0;
@@ -60,7 +53,7 @@ body { overflow-x: hidden !important; }
     background: #0d2137;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(1) {
     position: sticky;
     left: 0;
     top: 28px;
@@ -70,7 +63,7 @@ body { overflow-x: hidden !important; }
     width: 200px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(2) {
     position: sticky;
     left: 200px;
     top: 28px;
@@ -80,7 +73,7 @@ body { overflow-x: hidden !important; }
     width: 140px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(3) {
     position: sticky;
     left: 340px;
     top: 28px;
@@ -90,7 +83,7 @@ body { overflow-x: hidden !important; }
     width: 130px;
 }
 
-.gerencial-tabela-wrap tbody td {
+.gerencial-tabela tbody td {
     padding: 6px 10px;
     font-size: 12px;
     white-space: nowrap;
@@ -98,7 +91,7 @@ body { overflow-x: hidden !important; }
     background: white;
 }
 
-.gerencial-tabela-wrap tbody td:nth-child(1) {
+.gerencial-tabela tbody td:nth-child(1) {
     position: sticky;
     left: 0;
     z-index: 5;
@@ -107,7 +100,7 @@ body { overflow-x: hidden !important; }
     width: 200px;
 }
 
-.gerencial-tabela-wrap tbody td:nth-child(2) {
+.gerencial-tabela tbody td:nth-child(2) {
     position: sticky;
     left: 200px;
     z-index: 4;
@@ -116,7 +109,7 @@ body { overflow-x: hidden !important; }
     width: 140px;
 }
 
-.gerencial-tabela-wrap tbody td:nth-child(3) {
+.gerencial-tabela tbody td:nth-child(3) {
     position: sticky;
     left: 340px;
     z-index: 3;
@@ -125,22 +118,57 @@ body { overflow-x: hidden !important; }
     width: 130px;
 }
 
-.gerencial-tabela-wrap tbody tr:hover td {
+.gerencial-tabela tbody tr:hover td {
     background: #f0f4f8 !important;
     cursor: pointer;
 }
 
-.gerencial-tabela-wrap tbody tr.table-active td {
+.gerencial-tabela tbody tr.table-active td {
     background: #dbeafe !important;
 }
 
-#gerencialPainel {
+.gerencial-painel-detalhe {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 390px;
+    max-width: 100%;
+    background: #f8f9fa;
+    border-left: 3px solid #1a3a5c;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
     display: flex;
     flex-direction: column;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
+    overflow: hidden;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 10;
+}
+
+.gerencial-painel-detalhe.aberto {
+    transform: translateX(0);
+}
+
+.painel-header {
+    flex-shrink: 0;
+    background: #1a3a5c;
+    color: white;
+    padding: 12px 14px;
+}
+
+.painel-body {
+    flex: 1;
     min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+    background: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+    .gerencial-painel-detalhe {
+        width: 100%;
+    }
 }
 
 .gerencial-cards-status {
@@ -264,7 +292,7 @@ body.gerencial-mode .siprac-content {
 </div>
 
 <div class="gerencial-wrap" id="gerencialWrap">
-  <div class="gerencial-tabela-wrap" id="gerencialTabelaWrap">
+  <div class="gerencial-tabela" id="gerencialTabelaWrap">
       <table class="table table-sm table-hover siprac-table align-middle mb-0" id="tabela-gerencial">
         <colgroup>
           <col style="width: 200px; min-width: 200px;">
@@ -454,8 +482,9 @@ body.gerencial-mode .siprac-content {
     {% endif %}
   </div>
 
-  <div class="gerencial-painel" id="gerencialPainel">
-    <div id="gerencialPainelConteudo"></div>
+  <div class="gerencial-painel-detalhe" id="gerencialPainel">
+    <div class="painel-header" id="painel-secao-topo"></div>
+    <div class="painel-body" id="gerencialPainelConteudo"></div>
   </div>
 </div>
 
@@ -532,7 +561,8 @@ body.gerencial-mode .siprac-content {
   }
   window.gerencialTiposProducao = parseJsonEl('gerencial-tipos-producao');
 
-  const wrap = document.getElementById('gerencialWrap');
+  const painel = document.getElementById('gerencialPainel');
+  const painelHeader = document.getElementById('painel-secao-topo');
   const painelConteudo = document.getElementById('gerencialPainelConteudo');
   let linhaSelecionada = null;
 
@@ -549,7 +579,7 @@ body.gerencial-mode .siprac-content {
   }
 
   function fecharPainel() {
-    wrap.classList.remove('painel-aberto');
+    painel.classList.remove('aberto');
     if (linhaSelecionada) {
       linhaSelecionada.classList.remove('table-active');
       linhaSelecionada = null;
@@ -561,9 +591,12 @@ body.gerencial-mode .siprac-content {
     if (linhaSelecionada) linhaSelecionada.classList.remove('table-active');
     linhaSelecionada = tr;
     tr.classList.add('table-active');
-    painelConteudo.innerHTML = window.GerencialPainel.renderPanel(dados);
-    wrap.classList.add('painel-aberto');
+    const rendered = window.GerencialPainel.renderPanel(dados);
+    painelHeader.innerHTML = rendered.header;
+    painelConteudo.innerHTML = rendered.body;
+    painel.classList.add('aberto');
     window.GerencialPainel.bindPanelEvents(dados, {
+      painelRoot: painel,
       painelConteudo: painelConteudo,
       fecharPainel: fecharPainel,
       atualizarCelula: atualizarCelula,

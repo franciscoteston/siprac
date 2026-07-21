@@ -189,30 +189,23 @@ body.gerencial-mode .siprac-content {
 }
 
 .gerencial-wrap {
-    display: grid;
-    grid-template-columns: 1fr 0px;
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow: hidden;
-    transition: grid-template-columns 0.25s ease;
     max-width: 100%;
 }
 
-.gerencial-wrap.painel-aberto {
-    grid-template-columns: 1fr 390px;
-}
-
-.gerencial-tabela-wrap {
-    overflow-x: auto !important;
-    overflow-y: auto !important;
-    min-width: 0;
-    min-height: 0;
+.gerencial-tabela {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
     background: white;
     max-width: 100%;
     position: relative;
 }
 
-.gerencial-tabela-wrap table {
+.gerencial-tabela table {
     min-width: max-content;
     border-collapse: collapse;
     width: auto;
@@ -220,7 +213,7 @@ body.gerencial-mode .siprac-content {
 }
 
 /* Cabeçalho sticky vertical */
-.gerencial-tabela-wrap thead th {
+.gerencial-tabela thead th {
     position: sticky;
     top: 0;
     z-index: 10;
@@ -234,13 +227,13 @@ body.gerencial-mode .siprac-content {
 }
 
 /* Linha 2 do thead abaixo da linha 1 */
-.gerencial-tabela-wrap thead tr:nth-child(2) th {
+.gerencial-tabela thead tr:nth-child(2) th {
     top: 28px;
     z-index: 10;
 }
 
 /* Grupo FIXO no thead linha 1 - sticky horizontal E vertical */
-.gerencial-tabela-wrap thead tr:nth-child(1) th:first-child {
+.gerencial-tabela thead tr:nth-child(1) th:first-child {
     position: sticky;
     left: 0;
     top: 0;
@@ -249,8 +242,8 @@ body.gerencial-mode .siprac-content {
 }
 
 /* Coluna 1 sticky - OS/Processos */
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1),
-.gerencial-tabela-wrap tbody td:nth-child(1) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(1),
+.gerencial-tabela tbody td:nth-child(1) {
     position: sticky;
     left: 0;
     z-index: 9;
@@ -260,15 +253,15 @@ body.gerencial-mode .siprac-content {
     width: 200px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(1) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(1) {
     background: #1a3a5c;
     z-index: 19;
     top: 28px;
 }
 
 /* Coluna 2 sticky - Macroetapa */
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2),
-.gerencial-tabela-wrap tbody td:nth-child(2) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(2),
+.gerencial-tabela tbody td:nth-child(2) {
     position: sticky;
     left: 200px;
     z-index: 8;
@@ -278,15 +271,15 @@ body.gerencial-mode .siprac-content {
     width: 140px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(2) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(2) {
     background: #1a3a5c;
     z-index: 18;
     top: 28px;
 }
 
 /* Coluna 3 sticky - Status */
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3),
-.gerencial-tabela-wrap tbody td:nth-child(3) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(3),
+.gerencial-tabela tbody td:nth-child(3) {
     position: sticky;
     left: 340px;
     z-index: 7;
@@ -296,14 +289,14 @@ body.gerencial-mode .siprac-content {
     width: 130px;
 }
 
-.gerencial-tabela-wrap thead tr:nth-child(2) th:nth-child(3) {
+.gerencial-tabela thead tr:nth-child(2) th:nth-child(3) {
     background: #1a3a5c;
     z-index: 17;
     top: 28px;
 }
 
 /* Células de dados */
-.gerencial-tabela-wrap tbody td {
+.gerencial-tabela tbody td {
     padding: 6px 10px;
     font-size: 12px;
     white-space: nowrap;
@@ -313,41 +306,44 @@ body.gerencial-mode .siprac-content {
 }
 
 /* Hover e seleção */
-.gerencial-tabela-wrap tbody tr:hover td {
+.gerencial-tabela tbody tr:hover td {
     background: #f0f4f8 !important;
     cursor: pointer;
 }
 
-.gerencial-tabela-wrap tbody tr.table-active td {
+.gerencial-tabela tbody tr.table-active td {
     background: #dbeafe !important;
 }
 
-/* Painel lateral */
-.gerencial-painel {
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
+/* Painel lateral (overlay absoluto) */
+.gerencial-painel-detalhe {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 390px;
+    max-width: 100%;
     background: #f8f9fa;
     border-left: 3px solid #1a3a5c;
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
     display: flex;
     flex-direction: column;
-    /* NÃO definir height aqui — herdada do grid */
+    overflow: hidden;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 10;
 }
 
-#gerencialPainel {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%; /* ocupa todo o espaço do grid */
-    overflow: hidden;
+.gerencial-painel-detalhe.aberto {
+    transform: translateX(0);
 }
 
-#gerencialPainelConteudo {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+/* header + body são filhos diretos do painel */
+
+@media (max-width: 768px) {
+    .gerencial-painel-detalhe {
+        width: 100%;
+    }
 }
 
 .gerencial-status-card {
@@ -366,7 +362,7 @@ body.gerencial-mode .siprac-content {
 }
 
 .painel-header {
-    flex-shrink: 0; /* não encolhe */
+    flex-shrink: 0;
     background: #1a3a5c;
     color: white;
     padding: 12px 14px;
@@ -374,7 +370,7 @@ body.gerencial-mode .siprac-content {
 
 .painel-body {
     flex: 1;
-    min-height: 0; /* ESSENCIAL para scroll funcionar em flex */
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0;

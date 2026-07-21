@@ -232,96 +232,93 @@
       'background:rgba(255,255,255,0.15);color:white;' +
       'border:1px solid rgba(255,255,255,0.3);text-decoration:none;cursor:pointer;';
 
-    let html = '';
-    html += '<div class="painel-header" id="painel-secao-topo">';
-    html += '<div class="d-flex justify-content-between align-items-start">';
-    html += '<div>';
-    html += '<a href="/os/' + data.os_pk + '/" class="painel-os-numero"' +
+    let header = '';
+    header += '<div class="d-flex justify-content-between align-items-start">';
+    header += '<div>';
+    header += '<a href="/os/' + data.os_pk + '/" class="painel-os-numero"' +
       ' style="color:white;font-weight:700;font-size:14px;text-decoration:none;">' +
       escapeHtml(data.numero_os) + '</a>';
     (data.processos || []).forEach(function (p) {
-      html += '<div style="font-size:11px;color:#adb5bd;">' + escapeHtml(p.numero) + '</div>';
+      header += '<div style="font-size:11px;color:#adb5bd;">' + escapeHtml(p.numero) + '</div>';
     });
     if (!data.processos || !data.processos.length) {
-      html += '<div style="font-size:11px;color:#adb5bd;">' +
+      header += '<div style="font-size:11px;color:#adb5bd;">' +
         escapeHtml(data.processo_sei || '—') + '</div>';
     }
-    html += '</div>';
-    html += '<button type="button" id="painelBtnFechar" title="Fechar"' +
+    header += '</div>';
+    header += '<button type="button" id="painelBtnFechar" title="Fechar"' +
       ' style="background:transparent;border:none;color:#adb5bd;font-size:20px;' +
       'cursor:pointer;line-height:1;padding:0;">×</button>';
-    html += '</div>';
-    html += '<div class="mt-2 d-flex gap-2 flex-wrap">';
-    html += '<a href="/os/' + data.os_pk + '/" style="' + btnHeaderStyle + '">Ver OS completa →</a>';
+    header += '</div>';
+    header += '<div class="mt-2 d-flex gap-2 flex-wrap">';
+    header += '<a href="/os/' + data.os_pk + '/" style="' + btnHeaderStyle + '">Ver OS completa →</a>';
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" id="painelBtnNovaProd" style="' + btnHeaderStyle +
+      header += '<button type="button" id="painelBtnNovaProd" style="' + btnHeaderStyle +
         '">+ Nova produção</button>';
     }
-    html += '</div>';
-    html += '</div>';
+    header += '</div>';
 
-    html += '<div class="painel-body">';
-    html += '<div id="painelNovaProdForm" class="painel-nova-producao m-2" style="display:none;"></div>';
+    let body = '';
+    body += '<div id="painelNovaProdForm" class="painel-nova-producao m-2" style="display:none;"></div>';
 
-    html += '<div class="p-3 border-bottom bg-white">';
-    html += secaoTitulo('Macroetapa');
-    html += '<span class="badge rounded-pill" style="background:#e8eef5;color:#1a3a5c;' +
+    body += '<div class="p-3 border-bottom bg-white">';
+    body += secaoTitulo('Macroetapa');
+    body += '<span class="badge rounded-pill" style="background:#e8eef5;color:#1a3a5c;' +
       'font-size:12px;font-weight:600;padding:5px 12px;">' +
       escapeHtml(data.macroetapa_label || '—') + '</span>';
-    html += '</div>';
+    body += '</div>';
 
-    html += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-etapa">';
-    html += secaoTitulo('① Etapa na unidade');
-    html += '<span class="badge bg-primary" id="painelEtapaBadge">' +
+    body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-etapa">';
+    body += secaoTitulo('① Etapa na unidade');
+    body += '<span class="badge bg-primary" id="painelEtapaBadge">' +
       escapeHtml(data.etapa_interna_label || data.etapa_interna || '—') + '</span>';
     if (data.os_editavel && (data.etapa_interna_choices || []).length) {
-      html += '<div class="d-flex gap-1 flex-wrap mt-2" id="painelEtapaTransicoes">';
+      body += '<div class="d-flex gap-1 flex-wrap mt-2" id="painelEtapaTransicoes">';
       data.etapa_interna_choices.forEach(function (c) {
-        html += '<button type="button" class="btn btn-sm btn-outline-secondary"' +
+        body += '<button type="button" class="btn btn-sm btn-outline-secondary"' +
           ' style="font-size:11px;padding:2px 8px;" data-etapa="' + c.valor +
           '">→ ' + escapeHtml(c.label) + '</button>';
       });
-      html += '</div>';
+      body += '</div>';
     }
-    html += '</div>';
+    body += '</div>';
 
-    html += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-producoes">';
-    html += '<div class="d-flex justify-content-between align-items-center mb-2">';
-    html += secaoTitulo('② Produções');
+    body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-producoes">';
+    body += '<div class="d-flex justify-content-between align-items-center mb-2">';
+    body += secaoTitulo('② Produções');
     if (data.pode_criar_producao && data.os_editavel) {
-      html += '<button type="button" class="btn btn-sm btn-outline-success"' +
+      body += '<button type="button" class="btn btn-sm btn-outline-success"' +
         ' style="font-size:11px;padding:2px 8px;" id="painelBtnNovaProd2">+ Nova</button>';
     }
-    html += '</div>';
+    body += '</div>';
     if (!(data.producoes || []).length) {
-      html += '<p class="small text-muted mb-0">Nenhuma produção.</p>';
+      body += '<p class="small text-muted mb-0">Nenhuma produção.</p>';
     }
     (data.producoes || []).forEach(function (prod) {
-      html += renderProducaoAccordion(prod, data, prod.pk === data.producao_pk_ativa);
+      body += renderProducaoAccordion(prod, data, prod.pk === data.producao_pk_ativa);
     });
-    html += '</div>';
+    body += '</div>';
 
-    html += '<div class="p-3 bg-white mt-1" id="painel-secao-comentarios">';
-    html += secaoTitulo('③ Comentários da OS');
-    html += '<div id="painelComentariosOs" class="mb-2">';
+    body += '<div class="p-3 bg-white mt-1" id="painel-secao-comentarios">';
+    body += secaoTitulo('③ Comentários da OS');
+    body += '<div id="painelComentariosOs" class="mb-2">';
     (data.comentarios_os || []).forEach(function (c) {
-      html += '<div class="border-bottom py-1" style="font-size:11px;color:#495057;">' +
+      body += '<div class="border-bottom py-1" style="font-size:11px;color:#495057;">' +
         '<div style="font-weight:600;color:#1a3a5c;font-size:10px;">' +
         escapeHtml(c.servidor) + ' · ' + escapeHtml(c.data_hora) + '</div>' +
         '<div>' + escapeHtml(c.texto) + '</div></div>';
     });
     if (!(data.comentarios_os || []).length) {
-      html += '<em class="text-muted small">Nenhum comentário.</em>';
+      body += '<em class="text-muted small">Nenhum comentário.</em>';
     }
-    html += '</div>';
-    html += '<textarea class="form-control form-control-sm mb-1" id="painelComentarioOsTexto"' +
+    body += '</div>';
+    body += '<textarea class="form-control form-control-sm mb-1" id="painelComentarioOsTexto"' +
       ' rows="2" placeholder="Novo comentário…" style="font-size:11px;"></textarea>';
-    html += '<button type="button" class="btn btn-sm btn-primary" id="painelComentarioOsBtn"' +
+    body += '<button type="button" class="btn btn-sm btn-primary" id="painelComentarioOsBtn"' +
       ' style="font-size:11px;">Comentar</button>';
-    html += '</div>';
+    body += '</div>';
 
-    html += '</div>';
-    return html;
+    return { header: header, body: body };
   }
 
   function mostrarSugestao(prodPk, campo, prod) {
@@ -339,9 +336,10 @@
 
   function bindPanelEvents(data, ctx) {
     const osPk = data.os_pk;
+    const root = ctx.painelRoot || ctx.painelConteudo;
     const conteudo = ctx.painelConteudo;
 
-    conteudo.querySelector('#painelBtnFechar')?.addEventListener('click', ctx.fecharPainel);
+    root.querySelector('#painelBtnFechar')?.addEventListener('click', ctx.fecharPainel);
 
     function abrirFormNovaProd() {
       const formEl = conteudo.querySelector('#painelNovaProdForm');
@@ -371,7 +369,7 @@
       });
     }
 
-    conteudo.querySelector('#painelBtnNovaProd')?.addEventListener('click', abrirFormNovaProd);
+    root.querySelector('#painelBtnNovaProd')?.addEventListener('click', abrirFormNovaProd);
     conteudo.querySelector('#painelBtnNovaProd2')?.addEventListener('click', abrirFormNovaProd);
 
     conteudo.querySelectorAll('[data-etapa]').forEach(function (btn) {
@@ -531,16 +529,27 @@
   }
 
   function scrollParaSecao(secao, data) {
+    const body = document.getElementById('gerencialPainelConteudo');
+    if (!body) return;
+    if (secao === 'topo') {
+      body.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     const map = {
-      topo: 'painel-secao-topo',
       etapa: 'painel-secao-etapa',
       producoes: 'painel-secao-producoes',
       comentarios: 'painel-secao-comentarios',
       avaliador: data.producao_pk_ativa ? 'painel-campo-avaliador-' + data.producao_pk_ativa : 'painel-secao-producoes',
       'prazo-eav': data.producao_pk_ativa ? 'painel-campo-prazo-eav-' + data.producao_pk_ativa : 'painel-secao-producoes',
     };
-    const id = map[secao] || map.topo;
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const id = map[secao];
+    const el = id ? document.getElementById(id) : null;
+    if (!el || !body.contains(el)) {
+      body.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const top = el.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+    body.scrollTo({ top: Math.max(0, top - 8), behavior: 'smooth' });
   }
 
   window.GerencialPainel = {
