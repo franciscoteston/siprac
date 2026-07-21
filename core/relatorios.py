@@ -165,7 +165,6 @@ def relatorio_producao_por_servidor(filtros):
             "os",
             "os__natureza",
             "autor_trabalho",
-            "servidor_responsavel",
             "homologado_por",
         )
         .order_by("autor_trabalho__nome", "data_enviado")

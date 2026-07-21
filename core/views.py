@@ -187,14 +187,6 @@ def _contexto_dashboard_vazio():
         "os_por_macroetapa": [],
         "os_por_natureza": [],
         "producoes_unidade_por_status": contar_producoes_por_status_unidades([]),
-        "producoes_minha_por_status": {
-            "NAO_DISTRIBUIDO": 0,
-            "DISTRIBUIDO": 0,
-            "REVISAR": 0,
-            "VER_AJUSTES": 0,
-            "HOMOLOGAR": 0,
-            "HOMOLOGADO_MES": 0,
-        },
         "fila_unidade": [],
         "fila_pessoal": [],
         "dashboard_chart_data": {},
@@ -233,28 +225,6 @@ def _obter_unidades_ativas(servidor):
     return servidor.vinculos_unidade.filter(
         Q(data_fim__isnull=True) | Q(data_fim__gte=hoje),
     ).values_list("unidade_id", flat=True)
-
-
-def _servidores_revisores_da_unidade(servidor):
-    """Servidores com pode_homologar nas unidades ativas do servidor informado."""
-    if servidor is None:
-        return Servidor.objects.none()
-    hoje = timezone.localdate()
-    unidades_ids = list(_obter_unidades_ativas(servidor))
-    if not unidades_ids:
-        return Servidor.objects.none()
-    return (
-        Servidor.objects.filter(
-            vinculos_unidade__unidade_id__in=unidades_ids,
-            vinculos_unidade__perfil__pode_homologar=True,
-        )
-        .filter(
-            Q(vinculos_unidade__data_fim__isnull=True)
-            | Q(vinculos_unidade__data_fim__gte=hoje),
-        )
-        .distinct()
-        .order_by("nome")
-    )
 
 
 def _contar_os_abertas():
@@ -505,7 +475,7 @@ def _mapa_prazos_os(os_ids):
 
 def _serializar_fila_producoes(queryset, unidade=None):
     producoes = _ordenar_producoes_fila(
-        queryset.select_related("os", "tipo_producao", "servidor_responsavel"),
+        queryset.select_related("os", "tipo_producao"),
     )
     os_ids = [producao.os_id for producao in producoes]
     prazos = _mapa_prazos_os(os_ids)
@@ -518,11 +488,6 @@ def _serializar_fila_producoes(queryset, unidade=None):
             "apelido": producao.os.apelido,
             "tipo": producao.tipo_producao.prefixo,
             "status": producao.status,
-            "servidor_responsavel": (
-                producao.servidor_responsavel.nome
-                if producao.servidor_responsavel
-                else "—"
-            ),
             "prazo_os": producao.os.prazo_data,
             "prazo_interno": producao.prazo_interno,
             "prioridade": producao.os.prioridade,
@@ -565,7 +530,6 @@ def _serializar_minha_fila_padronizada(queryset):
             "os",
             "os__natureza",
             "tipo_producao",
-            "servidor_responsavel",
         ),
     )
     os_ids = [producao.os_id for producao in producoes]
@@ -602,7 +566,7 @@ def _statuses_chefia_fila(perfil):
 
 def _obter_minha_fila(servidor, unidades_ids, perfil):
     statuses_chefia = _statuses_chefia_fila(perfil)
-    queryset = _queryset_fila_pessoal(servidor, unidades_ids, statuses_chefia)
+    queryset = _queryset_fila_unidade(servidor, unidades_ids, statuses_chefia)
     os_ativas = set(_queryset_os_nao_encerradas().values_list("pk", flat=True))
     queryset = queryset.filter(os_id__in=os_ativas)
     return _serializar_minha_fila_padronizada(queryset)
@@ -620,12 +584,16 @@ def _ordenar_producoes_fila(queryset):
     return producoes
 
 
-def _queryset_fila_pessoal(servidor, unidades_ids, statuses_chefia):
-    filtro = Q(servidor_responsavel=servidor)
-    if statuses_chefia and unidades_ids:
-        os_ids = _obter_os_ids_unidades(unidades_ids)
-        if os_ids:
-            filtro |= Q(os_id__in=os_ids, status__in=statuses_chefia)
+def _queryset_fila_unidade(servidor, unidades_ids, statuses_chefia):
+    if not unidades_ids:
+        return Producao.objects.none()
+
+    os_ids = _obter_os_ids_unidades(unidades_ids)
+    filtro = Q(unidade_id__in=unidades_ids)
+    if os_ids:
+        filtro |= Q(os_id__in=os_ids)
+    if statuses_chefia and os_ids:
+        filtro |= Q(os_id__in=os_ids, status__in=statuses_chefia)
 
     return (
         Producao.objects.filter(filtro)
@@ -655,7 +623,7 @@ def _obter_fila_unidade(unidade):
     )
 
 
-def _contar_producoes_minhas_por_status(servidor):
+def _contar_producoes_unidade_por_status(servidor):
     hoje = timezone.localdate()
     resultado = {
         "NAO_DISTRIBUIDO": 0,
@@ -665,7 +633,14 @@ def _contar_producoes_minhas_por_status(servidor):
         "HOMOLOGAR": 0,
         "HOMOLOGADO_MES": 0,
     }
-    queryset = Producao.objects.filter(servidor_responsavel=servidor).exclude(
+    unidade = _obter_unidade_principal_servidor(servidor)
+    if unidade is None:
+        return resultado
+
+    os_ids = list(os_da_unidade_atual(unidade).values_list("pk", flat=True))
+    queryset = Producao.objects.filter(
+        Q(unidade=unidade) | Q(os_id__in=os_ids),
+    ).exclude(
         status=Producao.STATUS_CANCELADO,
     )
     for item in queryset.values("status").annotate(total=Count("id")):
@@ -745,7 +720,7 @@ def _contexto_dashboard_unidade(servidor, unidades_ids, perfil):
 def _contexto_dashboard_pessoal(servidor, perfil):
     unidades_ids = list(_obter_unidades_ativas(servidor))
     return {
-        "producoes_minha_por_status": _contar_producoes_minhas_por_status(servidor),
+        "producoes_unidade_por_status": _contar_producoes_unidade_por_status(servidor),
         "fila_pessoal": _obter_minha_fila(servidor, unidades_ids, perfil),
     }
 
@@ -1174,14 +1149,11 @@ def _aplicar_visibilidade_producao(queryset, request):
     if perfil and perfil.visibilidade_total:
         return queryset
 
-    if perfil and perfil.pode_homologar:
-        unidade = _obter_unidade_principal_servidor(servidor)
-        if unidade is None:
-            return queryset.none()
-        os_ids = os_da_unidade_atual(unidade).values_list("pk", flat=True)
-        return queryset.filter(os_id__in=os_ids)
-
-    return queryset.filter(servidor_responsavel=servidor)
+    unidade = _obter_unidade_principal_servidor(servidor)
+    if unidade is None:
+        return queryset.none()
+    os_ids = os_da_unidade_atual(unidade).values_list("pk", flat=True)
+    return queryset.filter(os_id__in=os_ids)
 
 
 def _aplicar_filtros_producao(queryset, request):
@@ -1210,11 +1182,6 @@ def _aplicar_filtros_producao(queryset, request):
             queryset = queryset.filter(os_id__in=os_ids)
         except UnidadeInterna.DoesNotExist:
             pass
-
-    if request.GET.get("responsavel") == "eu":
-        servidor = _obter_servidor(request.user)
-        if servidor:
-            queryset = queryset.filter(servidor_responsavel=servidor)
 
     return queryset
 
@@ -2124,14 +2091,7 @@ COLUNAS_GERENCIAL_CONFIG = {
     "dias_sei": {"label": "DIAS_SEI"},
     "prazo_recompra_itbi": {"label": "Prazo Recompra/ITBI"},
     "mes_cronograma": {"label": "CRONOG"},
-    "avaliador": {"label": "AVALIADOR"},
-    "prazo_aval": {"label": "PRAZO_AVAL"},
     "prazo_rev": {"label": "PRAZO_REV"},
-    "entrega_aval": {"label": "ENTREGA_AVAL"},
-    "revisor": {"label": "REVISOR"},
-    "entrega_rev": {"label": "ENTREGA_REV"},
-    "entrega_aju": {"label": "ENTREGA_AJU"},
-    "data_ajustes_ok": {"label": "AJUSTES_OK"},
     "data_homologar": {"label": "HOMOLOGAR"},
     "enviado": {"label": "ENVIADO"},
     "la_pt_ptf": {"label": "LA_PT_PTF"},
@@ -2176,14 +2136,7 @@ GRUPOS_COLUNAS_GERENCIAL = [
     (
         "PRAZOS",
         [
-            "avaliador",
-            "prazo_aval",
             "prazo_rev",
-            "entrega_aval",
-            "revisor",
-            "entrega_rev",
-            "entrega_aju",
-            "data_ajustes_ok",
             "data_homologar",
             "enviado",
         ],
@@ -2210,13 +2163,7 @@ COLUNAS_GERENCIAL_NOVAS = {
     "prazo_eav",
     "prazo_recompra_itbi",
     "mes_cronograma",
-    "prazo_aval",
     "prazo_rev",
-    "entrega_aval",
-    "revisor",
-    "entrega_rev",
-    "entrega_aju",
-    "data_ajustes_ok",
     "data_homologar",
     "enviado",
     "la_pt_ptf",
@@ -2245,14 +2192,7 @@ COLUNAS_GERENCIAL_PADRAO = [
     "prioridade",
     "prazo_recompra_itbi",
     "mes_cronograma",
-    "avaliador",
-    "prazo_aval",
     "prazo_rev",
-    "entrega_aval",
-    "revisor",
-    "entrega_rev",
-    "entrega_aju",
-    "data_ajustes_ok",
     "data_homologar",
     "enviado",
     "tipo_trabalho",
@@ -2472,14 +2412,7 @@ def _campos_vazios_gerencial():
         "prazo_eav": "—",
         "dias_sei": None,
         "mes_cronograma": "—",
-        "avaliador": "—",
-        "revisor": "—",
-        "prazo_aval": "—",
         "prazo_rev": "—",
-        "entrega_aval": "—",
-        "entrega_rev": "—",
-        "entrega_aju": "—",
-        "data_ajustes_ok": "—",
         "data_homologar": "—",
         "enviado": "—",
         "la_pt_ptf": "—",
@@ -2574,14 +2507,7 @@ def _montar_cells_gerencial(linha):
         "dias_sei": linha.get("dias_sei"),
         "prazo_recompra_itbi": linha.get("prazo_recompra_itbi", "—"),
         "mes_cronograma": linha.get("mes_cronograma", "—"),
-        "avaliador": linha.get("avaliador") or "—",
-        "prazo_aval": linha.get("prazo_aval", "—"),
         "prazo_rev": linha.get("prazo_rev", "—"),
-        "entrega_aval": linha.get("entrega_aval", "—"),
-        "revisor": linha.get("revisor", "—"),
-        "entrega_rev": linha.get("entrega_rev", "—"),
-        "entrega_aju": linha.get("entrega_aju", "—"),
-        "data_ajustes_ok": linha.get("data_ajustes_ok", "—"),
         "data_homologar": linha.get("data_homologar", "—"),
         "enviado": linha.get("enviado", "—"),
         "la_pt_ptf": linha.get("la_pt_ptf", "—"),
@@ -2632,43 +2558,12 @@ def _serializar_producao_painel_gerencial(producao, request):
         "prazo_eav_iso": (
             producao.prazo_interno.isoformat() if producao.prazo_interno else ""
         ),
-        "prazo_aval_iso": (
-            producao.prazo_aval.isoformat() if producao.prazo_aval else ""
-        ),
         "prazo_rev_iso": (
             producao.prazo_rev.isoformat() if producao.prazo_rev else ""
         ),
         "mes_cronograma_iso": (
             producao.mes_cronograma.strftime("%Y-%m")
             if producao.mes_cronograma
-            else ""
-        ),
-        "avaliador_id": producao.servidor_responsavel_id,
-        "avaliador_nome": (
-            producao.servidor_responsavel.nome
-            if producao.servidor_responsavel
-            else "—"
-        ),
-        "revisor_id": producao.revisor_id,
-        "revisor_nome": producao.revisor.nome if producao.revisor else "—",
-        "entrega_aval_iso": (
-            producao.data_entrega_avaliacao.isoformat()
-            if producao.data_entrega_avaliacao
-            else ""
-        ),
-        "entrega_rev_iso": (
-            producao.data_entrega_revisao.isoformat()
-            if producao.data_entrega_revisao
-            else ""
-        ),
-        "entrega_aju_iso": (
-            producao.data_entrega_ajustes.isoformat()
-            if producao.data_entrega_ajustes
-            else ""
-        ),
-        "data_ajustes_ok_iso": (
-            producao.data_ajustes_ok.isoformat()
-            if producao.data_ajustes_ok
             else ""
         ),
         "data_homologar_iso": (
@@ -2706,18 +2601,16 @@ def _producoes_painel_gerencial(
         producoes = (
             os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
             .filter(
-                Q(servidor_responsavel_id__in=servidores_unidade_ids)
+                Q(unidade=unidade)
                 | Q(criado_por_id__in=servidores_unidade_ids),
             )
-            .select_related("tipo_producao", "servidor_responsavel", "revisor")
+            .select_related("tipo_producao")
             .order_by("-data_criacao")
         )
-        if servidor_logado and not perfil_pode_homologar:
-            producoes = producoes.filter(servidor_responsavel=servidor_logado)
     else:
         producoes = (
             os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
-            .select_related("tipo_producao", "servidor_responsavel", "revisor")
+            .select_related("tipo_producao")
             .order_by("-data_criacao")
         )
 
@@ -2766,7 +2659,6 @@ def _montar_panel_gerencial(
         processo_sei = processo_principal.processo_sei.numero_processo
 
     servidores_unidade = []
-    revisores_unidade = []
     if unidade:
         servidores_unidade = [
             {"pk": s.pk, "nome": s.nome}
@@ -2776,11 +2668,6 @@ def _montar_panel_gerencial(
             )
             .distinct()
             .order_by("nome")
-        ]
-    if servidor_logado:
-        revisores_unidade = [
-            {"pk": s.pk, "nome": s.nome}
-            for s in _servidores_revisores_da_unidade(servidor_logado)
         ]
 
     comentarios_os_qs = (
@@ -2818,7 +2705,6 @@ def _montar_panel_gerencial(
             modo_b=modo_b,
         ),
         "servidores_unidade": servidores_unidade,
-        "revisores_unidade": revisores_unidade,
         "comentarios_os": [
             _serializar_comentario(c) for c in comentarios_os_qs[:5]
         ],
@@ -2994,19 +2880,12 @@ def _serializar_linhas_gerencial(
         producoes = (
             os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
             .filter(
-                Q(servidor_responsavel_id__in=servidores_unidade)
+                Q(unidade=unidade_logada)
                 | Q(criado_por_id__in=servidores_unidade),
             )
-            .select_related(
-                "tipo_producao",
-                "servidor_responsavel",
-                "revisor",
-            )
+            .select_related("tipo_producao")
             .order_by("-data_criacao")
         )
-
-        if servidor_logado and not perfil_pode_homologar:
-            producoes = producoes.filter(servidor_responsavel=servidor_logado)
 
         producoes = list(producoes)
         if not producoes and os_obj.producoes.exclude(
@@ -3016,11 +2895,7 @@ def _serializar_linhas_gerencial(
     else:
         producoes = list(
             os_obj.producoes.exclude(status=Producao.STATUS_CANCELADO)
-            .select_related(
-                "tipo_producao",
-                "servidor_responsavel",
-                "revisor",
-            )
+            .select_related("tipo_producao")
             .order_by("-data_criacao")
         )
 
@@ -3104,15 +2979,7 @@ def _serializar_linhas_gerencial(
                 "prazo_eav": _formatar_data_br(producao.prazo_interno),
                 "dias_sei": dias_sei,
                 "mes_cronograma": _formatar_mes_cronograma(producao.mes_cronograma),
-                "avaliador": (
-                    producao.servidor_responsavel.nome
-                    if producao.servidor_responsavel
-                    else ""
-                ),
-                "revisor": producao.revisor.nome if producao.revisor else "—",
-                "prazo_aval": _formatar_data_br(producao.prazo_aval),
                 "prazo_rev": _formatar_data_br(producao.prazo_rev),
-                "entrega_aval": _formatar_data_br(producao.data_entrega_avaliacao),
                 "status_transicoes": (
                     _transicoes_status_disponiveis(producao, request)
                     if request is not None
@@ -3126,9 +2993,6 @@ def _serializar_linhas_gerencial(
                     ),
                     ensure_ascii=False,
                 ),
-                "entrega_rev": _formatar_data_br(producao.data_entrega_revisao),
-                "entrega_aju": _formatar_data_br(producao.data_entrega_ajustes),
-                "data_ajustes_ok": _formatar_data_br(producao.data_ajustes_ok),
                 "data_homologar": _formatar_data_br(producao.data_homologar),
                 "enviado": _formatar_data_br(producao.data_enviado),
                 "la_pt_ptf": producao.numero_producao or "—",
@@ -3293,9 +3157,6 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_
             .order_by("nome")
             if unidade
             else Servidor.objects.none()
-        ),
-        "servidores_revisores": (
-            _servidores_revisores_da_unidade(servidor) if pode_homologar else Servidor.objects.none()
         ),
         "tipos_producao_unidade": (
             TipoProducao.objects.filter(
@@ -3483,7 +3344,6 @@ class ProducaoListView(RequerLoginMixin, ListView):
         queryset = Producao.objects.select_related(
             "os",
             "tipo_producao",
-            "servidor_responsavel",
         )
         queryset = _aplicar_visibilidade_producao(queryset, self.request)
         queryset = _aplicar_filtros_producao(queryset, self.request)
@@ -3495,7 +3355,6 @@ class ProducaoListView(RequerLoginMixin, ListView):
         context["filtro_tipo_producao"] = self.request.GET.get("tipo_producao", "")
         context["filtro_periodo"] = self.request.GET.get("periodo", "")
         context["filtro_unidade"] = self.request.GET.get("unidade", "")
-        context["filtro_responsavel"] = self.request.GET.get("responsavel", "")
         context["status_opcoes"] = Producao.STATUS_CHOICES
         context["tipos_producao"] = TipoProducao.objects.filter(ativo=True).order_by(
             "prefixo",
@@ -4661,8 +4520,6 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
             "tipo_producao",
             "criado_por",
             "homologado_por",
-            "servidor_responsavel",
-            "revisor",
             "autor_trabalho",
         )
 
@@ -4883,26 +4740,6 @@ def _buscar_registros_siat(busca):
     )
 
 
-def _pode_redistribuir_producao(producao, request):
-    perfil = getattr(request, "perfil_acesso", None)
-    if perfil is None or not perfil.pode_homologar:
-        return False
-    return producao.status not in (
-        Producao.STATUS_ENVIADO,
-        Producao.STATUS_CANCELADO,
-    )
-
-
-def _obter_servidor_responsavel_post(request):
-    servidor_id = request.POST.get("servidor_responsavel")
-    if not servidor_id:
-        return None, "Selecione o servidor responsável."
-    try:
-        return Servidor.objects.get(pk=int(servidor_id)), None
-    except (Servidor.DoesNotExist, ValueError, TypeError):
-        return None, "Servidor responsável inválido."
-
-
 def _obter_autor_trabalho_post(request):
     autor_id = request.POST.get("autor_trabalho")
     if not autor_id:
@@ -4911,16 +4748,6 @@ def _obter_autor_trabalho_post(request):
         return Servidor.objects.get(pk=int(autor_id)), None
     except (Servidor.DoesNotExist, ValueError, TypeError):
         return None, "Autor do trabalho inválido."
-
-
-def _obter_revisor_post(request, queryset_permitido):
-    revisor_id = (request.POST.get("revisor") or "").strip()
-    if not revisor_id:
-        return None, None
-    try:
-        return queryset_permitido.get(pk=int(revisor_id)), None
-    except (Servidor.DoesNotExist, ValueError, TypeError):
-        return None, "Revisor inválido."
 
 
 def _criar_producao_status_log(
@@ -4952,8 +4779,6 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             Producao.objects.select_related(
                 "os",
                 "tipo_producao",
-                "servidor_responsavel",
-                "revisor",
             ),
             pk=kwargs["pk"],
         )
@@ -4965,21 +4790,12 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
     def _contexto_formulario(self, request):
         perfil = getattr(request, "perfil_acesso", None)
         pode_homologar = perfil is not None and perfil.pode_homologar
-        servidor = _obter_servidor(request.user)
         return {
             "producao": self.producao_obj,
             "os": self.producao_obj.os,
             "transicoes": _transicoes_status_disponiveis(self.producao_obj, request),
-            "pode_redistribuir": _pode_redistribuir_producao(self.producao_obj, request),
             "pode_homologar": pode_homologar,
             "servidores": Servidor.objects.order_by("nome"),
-            "servidores_revisores": (
-                _servidores_revisores_da_unidade(servidor)
-                if pode_homologar
-                else Servidor.objects.none()
-            ),
-            "servidor_responsavel_atual_id": self.producao_obj.servidor_responsavel_id,
-            "revisor_atual_id": self.producao_obj.revisor_id,
         }
 
     def get(self, request, *args, **kwargs):
@@ -4996,14 +4812,11 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             messages.error(request, MSG_SEM_PERMISSAO)
             return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
-        acao = (request.POST.get("acao") or "").strip()
         justificativa = (request.POST.get("justificativa") or "").strip()
+        acao = (request.POST.get("acao") or "").strip()
 
         if acao == "atualizar_prazos":
             return self._processar_atualizar_prazos(request, servidor)
-
-        if acao == "redistribuir":
-            return self._processar_redistribuicao(request, servidor, justificativa)
 
         return self._processar_transicao_status(request, servidor, justificativa)
 
@@ -5106,45 +4919,6 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         messages.success(request, "Prazos da produção atualizados.")
         return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
 
-    def _processar_redistribuicao(self, request, servidor, justificativa):
-        if not _pode_redistribuir_producao(self.producao_obj, request):
-            messages.error(request, "Você não tem permissão para redistribuir esta produção.")
-            return redirect(
-                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
-            )
-
-        novo_responsavel, erro = _obter_servidor_responsavel_post(request)
-        if erro:
-            messages.error(request, erro)
-            return redirect(
-                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
-            )
-
-        if self.producao_obj.servidor_responsavel_id == novo_responsavel.pk:
-            messages.warning(request, "O servidor selecionado já é o responsável atual.")
-            return redirect(
-                reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
-            )
-
-        status_atual = self.producao_obj.status
-        self.producao_obj.servidor_responsavel = novo_responsavel
-        self.producao_obj.save(update_fields=["servidor_responsavel"])
-
-        _criar_producao_status_log(
-            self.producao_obj,
-            status_atual,
-            status_atual,
-            servidor,
-            servidor_destino=novo_responsavel,
-            justificativa=justificativa,
-        )
-
-        messages.success(
-            request,
-            f"Produção redistribuída para {novo_responsavel.nome}.",
-        )
-        return redirect(reverse("producao_detail", kwargs={"pk": self.producao_obj.pk}))
-
     def _processar_transicao_status(self, request, servidor, justificativa):
         status_novo = (request.POST.get("novo_status") or "").strip()
         transicao = _transicao_status_permitida(self.producao_obj, request, status_novo)
@@ -5176,26 +4950,8 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             )
 
         status_anterior = self.producao_obj.status
-        servidor_destino_log = self.producao_obj.servidor_responsavel
+        servidor_destino_log = None
         campos_atualizar = ["status"]
-
-        if status_novo == Producao.STATUS_DISTRIBUIDO:
-            novo_responsavel, erro = _obter_servidor_responsavel_post(request)
-            if erro:
-                if _request_wants_json(request):
-                    return self._resposta_status_json(
-                        request,
-                        sucesso=False,
-                        erro=erro,
-                        status=400,
-                    )
-                messages.error(request, erro)
-                return redirect(
-                    reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
-                )
-            self.producao_obj.servidor_responsavel = novo_responsavel
-            servidor_destino_log = novo_responsavel
-            campos_atualizar.append("servidor_responsavel")
 
         if status_novo == Producao.STATUS_ENVIADO:
             autor_trabalho, erro = _obter_autor_trabalho_post(request)
@@ -5219,29 +4975,6 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
             self.producao_obj.autor_trabalho = autor_trabalho
             self.producao_obj.homologado_por = servidor
             campos_atualizar.extend(["autor_trabalho", "homologado_por"])
-
-        perfil = getattr(request, "perfil_acesso", None)
-        if (
-            status_novo == Producao.STATUS_REVISAR
-            and perfil is not None
-            and perfil.pode_homologar
-        ):
-            revisores = _servidores_revisores_da_unidade(servidor)
-            revisor, erro = _obter_revisor_post(request, revisores)
-            if erro:
-                if _request_wants_json(request):
-                    return self._resposta_status_json(
-                        request,
-                        sucesso=False,
-                        erro=erro,
-                        status=400,
-                    )
-                messages.error(request, erro)
-                return redirect(
-                    reverse("producao_alterar_status", kwargs={"pk": self.producao_obj.pk}),
-                )
-            self.producao_obj.revisor = revisor
-            campos_atualizar.append("revisor")
 
         self.producao_obj.status = status_novo
         if status_novo == Producao.STATUS_REVISAR:
@@ -5276,7 +5009,6 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
         campos_atualizar.extend(
             _aplicar_datas_status_producao(self.producao_obj, status_novo, hoje),
         )
-        # VER_AJUSTES: não preenche data (decisão do revisor)
 
         self.producao_obj.save(update_fields=campos_atualizar)
 
@@ -5313,22 +5045,15 @@ class ProducaoAlterarStatusView(RequerLoginMixin, View):
 
 CAMPOS_DATA_PRODUCAO = frozenset(
     {
-        "data_entrega_avaliacao",
-        "data_entrega_revisao",
-        "data_entrega_ajustes",
-        "data_ajustes_ok",
         "data_homologar",
         "data_enviado",
         "prazo_interno",
-        "prazo_aval",
         "prazo_rev",
     },
 )
 CAMPOS_EDITAVEIS_PRODUCAO = frozenset(
     {
         "modelo_sugerido",
-        "revisor",
-        "servidor_responsavel",
         "mes_cronograma",
         "numero_producao",
         "numero_sei",
@@ -5358,8 +5083,7 @@ def _formatar_data_resposta_json(data):
 
 class ProducaoEditarCampoView(RequerHomologarMixin, View):
     def post(self, request, pk):
-        producao = get_object_or_404(Producao.objects.select_related("revisor"), pk=pk)
-        servidor = _obter_servidor(request.user)
+        producao = get_object_or_404(Producao, pk=pk)
         campo = (request.POST.get("campo") or "").strip()
         valor = (request.POST.get("valor") or "").strip()
 
@@ -5417,31 +5141,6 @@ class ProducaoEditarCampoView(RequerHomologarMixin, View):
                 },
             )
 
-        if campo == "servidor_responsavel":
-            if not valor:
-                producao.servidor_responsavel = None
-            else:
-                try:
-                    producao.servidor_responsavel = Servidor.objects.get(pk=int(valor))
-                except (Servidor.DoesNotExist, ValueError, TypeError):
-                    return JsonResponse(
-                        {"sucesso": False, "erro": "Avaliador inválido."},
-                        status=400,
-                    )
-            producao.save(update_fields=["servidor_responsavel"])
-            return JsonResponse(
-                {
-                    "sucesso": True,
-                    "campo": campo,
-                    "valor": (
-                        producao.servidor_responsavel.nome
-                        if producao.servidor_responsavel
-                        else ""
-                    ),
-                    "valor_id": producao.servidor_responsavel_id,
-                },
-            )
-
         if campo == "mes_cronograma":
             if not valor:
                 producao.mes_cronograma = None
@@ -5471,25 +5170,9 @@ class ProducaoEditarCampoView(RequerHomologarMixin, View):
                 },
             )
 
-        revisores = _servidores_revisores_da_unidade(servidor)
-        if not valor:
-            producao.revisor = None
-        else:
-            try:
-                producao.revisor = revisores.get(pk=int(valor))
-            except (Servidor.DoesNotExist, ValueError, TypeError):
-                return JsonResponse(
-                    {"sucesso": False, "erro": "Revisor inválido."},
-                    status=400,
-                )
-        producao.save(update_fields=["revisor"])
         return JsonResponse(
-            {
-                "sucesso": True,
-                "campo": campo,
-                "valor": producao.revisor.nome if producao.revisor else "",
-                "revisor_id": producao.revisor_id,
-            },
+            {"sucesso": False, "erro": "Campo não permitido."},
+            status=400,
         )
 
 
@@ -5743,23 +5426,7 @@ def _parse_json_ou_post(request):
 def _aplicar_datas_status_producao(producao, status_novo, data_ref):
     """Preenche datas de status se vazias. Não preenche em VER_AJUSTES."""
     campos = []
-    if status_novo == Producao.STATUS_REVISAR:
-        if not producao.data_entrega_avaliacao:
-            producao.data_entrega_avaliacao = data_ref
-            campos.append("data_entrega_avaliacao")
-    elif status_novo == Producao.STATUS_REVISADO:
-        if not producao.data_entrega_revisao:
-            producao.data_entrega_revisao = data_ref
-            campos.append("data_entrega_revisao")
-    elif status_novo == Producao.STATUS_ENTREGA_AJUSTES:
-        if not producao.data_entrega_ajustes:
-            producao.data_entrega_ajustes = data_ref
-            campos.append("data_entrega_ajustes")
-    elif status_novo == Producao.STATUS_AJUSTES_OK:
-        if not producao.data_ajustes_ok:
-            producao.data_ajustes_ok = data_ref
-            campos.append("data_ajustes_ok")
-    elif status_novo == Producao.STATUS_HOMOLOGAR:
+    if status_novo == Producao.STATUS_HOMOLOGAR:
         if not producao.data_homologar:
             producao.data_homologar = data_ref
             campos.append("data_homologar")
@@ -5877,7 +5544,7 @@ class OSEtapaAPIView(RequerLoginJSONMixin, View):
 class ProducaoStatusAPIView(RequerLoginJSONMixin, View):
     def post(self, request, pk):
         producao = get_object_or_404(
-            Producao.objects.select_related("os", "tipo_producao", "servidor_responsavel"),
+            Producao.objects.select_related("os", "tipo_producao"),
             pk=pk,
         )
         servidor = _obter_servidor(request.user)
@@ -5898,18 +5565,6 @@ class ProducaoStatusAPIView(RequerLoginJSONMixin, View):
         if transicao is None:
             return JsonResponse(
                 {"sucesso": False, "erro": "Transição de status não permitida."},
-                status=400,
-            )
-
-        if (
-            status_novo == Producao.STATUS_DISTRIBUIDO
-            and not producao.servidor_responsavel_id
-        ):
-            return JsonResponse(
-                {
-                    "sucesso": False,
-                    "erro": "Distribua a produção antes de alterar o status.",
-                },
                 status=400,
             )
 
@@ -5949,7 +5604,7 @@ class ProducaoStatusAPIView(RequerLoginJSONMixin, View):
             status_anterior,
             status_novo,
             servidor,
-            servidor_destino=producao.servidor_responsavel,
+            servidor_destino=None,
         )
         ativar_atendimento_interno_se_necessario(producao.os, servidor=servidor)
 
@@ -5963,122 +5618,6 @@ class ProducaoStatusAPIView(RequerLoginJSONMixin, View):
         if status_novo == Producao.STATUS_ENVIADO:
             resposta["opcoes_pos_enviado"] = _opcoes_pos_enviado(producao.os)
         return JsonResponse(resposta)
-
-
-class ProducaoDistribuirAPIView(RequerLoginJSONMixin, View):
-    def post(self, request, pk):
-        producao = get_object_or_404(
-            Producao.objects.select_related("os"),
-            pk=pk,
-        )
-        servidor = _obter_servidor(request.user)
-        if servidor is None:
-            return JsonResponse(
-                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
-                status=403,
-            )
-        if not os_editavel_para_usuario(producao.os, request):
-            return JsonResponse(
-                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
-                status=403,
-            )
-        perfil = getattr(request, "perfil_acesso", None)
-        if perfil is None or not perfil.pode_homologar:
-            return JsonResponse(
-                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
-                status=403,
-            )
-
-        dados = _parse_json_ou_post(request)
-        avaliador_id = dados.get("avaliador_id")
-        if not avaliador_id:
-            return JsonResponse(
-                {"sucesso": False, "erro": "Selecione o avaliador."},
-                status=400,
-            )
-        try:
-            avaliador = Servidor.objects.get(pk=int(avaliador_id))
-        except (Servidor.DoesNotExist, ValueError, TypeError):
-            return JsonResponse(
-                {"sucesso": False, "erro": "Avaliador inválido."},
-                status=400,
-            )
-
-        revisor = None
-        revisor_id = dados.get("revisor_id")
-        if revisor_id:
-            try:
-                revisor = _servidores_revisores_da_unidade(servidor).get(
-                    pk=int(revisor_id),
-                )
-            except (Servidor.DoesNotExist, ValueError, TypeError):
-                return JsonResponse(
-                    {"sucesso": False, "erro": "Revisor inválido."},
-                    status=400,
-                )
-
-        prazo_aval = None
-        prazo_aval_raw = (dados.get("prazo_aval") or "").strip()
-        if prazo_aval_raw:
-            try:
-                prazo_aval = datetime.date.fromisoformat(prazo_aval_raw)
-            except ValueError:
-                return JsonResponse(
-                    {"sucesso": False, "erro": "Prazo do avaliador inválido."},
-                    status=400,
-                )
-
-        prazo_rev = None
-        prazo_rev_raw = (dados.get("prazo_rev") or "").strip()
-        if prazo_rev_raw:
-            try:
-                prazo_rev = datetime.date.fromisoformat(prazo_rev_raw)
-            except ValueError:
-                return JsonResponse(
-                    {"sucesso": False, "erro": "Prazo do revisor inválido."},
-                    status=400,
-                )
-
-        status_anterior = producao.status
-        campos = ["servidor_responsavel", "prazo_aval", "prazo_rev", "revisor"]
-        producao.servidor_responsavel = avaliador
-        producao.prazo_aval = prazo_aval
-        producao.prazo_rev = prazo_rev
-        producao.revisor = revisor
-
-        mudou_status = False
-        if producao.status == Producao.STATUS_NAO_DISTRIBUIDO:
-            producao.status = Producao.STATUS_DISTRIBUIDO
-            campos.append("status")
-            mudou_status = True
-
-        producao.save(update_fields=campos)
-
-        if mudou_status:
-            _criar_producao_status_log(
-                producao,
-                status_anterior,
-                Producao.STATUS_DISTRIBUIDO,
-                servidor,
-                servidor_destino=avaliador,
-            )
-
-        return JsonResponse(
-            {
-                "sucesso": True,
-                "status": producao.status,
-                "status_label": _label_status_producao_gerencial(producao.status),
-                "cor": _cor_status_producao_gerencial(producao.status),
-                "avaliador": avaliador.nome,
-                "revisor": revisor.nome if revisor else "",
-                "prazo_aval": (
-                    prazo_aval.strftime("%d/%m/%Y") if prazo_aval else "—"
-                ),
-                "prazo_rev": (
-                    prazo_rev.strftime("%d/%m/%Y") if prazo_rev else "—"
-                ),
-            },
-        )
 
 
 class OSComentariosAPIView(RequerLoginJSONMixin, View):

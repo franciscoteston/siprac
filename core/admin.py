@@ -496,7 +496,6 @@ class ProducaoAdmin(admin.ModelAdmin):
         "os",
         "tipo_producao",
         "status",
-        "servidor_responsavel",
         "autor_trabalho",
         "ano",
         "criado_por",
@@ -510,7 +509,6 @@ class ProducaoAdmin(admin.ModelAdmin):
         "tipo_producao",
         "criado_por",
         "homologado_por",
-        "servidor_responsavel",
         "autor_trabalho",
         "unidade",
     )

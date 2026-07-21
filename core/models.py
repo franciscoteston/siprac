@@ -964,22 +964,6 @@ class Producao(models.Model):
         related_name="producoes",
         verbose_name="Unidade responsável",
     )
-    servidor_responsavel = models.ForeignKey(
-        Servidor,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="producoes_responsavel",
-        verbose_name="Servidor responsável",
-    )
-    revisor = models.ForeignKey(
-        Servidor,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="producoes_revisor",
-        verbose_name="Revisor",
-    )
     modelo_sugerido = models.CharField(
         max_length=50,
         null=True,
@@ -1007,26 +991,6 @@ class Producao(models.Model):
         blank=True,
         related_name="producoes_homologadas",
     )
-    data_entrega_avaliacao = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data de entrega da avaliação",
-    )
-    data_entrega_revisao = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data de entrega da revisão",
-    )
-    data_entrega_ajustes = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data de entrega dos ajustes",
-    )
-    data_ajustes_ok = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data de ajustes OK",
-    )
     data_homologar = models.DateField(
         null=True,
         blank=True,
@@ -1042,11 +1006,6 @@ class Producao(models.Model):
         null=True,
         blank=True,
         verbose_name="Prazo interno",
-    )
-    prazo_aval = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Prazo do avaliador",
     )
     prazo_rev = models.DateField(
         null=True,

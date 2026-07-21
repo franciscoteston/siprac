@@ -36,7 +36,6 @@ from core.views import (
     ProducaoAlterarStatusView,
     ProducaoCreateView,
     ProducaoDetailView,
-    ProducaoDistribuirAPIView,
     ProducaoEditarCampoView,
     ProducaoListView,
     ProducaoNovaAPIView,
@@ -174,11 +173,6 @@ urlpatterns = [
         'api/producao/<int:pk>/status/',
         ProducaoStatusAPIView.as_view(),
         name='api_producao_status',
-    ),
-    path(
-        'api/producao/<int:pk>/distribuir/',
-        ProducaoDistribuirAPIView.as_view(),
-        name='api_producao_distribuir',
     ),
     path(
         'api/os/<int:pk>/comentarios/',

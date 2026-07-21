@@ -425,16 +425,11 @@ body.gerencial-mode .siprac-content {
                 data-col="{{ col_id }}"
                 data-os-pk="{{ linha.os_pk }}"
                 data-producao-pk="{{ linha.producao_pk|default:'' }}"
-                {% if col_id == 'avaliador' and linha.tem_producao and linha.os_editavel %}
-                style="cursor:pointer; text-decoration:underline dotted;"
-                onclick="abrirPainelSecao(event, 'avaliador')"
-                {% elif col_id == 'prazo_eav' and linha.tem_producao and linha.os_editavel %}
+                {% if col_id == 'prazo_eav' and linha.tem_producao and linha.os_editavel %}
                 style="cursor:pointer;"
                 onclick="abrirPainelSecao(event, 'prazo-eav')"
                 {% endif %}>
-              {% if col_id == 'avaliador' and linha.tem_producao and linha.status_producao == 'NAO_DISTRIBUIDO' and linha.os_editavel %}
-                {{ linha.avaliador|default:"+ Distribuir" }}
-              {% elif col_id == 'numero_imovel' and linha.numero_imovel_extra > 0 %}
+              {% if col_id == 'numero_imovel' and linha.numero_imovel_extra > 0 %}
                 {{ linha.numero_imovel }}
                 <span class="badge bg-secondary ms-1"
                       data-bs-toggle="tooltip"
@@ -503,22 +498,6 @@ body.gerencial-mode .siprac-content {
   "podeEditarEntradaDai": {{ pode_editar_entrada_dai|yesno:"true,false" }},
   "colunasVisiveis": {{ colunas_gerencial_visiveis_json|safe }}
 }
-</script>
-
-<script type="application/json" id="gerencial-servidores-unidade">
-[
-{% for srv in servidores_unidade %}
-  {"id": {{ srv.pk }}, "nome": "{{ srv.nome|escapejs }}"}{% if not forloop.last %},{% endif %}
-{% endfor %}
-]
-</script>
-
-<script type="application/json" id="gerencial-servidores-revisores">
-[
-{% for srv in servidores_revisores %}
-  {"id": {{ srv.pk }}, "nome": "{{ srv.nome|escapejs }}"}{% if not forloop.last %},{% endif %}
-{% endfor %}
-]
 </script>
 
 <script type="application/json" id="gerencial-tipos-producao">
@@ -601,11 +580,8 @@ body.gerencial-mode .siprac-content {
       fecharPainel: fecharPainel,
       atualizarCelula: atualizarCelula,
       colMap: {
-        prazo_interno: 'prazo_eav', prazo_aval: 'prazo_aval',
-        servidor_responsavel: 'avaliador', revisor: 'revisor',
+        prazo_interno: 'prazo_eav', prazo_rev: 'prazo_rev',
         mes_cronograma: 'mes_cronograma', modelo_sugerido: 'modelo_sugerido',
-        data_entrega_avaliacao: 'entrega_aval', data_entrega_revisao: 'entrega_rev',
-        data_entrega_ajustes: 'entrega_aju', data_ajustes_ok: 'data_ajustes_ok',
         data_homologar: 'data_homologar', data_enviado: 'enviado',
       },
     });
@@ -680,8 +656,6 @@ body.gerencial-mode .siprac-content {
     catch (e) { return []; }
   }
 
-  const servidoresUnidade = parseJsonEl('gerencial-servidores-unidade');
-  const servidoresRevisores = parseJsonEl('gerencial-servidores-revisores');
   const tiposProducao = parseJsonEl('gerencial-tipos-producao');
 
   function fecharPopover() {
@@ -861,53 +835,6 @@ body.gerencial-mode .siprac-content {
     const btn = popoverConteudo.querySelector('.btn-pos[data-acao="manter"]');
     if (btn) btn.addEventListener('click', fecharPopover);
   }
-
-  window.abrirPopoverDistribuir = function (event, producaoPk) {
-    event.preventDefault();
-    event.stopPropagation();
-    let html = '<div class="gerencial-popover-titulo">Distribuir produção</div>';
-    html += '<div class="mb-2"><label class="form-label small mb-1">Avaliador</label>';
-    html += '<select class="form-select form-select-sm" id="popoverAval">' +
-      '<option value="">Selecione…</option>' +
-      optionsHtml(servidoresUnidade, 'id', 'nome') + '</select></div>';
-    html += '<div class="mb-2"><label class="form-label small mb-1">Prazo avaliador</label>';
-    html += '<input type="date" class="form-control form-control-sm" id="popoverPrazoAval"></div>';
-    html += '<div class="mb-2"><label class="form-label small mb-1">Revisor</label>';
-    html += '<select class="form-select form-select-sm" id="popoverRev">' +
-      '<option value="">—</option>' +
-      optionsHtml(servidoresRevisores, 'id', 'nome') + '</select></div>';
-    html += '<div class="mb-2"><label class="form-label small mb-1">Prazo revisor</label>';
-    html += '<input type="date" class="form-control form-control-sm" id="popoverPrazoRev"></div>';
-    html += '<button type="button" class="btn btn-primary w-100" id="popoverDistSalvar">Distribuir</button>';
-    abrirPopover(event.target, html);
-    const tr = event.target.closest('tr');
-    popoverConteudo.querySelector('#popoverDistSalvar').addEventListener('click', function () {
-      const payload = {
-        avaliador_id: popoverConteudo.querySelector('#popoverAval').value,
-        prazo_aval: popoverConteudo.querySelector('#popoverPrazoAval').value,
-        revisor_id: popoverConteudo.querySelector('#popoverRev').value || null,
-        prazo_rev: popoverConteudo.querySelector('#popoverPrazoRev').value,
-      };
-      postJson('/api/producao/' + producaoPk + '/distribuir/', payload)
-        .then(function (resp) {
-          const celAval = tr.querySelector('[data-col="avaliador"]');
-          if (celAval) {
-            celAval.textContent = resp.avaliador || '—';
-            celAval.removeAttribute('onclick');
-            celAval.style.cursor = '';
-            celAval.style.textDecoration = '';
-          }
-          const celStatus = tr.querySelector('.gerencial-cel-status');
-          if (celStatus && resp.status_label) {
-            celStatus.innerHTML = '<span class="badge bg-' + (resp.cor || 'info') + '">' +
-              resp.status_label + '</span>';
-          }
-          tr.dataset.statusProducao = resp.status || 'DISTRIBUIDO';
-          fecharPopover();
-        })
-        .catch(function (err) { alert(err.message); });
-    });
-  };
 
   window.abrirPopoverNovaProd = function (event, osPk) {
     event.preventDefault();

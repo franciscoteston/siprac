@@ -67,7 +67,6 @@
         <th>OS vinculada</th>
         <th>Tipo</th>
         <th>Status</th>
-        <th>Responsável</th>
         <th>Criação</th>
       </tr>
     </thead>
@@ -94,14 +93,11 @@
             {{ producao.status|status_producao_display }}
           </span>
         </td>
-        <td class="small">
-          {% if producao.servidor_responsavel %}{{ producao.servidor_responsavel.nome }}{% else %}—{% endif %}
-        </td>
         <td class="small">{{ producao.data_criacao|date:"d/m/Y H:i" }}</td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="6" class="text-muted text-center py-4">Nenhuma produção encontrada.</td>
+        <td colspan="5" class="text-muted text-center py-4">Nenhuma produção encontrada.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -113,7 +109,7 @@
   <ul class="pagination pagination-sm justify-content-center mb-0">
     {% if page_obj.has_previous %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ filtro_status }}&tipo_producao={{ filtro_tipo_producao }}&periodo={{ filtro_periodo }}&unidade={{ filtro_unidade }}&responsavel={{ filtro_responsavel }}">Anterior</a>
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ filtro_status }}&tipo_producao={{ filtro_tipo_producao }}&periodo={{ filtro_periodo }}&unidade={{ filtro_unidade }}">Anterior</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -125,7 +121,7 @@
 
     {% if page_obj.has_next %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ filtro_status }}&tipo_producao={{ filtro_tipo_producao }}&periodo={{ filtro_periodo }}&unidade={{ filtro_unidade }}&responsavel={{ filtro_responsavel }}">Próxima</a>
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ filtro_status }}&tipo_producao={{ filtro_tipo_producao }}&periodo={{ filtro_periodo }}&unidade={{ filtro_unidade }}">Próxima</a>
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link">Próxima</span></li>

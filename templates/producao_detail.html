@@ -63,16 +63,6 @@
       <dd class="col-sm-9"><a href="{% url 'os_detalhe' os.pk %}">{{ os.numero_os }}</a></dd>
       <dt class="col-sm-3">Criado por</dt>
       <dd class="col-sm-9">{{ producao.criado_por.nome }}</dd>
-      <dt class="col-sm-3">Servidor responsável</dt>
-      <dd class="col-sm-9">
-        {% if producao.servidor_responsavel %}
-          {{ producao.servidor_responsavel.nome }}
-        {% else %}—{% endif %}
-      </dd>
-      {% if producao.revisor %}
-      <dt class="col-sm-3">Revisor</dt>
-      <dd class="col-sm-9">{{ producao.revisor.nome }}</dd>
-      {% endif %}
       {% if producao.numero_revisao > 1 %}
       <dt class="col-sm-3">Nº de revisões</dt>
       <dd class="col-sm-9">{{ producao.numero_revisao }}</dd>
@@ -154,122 +144,6 @@
   <div class="card-header bg-white fw-semibold">Datas do fluxo</div>
   <div class="card-body">
     <dl class="row mb-0 small">
-      {% if pode_homologar or producao.data_entrega_avaliacao %}
-      <dt class="col-sm-4">Data de entrega da avaliação</dt>
-      <dd class="col-sm-8">
-        {% if pode_homologar %}
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <input type="date"
-                 id="data-entrega-avaliacao-input"
-                 class="form-control form-control-sm"
-                 style="max-width: 180px"
-                 value="{% if producao.data_entrega_avaliacao %}{{ producao.data_entrega_avaliacao|date:'Y-m-d' }}{% endif %}">
-          <button type="button"
-                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
-                  data-campo="data_entrega_avaliacao"
-                  data-input="data-entrega-avaliacao-input"
-                  data-display="display-data-entrega-avaliacao"
-                  data-erro="erro-data-entrega-avaliacao">
-            Salvar
-          </button>
-        </div>
-        <div class="text-danger small mt-1 d-none" id="erro-data-entrega-avaliacao"></div>
-        <span class="d-none" id="display-data-entrega-avaliacao">
-          {% if producao.data_entrega_avaliacao %}{{ producao.data_entrega_avaliacao|date:"d/m/Y" }}{% else %}—{% endif %}
-        </span>
-        {% elif producao.data_entrega_avaliacao %}
-          {{ producao.data_entrega_avaliacao|date:"d/m/Y" }}
-        {% endif %}
-      </dd>
-      {% endif %}
-
-      {% if pode_homologar or producao.data_entrega_revisao %}
-      <dt class="col-sm-4">Data de entrega da revisão</dt>
-      <dd class="col-sm-8">
-        {% if pode_homologar %}
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <input type="date"
-                 id="data-entrega-revisao-input"
-                 class="form-control form-control-sm"
-                 style="max-width: 180px"
-                 value="{% if producao.data_entrega_revisao %}{{ producao.data_entrega_revisao|date:'Y-m-d' }}{% endif %}">
-          <button type="button"
-                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
-                  data-campo="data_entrega_revisao"
-                  data-input="data-entrega-revisao-input"
-                  data-display="display-data-entrega-revisao"
-                  data-erro="erro-data-entrega-revisao">
-            Salvar
-          </button>
-        </div>
-        <div class="text-danger small mt-1 d-none" id="erro-data-entrega-revisao"></div>
-        <span class="d-none" id="display-data-entrega-revisao">
-          {% if producao.data_entrega_revisao %}{{ producao.data_entrega_revisao|date:"d/m/Y" }}{% else %}—{% endif %}
-        </span>
-        {% elif producao.data_entrega_revisao %}
-          {{ producao.data_entrega_revisao|date:"d/m/Y" }}
-        {% endif %}
-      </dd>
-      {% endif %}
-
-      {% if pode_homologar or producao.data_entrega_ajustes %}
-      <dt class="col-sm-4">Data de entrega dos ajustes</dt>
-      <dd class="col-sm-8">
-        {% if pode_homologar %}
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <input type="date"
-                 id="data-entrega-ajustes-input"
-                 class="form-control form-control-sm"
-                 style="max-width: 180px"
-                 value="{% if producao.data_entrega_ajustes %}{{ producao.data_entrega_ajustes|date:'Y-m-d' }}{% endif %}">
-          <button type="button"
-                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
-                  data-campo="data_entrega_ajustes"
-                  data-input="data-entrega-ajustes-input"
-                  data-display="display-data-entrega-ajustes"
-                  data-erro="erro-data-entrega-ajustes">
-            Salvar
-          </button>
-        </div>
-        <div class="text-danger small mt-1 d-none" id="erro-data-entrega-ajustes"></div>
-        <span class="d-none" id="display-data-entrega-ajustes">
-          {% if producao.data_entrega_ajustes %}{{ producao.data_entrega_ajustes|date:"d/m/Y" }}{% else %}—{% endif %}
-        </span>
-        {% elif producao.data_entrega_ajustes %}
-          {{ producao.data_entrega_ajustes|date:"d/m/Y" }}
-        {% endif %}
-      </dd>
-      {% endif %}
-
-      {% if pode_homologar or producao.data_ajustes_ok %}
-      <dt class="col-sm-4">Data de ajustes OK</dt>
-      <dd class="col-sm-8">
-        {% if pode_homologar %}
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          <input type="date"
-                 id="data-ajustes-ok-input"
-                 class="form-control form-control-sm"
-                 style="max-width: 180px"
-                 value="{% if producao.data_ajustes_ok %}{{ producao.data_ajustes_ok|date:'Y-m-d' }}{% endif %}">
-          <button type="button"
-                  class="btn btn-outline-primary btn-sm btn-salvar-data-fluxo"
-                  data-campo="data_ajustes_ok"
-                  data-input="data-ajustes-ok-input"
-                  data-display="display-data-ajustes-ok"
-                  data-erro="erro-data-ajustes-ok">
-            Salvar
-          </button>
-        </div>
-        <div class="text-danger small mt-1 d-none" id="erro-data-ajustes-ok"></div>
-        <span class="d-none" id="display-data-ajustes-ok">
-          {% if producao.data_ajustes_ok %}{{ producao.data_ajustes_ok|date:"d/m/Y" }}{% else %}—{% endif %}
-        </span>
-        {% elif producao.data_ajustes_ok %}
-          {{ producao.data_ajustes_ok|date:"d/m/Y" }}
-        {% endif %}
-      </dd>
-      {% endif %}
-
       {% if pode_homologar or producao.data_homologar %}
       <dt class="col-sm-4">Data apto à homologação</dt>
       <dd class="col-sm-8">
@@ -328,7 +202,7 @@
       </dd>
       {% endif %}
     </dl>
-    {% if not pode_homologar and not producao.data_entrega_avaliacao and not producao.data_entrega_revisao and not producao.data_entrega_ajustes and not producao.data_ajustes_ok and not producao.data_homologar and not producao.data_enviado %}
+    {% if not pode_homologar and not producao.data_homologar and not producao.data_enviado %}
     <p class="text-muted small mb-0">Nenhuma data registrada.</p>
     {% endif %}
   </div>
@@ -386,23 +260,12 @@
                       {% endfor %}
                     </select>
                   </div>
-                  <div class="col-md-3 d-none" id="campo-servidor-inline">
-                    <label for="servidor_responsavel" class="form-label mb-1">Servidor responsável</label>
-                    <select name="servidor_responsavel" id="servidor_responsavel" class="form-select form-select-sm">
-                      <option value="">Selecione…</option>
-                      {% for srv in servidores %}
-                      <option value="{{ srv.pk }}"{% if srv.pk == producao.servidor_responsavel_id %} selected{% endif %}>
-                        {{ srv.nome }}
-                      </option>
-                      {% endfor %}
-                    </select>
-                  </div>
                   <div class="col-md-3 d-none" id="campo-autor-inline">
                     <label for="autor_trabalho" class="form-label mb-1">Autor do trabalho</label>
                     <select name="autor_trabalho" id="autor_trabalho" class="form-select form-select-sm">
                       <option value="">Selecione…</option>
                       {% for srv in servidores %}
-                      <option value="{{ srv.pk }}"{% if srv.pk == producao.servidor_responsavel_id %} selected{% endif %}>
+                      <option value="{{ srv.pk }}"{% if srv.pk == producao.autor_trabalho_id %} selected{% endif %}>
                         {{ srv.nome }}
                       </option>
                       {% endfor %}
@@ -517,7 +380,6 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var STATUS_DISTRIBUIDO = 'DISTRIBUIDO';
   var STATUS_ENVIADO = 'ENVIADO';
   var statusUrl = '{% url "producao_alterar_status" producao.pk %}';
 
@@ -552,7 +414,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function atualizarCamposStatusInline() {
     var select = document.getElementById('novo_status');
-    var campoServidor = document.getElementById('campo-servidor-inline');
     var campoAutor = document.getElementById('campo-autor-inline');
     var textarea = document.getElementById('justificativa');
     if (!select) {
@@ -563,11 +424,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var destino = select.value;
     var justificativaObrigatoria = option && option.dataset.justificativaObrigatoria === 'true';
 
-    campoServidor.classList.add('d-none');
     campoAutor.classList.add('d-none');
-    if (destino === STATUS_DISTRIBUIDO) {
-      campoServidor.classList.remove('d-none');
-    } else if (destino === STATUS_ENVIADO) {
+    if (destino === STATUS_ENVIADO) {
       campoAutor.classList.remove('d-none');
     }
 

@@ -6,10 +6,6 @@
   'use strict';
 
   const STATUS_SUGESTOES = {
-    data_entrega_avaliacao: { de: 'DISTRIBUIDO', para: 'REVISAR', msg: 'Entregar para revisão?' },
-    data_entrega_revisao: { de: 'REVISAR', para: 'REVISADO', msg: 'Marcar como revisado?' },
-    data_entrega_ajustes: { de: 'VER_AJUSTES', para: 'ENTREGA_AJUSTES', msg: 'Entregar ajustes?' },
-    data_ajustes_ok: { de: 'ENTREGA_AJUSTES', para: 'HOMOLOGAR', msg: 'Aprovar ajustes?' },
     data_enviado: { de: 'HOMOLOGAR', para: 'ENVIADO', msg: 'Marcar como enviado?' },
   };
 
@@ -173,30 +169,11 @@
     html += renderCampoTexto(prod.pk, 'mes_cronograma', 'Cronograma', prod.mes_cronograma_iso, 'month');
     html += renderCampoTexto(prod.pk, 'modelo_sugerido', 'Modelo sug.', prod.modelo_sugerido);
 
-    html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Distribuição</div>';
-    html += renderCampoSelect(
-      prod.pk,
-      'servidor_responsavel',
-      'Avaliador',
-      '<option value="">—</option>' + optionsHtml(data.servidores_unidade, prod.avaliador_id),
-      'painel-campo-avaliador-' + prod.pk,
-    );
-    html += renderCampoData(prod.pk, 'prazo_aval', 'Prazo aval', prod.prazo_aval_iso);
-    html += renderCampoData(prod.pk, 'data_entrega_avaliacao', 'Entrega aval', prod.entrega_aval_iso);
-
     html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Revisão</div>';
-    html += renderCampoSelect(
-      prod.pk,
-      'revisor',
-      'Revisor',
-      '<option value="">—</option>' + optionsHtml(data.revisores_unidade, prod.revisor_id),
-    );
     html += renderCampoData(prod.pk, 'prazo_rev', 'Prazo rev', prod.prazo_rev_iso);
-    html += renderCampoData(prod.pk, 'data_entrega_revisao', 'Entrega rev', prod.entrega_rev_iso);
-    html += renderCampoData(prod.pk, 'data_entrega_ajustes', 'Entrega aju', prod.entrega_aju_iso);
 
     html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Homologação</div>';
-    html += renderCampoData(prod.pk, 'data_ajustes_ok', 'Ajustes OK', prod.data_ajustes_ok_iso);
+    html += renderCampoData(prod.pk, 'data_homologar', 'Homologar', prod.data_homologar_iso);
     html += renderCampoTexto(prod.pk, 'numero_producao', 'Nº trabalho', prod.numero_producao);
     html += renderCampoTexto(prod.pk, 'numero_sei', 'DOC SEI', prod.numero_sei);
     html += renderCampoData(prod.pk, 'data_enviado', 'Envio SEI', prod.enviado_iso);
@@ -419,12 +396,6 @@
         postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor)
           .then(function () {
             const prod = (data.producoes || []).find(function (p) { return String(p.pk) === String(prodPk); });
-            if (prod && campo.endsWith('_iso') === false) {
-              if (campo.indexOf('data_') === 0 || campo.indexOf('prazo_') === 0) {
-                prod[campo.replace('data_', '').replace('prazo_', '') + '_iso'] = valor;
-              }
-              mostrarSugestao(prodPk, campo, prod);
-            }
             if (prod && STATUS_SUGESTOES[campo]) {
               mostrarSugestao(prodPk, campo, prod);
             }
@@ -539,7 +510,6 @@
       etapa: 'painel-secao-etapa',
       producoes: 'painel-secao-producoes',
       comentarios: 'painel-secao-comentarios',
-      avaliador: data.producao_pk_ativa ? 'painel-campo-avaliador-' + data.producao_pk_ativa : 'painel-secao-producoes',
       'prazo-eav': data.producao_pk_ativa ? 'painel-campo-prazo-eav-' + data.producao_pk_ativa : 'painel-secao-producoes',
     };
     const id = map[secao];

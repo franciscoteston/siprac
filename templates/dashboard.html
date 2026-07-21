@@ -165,7 +165,7 @@
   </div>
 </div>
 
-<h2 class="h5 mb-3">Minha fila</h2>
+<h2 class="h5 mb-3">Fila da unidade</h2>
 {% include 'includes/fila_minha_padrao.html' %}
 
 {% elif nivel_visao == 'UNIDADE' %}
@@ -192,7 +192,7 @@
     </a>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <a href="{% url 'producao_list' %}?status=PARA_REVISAO" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=REVISAR" class="text-decoration-none text-dark">
       <div class="card siprac-card card-laranja h-100">
         <div class="card-body">
           <p class="card-text text-muted mb-1">Para revisão/ajustes</p>
@@ -241,7 +241,6 @@
         <th>OS</th>
         <th>Tipo</th>
         <th>Status</th>
-        <th>Responsável</th>
         <th>Prazo OS</th>
         <th>Prazo interno</th>
       </tr>
@@ -252,87 +251,86 @@
         <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}{% if item.apelido %} ({{ item.apelido }}){% endif %}</a></td>
         <td>{{ item.tipo }}</td>
         <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
-        <td class="small">{{ item.servidor_responsavel }}</td>
         <td class="small">{% if item.prazo_os %}{{ item.prazo_os|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td class="small">{% if item.prazo_interno %}{{ item.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="6" class="text-muted text-center py-4">Nenhuma produção ativa na unidade.</td></tr>
+      <tr><td colspan="5" class="text-muted text-center py-4">Nenhuma produção ativa na unidade.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
 
-<h2 class="h6 mb-3 text-muted">Minha fila</h2>
+<h2 class="h6 mb-3 text-muted">Fila da unidade</h2>
 {% include 'includes/fila_minha_padrao.html' %}
 
 {% else %}
 
-<h2 class="h5 mb-3">Minhas produções</h2>
+<h2 class="h5 mb-3">Produções da unidade</h2>
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=ENTRADA&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=NAO_DISTRIBUIDO" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Em entrada</p>
-          <p class="mb-0"><span class="badge bg-secondary fs-6">{{ producoes_minha_por_status.ENTRADA }}</span></p>
+          <p class="card-text text-muted small mb-1">Não distribuído</p>
+          <p class="mb-0"><span class="badge bg-secondary fs-6">{{ producoes_unidade_por_status.NAO_DISTRIBUIDO }}</span></p>
         </div>
       </div>
     </a>
   </div>
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
           <p class="card-text text-muted small mb-1">Distribuídas</p>
-          <p class="mb-0"><span class="badge bg-info fs-6">{{ producoes_minha_por_status.DISTRIBUIDO }}</span></p>
+          <p class="mb-0"><span class="badge bg-info fs-6">{{ producoes_unidade_por_status.DISTRIBUIDO }}</span></p>
         </div>
       </div>
     </a>
   </div>
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=REVISAR" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Em elaboração</p>
-          <p class="mb-0"><span class="badge bg-primary fs-6">{{ producoes_minha_por_status.DISTRIBUIDO }}</span></p>
+          <p class="card-text text-muted small mb-1">Revisar</p>
+          <p class="mb-0"><span class="badge bg-warning text-dark fs-6">{{ producoes_unidade_por_status.REVISAR }}</span></p>
         </div>
       </div>
     </a>
   </div>
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=PARA_REVISAO&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=VER_AJUSTES" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Para revisão</p>
-          <p class="mb-0"><span class="badge bg-warning text-dark fs-6">{{ producoes_minha_por_status.PARA_REVISAO }}</span></p>
+          <p class="card-text text-muted small mb-1">Ver ajustes</p>
+          <p class="mb-0"><span class="badge fs-6" style="background-color: #fd7e14;">{{ producoes_unidade_por_status.VER_AJUSTES }}</span></p>
         </div>
       </div>
     </a>
   </div>
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=PARA_AJUSTES&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?status=HOMOLOGAR" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Para ajustes</p>
-          <p class="mb-0"><span class="badge fs-6" style="background-color: #fd7e14;">{{ producoes_minha_por_status.PARA_AJUSTES }}</span></p>
+          <p class="card-text text-muted small mb-1">Homologar</p>
+          <p class="mb-0"><span class="badge bg-primary fs-6">{{ producoes_unidade_por_status.HOMOLOGAR }}</span></p>
         </div>
       </div>
     </a>
   </div>
   <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?periodo=mes_atual&responsavel=eu" class="text-decoration-none text-dark">
+    <a href="{% url 'producao_list' %}?periodo=mes_atual" class="text-decoration-none text-dark">
       <div class="card siprac-card h-100">
         <div class="card-body py-3">
           <p class="card-text text-muted small mb-1">Homologadas no mês</p>
-          <p class="mb-0"><span class="badge bg-success fs-6">{{ producoes_minha_por_status.HOMOLOGADO_MES }}</span></p>
+          <p class="mb-0"><span class="badge bg-success fs-6">{{ producoes_unidade_por_status.HOMOLOGADO_MES }}</span></p>
         </div>
       </div>
     </a>
   </div>
 </div>
 
-<h2 class="h5 mb-3">Minha fila</h2>
+<h2 class="h5 mb-3">Fila da unidade</h2>
 {% include 'includes/fila_minha_padrao.html' %}
 
 {% endif %}

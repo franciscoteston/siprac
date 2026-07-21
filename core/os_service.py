@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
+from django.db.models import Case, CharField, Count, F, OuterRef, Q, Subquery, Value, When
 from django.utils import timezone
 
 from core.models import Encaminhamento, OS, OsUnidadeStatus, Producao, TarefaInterna
@@ -668,18 +668,20 @@ def itens_pendentes_usuario(servidor):
     """
     Retorna contagem de itens pendentes para o servidor logado.
     - os_novas: OSs encaminhadas para a unidade do servidor após seu último login
-    - producoes_pendentes: produções onde servidor_responsavel=servidor
-      com status em DISTRIBUIDO, PARA_REVISAO ou PARA_AJUSTES
-    - revisoes_pendentes: produções em PARA_REVISAO na unidade do servidor
+    - producoes_pendentes: produções da unidade do servidor (unidade_id ou OS
+      nas unidades ativas) com status em DISTRIBUIDO, VER_AJUSTES ou REVISAR
+    - revisoes_pendentes: produções em REVISAR na unidade do servidor
       (apenas para perfis com pode_homologar=True)
     """
     from django.utils import timezone
 
     ultimo_login = servidor.user.last_login or timezone.now()
 
-    vinculos_ativos = servidor.vinculos_unidade.filter(
-        data_fim__isnull=True
-    ).values_list("unidade_id", flat=True)
+    vinculos_ativos = list(
+        servidor.vinculos_unidade.filter(
+            data_fim__isnull=True
+        ).values_list("unidade_id", flat=True)
+    )
 
     os_novas = TarefaInterna.objects.filter(
         unidade_id__in=vinculos_ativos,
@@ -687,14 +689,23 @@ def itens_pendentes_usuario(servidor):
         data_inicio__gt=ultimo_login,
     ).count()
 
-    producoes_pendentes = Producao.objects.filter(
-        servidor_responsavel=servidor,
-        status__in=[
-            Producao.STATUS_DISTRIBUIDO,
-            Producao.STATUS_VER_AJUSTES,
-            Producao.STATUS_REVISAR,
-        ],
-    ).count()
+    os_ids_unidade = set(
+        OsUnidadeStatus.objects.filter(
+            unidade_id__in=vinculos_ativos,
+        ).values_list("os_id", flat=True)
+    )
+    producoes_pendentes = (
+        Producao.objects.filter(
+            Q(unidade_id__in=vinculos_ativos) | Q(os_id__in=os_ids_unidade),
+            status__in=[
+                Producao.STATUS_DISTRIBUIDO,
+                Producao.STATUS_VER_AJUSTES,
+                Producao.STATUS_REVISAR,
+            ],
+        )
+        .distinct()
+        .count()
+    )
 
     revisoes_pendentes = 0
     perfil = servidor.vinculos_unidade.filter(
