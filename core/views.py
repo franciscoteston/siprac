@@ -2659,8 +2659,16 @@ def _montar_panel_gerencial(os_obj, producao, unidade, dados_imovel, entrada_dai
             else "—"
         ),
         "avaliador_id": producao.servidor_responsavel_id if producao else None,
-        "prazo_aval": prazo_interno_display,
-        "prazo_aval_iso": prazo_interno_iso,
+        "prazo_aval": (
+            _formatar_data_br(producao.prazo_aval)
+            if producao and producao.prazo_aval
+            else "—"
+        ),
+        "prazo_aval_iso": (
+            producao.prazo_aval.isoformat()
+            if producao and producao.prazo_aval
+            else ""
+        ),
         "prazo_rev": (
             _formatar_data_br(producao.prazo_rev)
             if producao and producao.prazo_rev
@@ -3013,7 +3021,7 @@ def _serializar_linhas_gerencial(
                     else ""
                 ),
                 "revisor": producao.revisor.nome if producao.revisor else "—",
-                "prazo_aval": _formatar_data_br(producao.prazo_interno),
+                "prazo_aval": _formatar_data_br(producao.prazo_aval),
                 "prazo_rev": _formatar_data_br(producao.prazo_rev),
                 "entrega_aval": _formatar_data_br(producao.data_entrega_avaliacao),
                 "status_transicoes": (
@@ -5212,6 +5220,7 @@ CAMPOS_DATA_PRODUCAO = frozenset(
         "data_homologar",
         "data_enviado",
         "prazo_interno",
+        "prazo_aval",
     },
 )
 CAMPOS_EDITAVEIS_PRODUCAO = frozenset(
@@ -5912,9 +5921,9 @@ class ProducaoDistribuirAPIView(RequerLoginJSONMixin, View):
                 )
 
         status_anterior = producao.status
-        campos = ["servidor_responsavel", "prazo_interno", "prazo_rev", "revisor"]
+        campos = ["servidor_responsavel", "prazo_aval", "prazo_rev", "revisor"]
         producao.servidor_responsavel = avaliador
-        producao.prazo_interno = prazo_aval
+        producao.prazo_aval = prazo_aval
         producao.prazo_rev = prazo_rev
         producao.revisor = revisor
 

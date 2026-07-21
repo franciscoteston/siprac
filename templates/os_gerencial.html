@@ -608,8 +608,13 @@ body.gerencial-mode .siprac-content {
             if (campo === 'prazo_interno') {
               const display = data.valor_display || '—';
               panelData.prazo_eav = display;
-              panelData.prazo_aval = display;
+              panelData.prazo_eav_iso = data.valor || '';
               atualizarCelula(osPk, 'prazo_eav', escapeHtml(display), prodPk);
+            }
+            if (campo === 'prazo_aval') {
+              const display = data.valor_display || '—';
+              panelData.prazo_aval = display;
+              panelData.prazo_aval_iso = data.valor || '';
               atualizarCelula(osPk, 'prazo_aval', escapeHtml(display), prodPk);
             }
             if (campo === 'data_entrega_avaliacao') {
@@ -763,8 +768,8 @@ body.gerencial-mode .siprac-content {
       {% endfor %}
       html += '</select><button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="servidor_responsavel">Salvar</button>';
       html += '<label class="form-label small">PRAZO_AVAL</label>';
-      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="prazo_interno" value="' + escapeHtml(data.prazo_aval_iso) + '">';
-      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="prazo_interno">Salvar</button>';
+      html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="prazo_aval" value="' + escapeHtml(data.prazo_aval_iso) + '">';
+      html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="prazo_aval">Salvar</button>';
       html += '<label class="form-label small">ENTREGA_AVAL</label>';
       html += '<input type="date" class="form-control form-control-sm mb-2" data-field-prod="data_entrega_avaliacao" value="' + escapeHtml(data.entrega_aval_iso) + '">';
       html += '<button type="button" class="btn btn-outline-primary btn-sm mb-2" data-save-prod="data_entrega_avaliacao">Salvar</button>';
