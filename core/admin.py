@@ -141,16 +141,10 @@ class PerfilAcessoAdmin(admin.ModelAdmin):
     list_display = [
         "nome",
         "visibilidade",
-        "pode_criar_os",
-        "pode_encerrar_os",
-        "pode_homologar",
         "admin_sistema",
     ]
     list_editable = [
         "visibilidade",
-        "pode_criar_os",
-        "pode_encerrar_os",
-        "pode_homologar",
         "admin_sistema",
     ]
     fieldsets = [
@@ -160,20 +154,12 @@ class PerfilAcessoAdmin(admin.ModelAdmin):
         ("Visibilidade", {
             "fields": ["visibilidade"],
             "description": (
-                "UNIDADE: só vê OSs da própria unidade. "
-                "DEPARTAMENTO: vê todas (consulta e entrada). "
-                "TOTAL: acesso completo a todas as OSs."
+                "UNIDADE: só vê/edita OSs abertas na própria unidade. "
+                "DEPARTAMENTO e TOTAL: vê e edita todas as OSs."
             ),
         }),
-        ("Permissões operacionais", {
-            "fields": [
-                "pode_criar_os",
-                "pode_encerrar_os",
-                "pode_homologar",
-                "pode_criar_os_interna",
-                "visibilidade_total",
-                "admin_sistema",
-            ],
+        ("Administração", {
+            "fields": ["admin_sistema"],
         }),
     ]
     search_fields = ("nome",)

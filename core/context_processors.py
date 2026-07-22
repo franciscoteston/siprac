@@ -21,10 +21,23 @@ def siprac_navbar(request):
 
     vinculo = getattr(request, "vinculo_ativo", None)
     if vinculo is None:
+        from django.db.models import Case, IntegerField, Value, When
+
         vinculo = (
             servidor.vinculos_unidade.filter(data_fim__isnull=True)
             .select_related("unidade", "perfil")
-            .order_by("-perfil__pode_homologar")
+            .annotate(
+                _ordem_vis=(
+                    Case(
+                        When(perfil__visibilidade="TOTAL", then=Value(0)),
+                        When(perfil__visibilidade="DEPARTAMENTO", then=Value(1)),
+                        When(perfil__visibilidade="UNIDADE", then=Value(2)),
+                        default=Value(99),
+                        output_field=IntegerField(),
+                    )
+                ),
+            )
+            .order_by("_ordem_vis", "-data_inicio")
             .first()
         )
     if vinculo:

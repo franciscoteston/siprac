@@ -488,7 +488,6 @@ body.gerencial-mode .siprac-content {
 <script type="application/json" id="gerencial-config">
 {
   "preferenciasUrl": "{% url 'api_preferencias_gerencial' %}",
-  "podeHomologar": {{ pode_homologar|yesno:"true,false" }},
   "gerencialModoB": {{ gerencial_modo_b|default:False|yesno:"true,false" }},
   "podeEditarEntradaDai": {{ pode_editar_entrada_dai|yesno:"true,false" }},
   "colunasVisiveis": {{ colunas_gerencial_visiveis_json|safe }}

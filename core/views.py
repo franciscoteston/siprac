@@ -55,7 +55,6 @@ from core.relatorios import (
 from core.middleware import obter_vinculo_unidade_ativo
 from core.mixins import (
     RequerAdminMixin,
-    RequerHomologarMixin,
     RequerLoginJSONMixin,
     RequerLoginMixin,
 )
@@ -68,7 +67,6 @@ from core.os_service import (
     data_entrada_unidade,
     inicio_ciclo_prazo_os,
     inicio_ciclo_prazo_unidade,
-    is_primeiro_encaminhamento,
     macroetapa_atual_os,
     origem_encaminhamento,
     os_ativas_por_unidade,
@@ -128,7 +126,6 @@ MSG_OS_SOMENTE_LEITURA = (
 
 NIVEL_VISAO_SISTEMICA = "SISTEMICA"
 NIVEL_VISAO_UNIDADE = "UNIDADE"
-NIVEL_VISAO_PESSOAL = "PESSOAL"
 
 PRIORIDADE_ORDEM = {
     "URGENTE": 0,
@@ -151,11 +148,9 @@ logger = logging.getLogger(__name__)
 
 
 def _determinar_nivel_visao(perfil):
-    if perfil and perfil.visibilidade_total:
+    if perfil and perfil.visibilidade in ("TOTAL", "DEPARTAMENTO"):
         return NIVEL_VISAO_SISTEMICA
-    if perfil and perfil.pode_homologar:
-        return NIVEL_VISAO_UNIDADE
-    return NIVEL_VISAO_PESSOAL
+    return NIVEL_VISAO_UNIDADE
 
 
 def _obter_unidade_principal_servidor(servidor):
@@ -166,17 +161,15 @@ def _obter_unidade_principal_servidor(servidor):
 def _obter_visao_label(nivel_visao, servidor):
     if nivel_visao == NIVEL_VISAO_SISTEMICA:
         return "Visão sistêmica — Divisão de Avaliação de Imóveis"
-    if nivel_visao == NIVEL_VISAO_UNIDADE:
-        unidade = _obter_unidade_principal_servidor(servidor)
-        if unidade:
-            return f"Visão da unidade — {unidade.sigla}"
-        return "Visão da unidade"
-    return f"Minha visão — {servidor.nome}"
+    unidade = _obter_unidade_principal_servidor(servidor)
+    if unidade:
+        return f"Visão da unidade — {unidade.sigla}"
+    return "Visão da unidade"
 
 
 def _contexto_dashboard_vazio():
     return {
-        "nivel_visao": NIVEL_VISAO_PESSOAL,
+        "nivel_visao": NIVEL_VISAO_UNIDADE,
         "servidor_logado": None,
         "visao_label": "",
         "total_os_ativas": 0,
@@ -441,14 +434,6 @@ def _contexto_dashboard_unidade(servidor, unidades_ids, perfil):
             [],
             [],
         ),
-        "card_producao_mes": _contar_producao_homologada_mes(os_ids=os_ids),
-    }
-
-
-def _contexto_dashboard_pessoal(servidor, perfil):
-    unidade = _obter_unidade_principal_servidor(servidor)
-    os_ids = set(os_da_unidade_atual(unidade).values_list("pk", flat=True)) if unidade else set()
-    return {
         "card_producao_mes": _contar_producao_homologada_mes(os_ids=os_ids),
     }
 
@@ -766,8 +751,8 @@ def _queryset_os_anotado():
 
 
 def _aplicar_visibilidade_os(queryset, request):
-    perfil = getattr(request, "perfil_acesso", None)
-    if perfil and perfil.visibilidade_total:
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
         return queryset
 
     servidor = _obter_servidor(request.user)
@@ -862,12 +847,12 @@ def _aplicar_filtros_os(queryset, request):
 
 
 def _aplicar_visibilidade_producao(queryset, request):
-    perfil = getattr(request, "perfil_acesso", None)
     servidor = _obter_servidor(request.user)
     if servidor is None:
         return queryset.none()
 
-    if perfil and perfil.visibilidade_total:
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
         return queryset
 
     unidade = _obter_unidade_principal_servidor(servidor)
@@ -1025,10 +1010,8 @@ class DashboardView(RequerLoginMixin, TemplateView):
 
         if nivel_visao == NIVEL_VISAO_SISTEMICA:
             context.update(_contexto_dashboard_sistemica(servidor, unidades_ids, perfil))
-        elif nivel_visao == NIVEL_VISAO_UNIDADE:
-            context.update(_contexto_dashboard_unidade(servidor, unidades_ids, perfil))
         else:
-            context.update(_contexto_dashboard_pessoal(servidor, perfil))
+            context.update(_contexto_dashboard_unidade(servidor, unidades_ids, perfil))
 
         context["visao_label"] = _obter_visao_label(nivel_visao, servidor)
         return context
@@ -1981,14 +1964,8 @@ def _grupos_header_gerencial(colunas_visiveis):
 
 
 def _pode_editar_entrada_dai(request):
-    perfil = getattr(request, "perfil_acesso", None)
-    if perfil is None:
-        return False
-    return (
-        perfil.pode_criar_os
-        or perfil.pode_homologar
-        or perfil.visibilidade_total
-    )
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+    return visibilidade in ("TOTAL", "DEPARTAMENTO")
 
 
 def _formatar_data_br(data):
@@ -2248,7 +2225,6 @@ def _producoes_painel_gerencial(
     os_obj,
     unidade,
     servidor_logado,
-    perfil_pode_homologar,
     request,
     producao_ativa=None,
     modo_b=False,
@@ -2294,7 +2270,6 @@ def _montar_panel_gerencial(
     *,
     request=None,
     servidor_logado=None,
-    perfil_pode_homologar=False,
     modo_b=False,
     etapa_interna=None,
     etapa_interna_choices=None,
@@ -2359,7 +2334,6 @@ def _montar_panel_gerencial(
             os_obj,
             unidade,
             servidor_logado,
-            perfil_pode_homologar,
             request,
             producao_ativa=producao,
             modo_b=modo_b,
@@ -2417,7 +2391,6 @@ def _serializar_linhas_gerencial(
     os_obj,
     unidade_logada=None,
     servidor_logado=None,
-    perfil_pode_homologar=False,
     request=None,
     modo_b=False,
 ):
@@ -2571,7 +2544,6 @@ def _serializar_linhas_gerencial(
             entrada_eav,
             request=request,
             servidor_logado=servidor_logado,
-            perfil_pode_homologar=perfil_pode_homologar,
             modo_b=modo_b,
             etapa_interna=etapa_interna,
             etapa_interna_choices=etapa_interna_choices,
@@ -2654,7 +2626,6 @@ def _montar_linhas_gerencial(
     os_queryset,
     unidade,
     servidor_logado=None,
-    perfil_pode_homologar=False,
     request=None,
     modo_b=False,
 ):
@@ -2671,7 +2642,6 @@ def _montar_linhas_gerencial(
                 os_obj,
                 unidade,
                 servidor_logado=servidor_logado,
-                perfil_pode_homologar=perfil_pode_homologar,
                 request=request,
                 modo_b=modo_b,
             ),
@@ -2733,14 +2703,11 @@ def _contagens_status_gerencial(os_ids):
 def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_b=False):
     servidor = _obter_servidor(request.user)
     unidade = _obter_unidade_principal_servidor(servidor)
-    perfil = getattr(request, "perfil_acesso", None)
-    pode_homologar = perfil is not None and perfil.pode_homologar
     os_ids = list(queryset_completo.values_list("pk", flat=True))
     linhas_base = _montar_linhas_gerencial(
         queryset_completo,
         unidade,
         servidor_logado=servidor,
-        perfil_pode_homologar=pode_homologar,
         request=request,
         modo_b=modo_b,
     )
@@ -2786,7 +2753,6 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_
             default=str,
             ensure_ascii=False,
         ),
-        "pode_homologar": pode_homologar,
         "pode_editar_entrada_dai": _pode_editar_entrada_dai(request),
         "servidores": Servidor.objects.order_by("nome"),
         "servidores_unidade": (
@@ -2894,13 +2860,10 @@ class OSListView(RequerLoginMixin, ListView):
         if self.request.GET.get("view") in ("gerencial", "gerencial_b"):
             servidor = _obter_servidor(self.request.user)
             unidade = _obter_unidade_principal_servidor(servidor)
-            perfil = getattr(self.request, "perfil_acesso", None)
-            pode_homologar = perfil is not None and perfil.pode_homologar
             linhas = _montar_linhas_gerencial(
                 queryset,
                 unidade,
                 servidor_logado=servidor,
-                perfil_pode_homologar=pode_homologar,
                 request=self.request,
                 modo_b=(self.request.GET.get("view") == "gerencial_b"),
             )
@@ -2953,13 +2916,10 @@ class OSListView(RequerLoginMixin, ListView):
         if view_mode in ("gerencial", "gerencial_b"):
             servidor = _obter_servidor(self.request.user)
             unidade = _obter_unidade_principal_servidor(servidor)
-            perfil = getattr(self.request, "perfil_acesso", None)
-            pode_homologar = perfil is not None and perfil.pode_homologar
             linhas_pagina = _montar_linhas_gerencial(
                 context["ordens"],
                 unidade,
                 servidor_logado=servidor,
-                perfil_pode_homologar=pode_homologar,
                 request=self.request,
                 modo_b=(view_mode == "gerencial_b"),
             )
@@ -3001,8 +2961,8 @@ class ProducaoListView(RequerLoginMixin, ListView):
             "prefixo",
         )
         context["unidades"] = UnidadeInterna.objects.all().order_by("sigla")
-        perfil = getattr(self.request, "perfil_acesso", None)
-        context["exibir_filtro_unidade"] = perfil and perfil.visibilidade_total
+        visibilidade = getattr(self.request, "visibilidade", "UNIDADE")
+        context["exibir_filtro_unidade"] = visibilidade in ("TOTAL", "DEPARTAMENTO")
         return context
 
 
@@ -3143,13 +3103,9 @@ class OSDetailView(RequerLoginMixin, DetailView):
         context["status_unidade"] = status_unidade
         context["status_unidade_atual"] = status_unidade
         context["os_editavel"] = os_editavel_para_usuario(os_obj, self.request)
-        context["is_primeiro_encaminhamento"] = is_primeiro_encaminhamento(os_obj)
-        perfil = getattr(self.request, "perfil_acesso", None)
-        context["pode_homologar"] = bool(perfil and perfil.pode_homologar)
+        # Reabrir: OS CONCLUIDA na unidade do vínculo (os_editavel é False para UNIDADE).
         context["pode_reabrir_na_unidade"] = (
-            perfil is not None
-            and perfil.pode_homologar
-            and status_unidade is not None
+            status_unidade is not None
             and status_unidade.status == "CONCLUIDA"
         )
         return context
@@ -3167,19 +3123,6 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
         if not os_editavel_para_usuario(self.os_obj, request):
             messages.error(request, MSG_OS_SOMENTE_LEITURA)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
-        if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
-            # DEPARTAMENTO só pode fazer o primeiro encaminhamento
-            # ou incluir processo relacionado
-            if not is_primeiro_encaminhamento(self.os_obj):
-                messages.error(
-                    request,
-                    "Perfil DEPARTAMENTO só pode fazer o primeiro "
-                    "encaminhamento. Para reencaminhar, use um "
-                    "vínculo operacional.",
-                )
-                return redirect(
-                    reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}),
-                )
         return super().dispatch(request, *args, **kwargs)
 
     def get_form(self, form_class=None):
@@ -3301,11 +3244,6 @@ class EncaminhamentoCreateView(RequerLoginMixin, FormView):
 class OSReabrirNaUnidadeView(RequerLoginMixin, View):
     def post(self, request, pk):
         os_obj = get_object_or_404(OS, pk=pk)
-        perfil = getattr(request, "perfil_acesso", None)
-        if perfil is None or not perfil.pode_homologar:
-            messages.error(request, MSG_SEM_PERMISSAO)
-            return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
-
         servidor = _obter_servidor(request.user)
         unidade = _obter_unidade_principal_servidor(servidor) if servidor else None
         if servidor is None or unidade is None:
@@ -3324,6 +3262,8 @@ class OSReabrirNaUnidadeView(RequerLoginMixin, View):
             )
             return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
 
+        # CONCLUIDA ⇒ os_editavel=False para UNIDADE; reabrir exige vínculo
+        # na unidade com status CONCLUIDA (mesmo critério do botão na detail).
         _ativar_os_na_unidade(
             os_obj,
             unidade,
@@ -3345,13 +3285,6 @@ class ProducaoCreateView(RequerLoginMixin, FormView):
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         if not os_editavel_para_usuario(self.os_obj, request):
             messages.error(request, MSG_OS_SOMENTE_LEITURA)
-            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
-        if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
-            messages.error(
-                request,
-                "Perfil DEPARTAMENTO não pode registrar produção. "
-                "Use um vínculo operacional.",
-            )
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         return super().dispatch(request, *args, **kwargs)
 
@@ -3452,10 +3385,6 @@ class OSEncerramentoView(RequerLoginMixin, FormView):
 
     def dispatch(self, request, *args, **kwargs):
         self.os_obj = get_object_or_404(OS, pk=kwargs["pk"])
-        perfil = getattr(request, "perfil_acesso", None)
-        if perfil is None or not perfil.pode_encerrar_os:
-            messages.error(request, MSG_SEM_PERMISSAO)
-            return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
         if not os_editavel_para_usuario(self.os_obj, request):
             messages.error(request, MSG_OS_SOMENTE_LEITURA)
             return redirect(reverse("os_detalhe", kwargs={"pk": self.os_obj.pk}))
@@ -3600,11 +3529,10 @@ class OSLiberarProcessoView(RequerLoginMixin, View):
     template_name = "os_liberar_processo.html"
 
     def dispatch(self, request, *args, **kwargs):
-        perfil = getattr(request, "perfil_acesso", None)
-        if not perfil or not perfil.pode_homologar:
+        self.os_obj = get_object_or_404(OS, pk=kwargs["os_pk"])
+        if not os_editavel_para_usuario(self.os_obj, request):
             raise PermissionDenied
 
-        self.os_obj = get_object_or_404(OS, pk=kwargs["os_pk"])
         self.os_processo = get_object_or_404(
             OsProcesso,
             pk=kwargs["proc_pk"],
@@ -4184,8 +4112,6 @@ class ProducaoDetailView(RequerLoginMixin, DetailView):
             .order_by("-data_hora")
         )
         context["tem_servidor"] = _obter_servidor(self.request.user) is not None
-        perfil = getattr(self.request, "perfil_acesso", None)
-        context["pode_homologar"] = perfil is not None and perfil.pode_homologar
         context["pode_cancelar"] = (
             producao.status != Producao.STATUS_CANCELADO
             and os_editavel_para_usuario(producao.os, self.request)
@@ -4336,9 +4262,14 @@ def _formatar_data_resposta_json(data):
     }
 
 
-class ProducaoEditarCampoView(RequerHomologarMixin, View):
+class ProducaoEditarCampoView(RequerLoginMixin, View):
     def post(self, request, pk):
         producao = get_object_or_404(Producao, pk=pk)
+        if not os_editavel_para_usuario(producao.os, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
         campo = (request.POST.get("campo") or "").strip()
         valor = (request.POST.get("valor") or "").strip()
 
@@ -4373,7 +4304,6 @@ class OSEditarCampoView(RequerLoginMixin, View):
         )
         campo = (request.POST.get("campo") or "").strip()
         valor = (request.POST.get("valor") or "").strip()
-        perfil = getattr(request, "perfil_acesso", None)
 
         if campo not in CAMPOS_EDITAVEIS_OS:
             return JsonResponse(
@@ -4442,9 +4372,9 @@ class OSEditarCampoView(RequerLoginMixin, View):
                 },
             )
 
-        if not perfil or not perfil.pode_homologar:
+        if not os_editavel_para_usuario(os_obj, request):
             return JsonResponse(
-                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
                 status=403,
             )
 
@@ -4483,13 +4413,6 @@ class OSEditarCampoView(RequerLoginMixin, View):
             )
 
         if campo == "prazo_data":
-            # TODO: revisar — placeholder até pode_editar_prazo_global
-            if not perfil or not perfil.pode_homologar:
-                return JsonResponse(
-                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
-                    status=403,
-                )
-
             servidor = _obter_servidor(request.user)
             if servidor is None:
                 return JsonResponse(
@@ -4565,11 +4488,9 @@ class OsUnidadePrazoEditarView(RequerLoginMixin, View):
 
     def post(self, request, pk):
         os_obj = get_object_or_404(OS, pk=pk)
-        perfil = getattr(request, "perfil_acesso", None)
-        # TODO: revisar — placeholder até pode_editar_prazo_unidade
-        if not perfil or not perfil.pode_homologar:
+        if not os_editavel_para_usuario(os_obj, request):
             return JsonResponse(
-                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
                 status=403,
             )
 
@@ -5042,14 +4963,6 @@ class ProducaoNovaAPIView(RequerLoginJSONMixin, View):
         if not os_editavel_para_usuario(os_obj, request):
             return JsonResponse(
                 {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
-                status=403,
-            )
-        if getattr(request, "visibilidade", "UNIDADE") == "DEPARTAMENTO":
-            return JsonResponse(
-                {
-                    "sucesso": False,
-                    "erro": "Perfil DEPARTAMENTO não pode registrar produção.",
-                },
                 status=403,
             )
 

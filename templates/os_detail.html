@@ -22,15 +22,13 @@
   <div>
     <strong>Modo somente leitura</strong> —
     Esta OS foi concluída na sua unidade.
-    {% if pode_homologar and pode_reabrir_na_unidade %}
+    {% if pode_reabrir_na_unidade %}
     <form method="post" action="{% url 'os_reabrir_unidade' os.pk %}" class="d-inline ms-2">
       {% csrf_token %}
       <button type="submit" class="btn btn-link alert-link p-0 align-baseline">
         Reabrir na unidade →
       </button>
     </form>
-    {% elif pode_homologar %}
-    <span class="ms-2">Use o botão de reabertura quando a OS estiver concluída na unidade.</span>
     {% else %}
     Solicite a reabertura à chefia da sua unidade.
     {% endif %}
@@ -66,12 +64,8 @@
   </div>
   <div class="d-flex flex-wrap gap-2">
     {% if tem_servidor and os_editavel %}
-      {% if request.visibilidade != 'DEPARTAMENTO' or is_primeiro_encaminhamento %}
       <a href="{% url 'os_encaminhar' os.pk %}" class="btn btn-outline-primary btn-sm">Encaminhar</a>
-      {% endif %}
-      {% if request.visibilidade != 'DEPARTAMENTO' %}
       <a href="{% url 'os_producao' os.pk %}" class="btn btn-outline-primary btn-sm">Registrar produção</a>
-      {% endif %}
     {% endif %}
     {% if pode_reabrir_na_unidade %}
     <form method="post" action="{% url 'os_reabrir_unidade' os.pk %}" class="d-inline">
@@ -79,7 +73,7 @@
       <button type="submit" class="btn btn-outline-warning btn-sm">Reabrir na unidade</button>
     </form>
     {% endif %}
-    {% if os_editavel and request.perfil_acesso and request.perfil_acesso.pode_encerrar_os %}
+    {% if os_editavel %}
       <a href="{% url 'os_encerrar' os.pk %}" class="btn btn-outline-danger btn-sm">Encerrar OS</a>
     {% endif %}
   </div>
@@ -223,7 +217,7 @@
                 </td>
                 <td>{% if vinculo.data_encerramento %}{{ vinculo.data_encerramento|date:"d/m/Y" }}{% else %}—{% endif %}</td>
                 <td class="text-end">
-                  {% if vinculo.aguardando_redistribuicao and request.perfil_acesso and request.perfil_acesso.pode_homologar %}
+                  {% if vinculo.aguardando_redistribuicao and os_editavel %}
                   <a href="{% url 'os_liberar_processo' os.pk vinculo.pk %}"
                      class="btn btn-outline-warning btn-sm">
                     Liberar processo

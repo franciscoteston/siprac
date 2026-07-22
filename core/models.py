@@ -40,16 +40,11 @@ class PerfilAcesso(models.Model):
 
     VISIBILIDADE_CHOICES = [
         ("UNIDADE", "Apenas sua unidade"),
-        ("DEPARTAMENTO", "Todas as OSs (consulta e entrada)"),
+        ("DEPARTAMENTO", "Todas as OSs (edição completa)"),
         ("TOTAL", "Total (edição completa)"),
     ]
 
     nome = models.CharField(max_length=255)
-    pode_criar_os = models.BooleanField(default=False)
-    pode_encerrar_os = models.BooleanField(default=False)
-    pode_criar_os_interna = models.BooleanField(default=False)
-    pode_homologar = models.BooleanField(default=False)
-    visibilidade_total = models.BooleanField(default=False)
     visibilidade = models.CharField(
         max_length=15,
         choices=VISIBILIDADE_CHOICES,

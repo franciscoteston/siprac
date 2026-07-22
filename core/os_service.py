@@ -21,9 +21,7 @@ def os_editavel_para_usuario(os, request):
     Retorna True se o usuário logado pode editar a OS.
 
     Regras:
-    - Visibilidade TOTAL: sempre pode editar
-    - Visibilidade DEPARTAMENTO: pode editar (criar OS, registrar processo)
-      mas NÃO pode encaminhar nem criar produção
+    - Visibilidade TOTAL ou DEPARTAMENTO: sempre pode editar
     - Visibilidade UNIDADE: só pode editar se OsUnidadeStatus
       da sua unidade for ABERTA ou REABERTA
     - Se OsUnidadeStatus for CONCLUIDA ou SOMENTE_LEITURA:
@@ -31,17 +29,12 @@ def os_editavel_para_usuario(os, request):
     """
     visibilidade = getattr(request, "visibilidade", "UNIDADE")
 
-    if visibilidade == "TOTAL":
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
         return True
 
     vinculo = getattr(request, "vinculo_ativo", None)
     if not vinculo:
         return False
-
-    if visibilidade == "DEPARTAMENTO":
-        # DEPARTAMENTO pode criar OS e registrar processo
-        # mas não pode editar OS que está em unidade operacional
-        return True
 
     # UNIDADE — verificar OsUnidadeStatus
     try:

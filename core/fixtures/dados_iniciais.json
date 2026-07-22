@@ -4,11 +4,7 @@
     "pk": 1,
     "fields": {
       "nome": "Administrador",
-      "pode_criar_os": true,
-      "pode_encerrar_os": true,
-      "pode_criar_os_interna": true,
-      "pode_homologar": true,
-      "visibilidade_total": true,
+      "visibilidade": "TOTAL",
       "admin_sistema": true
     }
   },
@@ -17,11 +13,7 @@
     "pk": 2,
     "fields": {
       "nome": "Diretor",
-      "pode_criar_os": true,
-      "pode_encerrar_os": true,
-      "pode_criar_os_interna": true,
-      "pode_homologar": true,
-      "visibilidade_total": true,
+      "visibilidade": "TOTAL",
       "admin_sistema": false
     }
   },
@@ -30,11 +22,7 @@
     "pk": 3,
     "fields": {
       "nome": "Aux. Téc. Direção",
-      "pode_criar_os": true,
-      "pode_encerrar_os": true,
-      "pode_criar_os_interna": true,
-      "pode_homologar": true,
-      "visibilidade_total": true,
+      "visibilidade": "TOTAL",
       "admin_sistema": false
     }
   },
@@ -43,11 +31,7 @@
     "pk": 4,
     "fields": {
       "nome": "Coordenador",
-      "pode_criar_os": true,
-      "pode_encerrar_os": true,
-      "pode_criar_os_interna": true,
-      "pode_homologar": true,
-      "visibilidade_total": false,
+      "visibilidade": "UNIDADE",
       "admin_sistema": false
     }
   },
@@ -56,11 +40,7 @@
     "pk": 5,
     "fields": {
       "nome": "Aux. Téc. Coord.",
-      "pode_criar_os": true,
-      "pode_encerrar_os": false,
-      "pode_criar_os_interna": false,
-      "pode_homologar": true,
-      "visibilidade_total": false,
+      "visibilidade": "UNIDADE",
       "admin_sistema": false
     }
   },
@@ -69,11 +49,7 @@
     "pk": 6,
     "fields": {
       "nome": "Técnico",
-      "pode_criar_os": false,
-      "pode_encerrar_os": false,
-      "pode_criar_os_interna": false,
-      "pode_homologar": false,
-      "visibilidade_total": false,
+      "visibilidade": "UNIDADE",
       "admin_sistema": false
     }
   },
@@ -82,11 +58,7 @@
     "pk": 7,
     "fields": {
       "nome": "Aux. Adm. Gestão",
-      "pode_criar_os": true,
-      "pode_encerrar_os": false,
-      "pode_criar_os_interna": false,
-      "pode_homologar": false,
-      "visibilidade_total": false,
+      "visibilidade": "DEPARTAMENTO",
       "admin_sistema": false
     }
   },
@@ -95,11 +67,7 @@
     "pk": 8,
     "fields": {
       "nome": "Aux. Adm. Pesquisa",
-      "pode_criar_os": false,
-      "pode_encerrar_os": false,
-      "pode_criar_os_interna": false,
-      "pode_homologar": false,
-      "visibilidade_total": false,
+      "visibilidade": "UNIDADE",
       "admin_sistema": false
     }
   },

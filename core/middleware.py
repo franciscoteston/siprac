@@ -132,24 +132,8 @@ class PerfilAcessoMiddleware:
                         None,
                     )
 
-                # Corrigir visibilidade DEPARTAMENTO para vínculos operacionais
-                # Se o perfil é DEPARTAMENTO mas a unidade ativa é OPERACIONAL,
-                # a visibilidade efetiva é UNIDADE
-                if visibilidade == "DEPARTAMENTO" and request.vinculo_ativo:
-                    unidade = request.vinculo_ativo.unidade
-                    tipo_unidade = getattr(unidade, "tipo", "OPERACIONAL")
-                    if tipo_unidade == "OPERACIONAL":
-                        visibilidade = "UNIDADE"
-
                 if visibilidade not in ("UNIDADE", "DEPARTAMENTO", "TOTAL"):
-                    if request.perfil_acesso and getattr(
-                        request.perfil_acesso,
-                        "visibilidade_total",
-                        False,
-                    ):
-                        visibilidade = "TOTAL"
-                    else:
-                        visibilidade = "UNIDADE"
+                    visibilidade = "UNIDADE"
 
                 request.visibilidade = visibilidade
 
