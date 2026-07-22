@@ -1,7 +1,6 @@
 from datetime import date
 
 import openpyxl
-from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -164,14 +163,14 @@ def relatorio_producao_por_servidor(filtros):
             "tipo_producao",
             "os",
             "os__natureza",
-            "autor_trabalho",
-            "homologado_por",
+            "criado_por",
+            "unidade",
         )
-        .order_by("autor_trabalho__nome", "data_enviado")
+        .order_by("criado_por__nome", "data_enviado")
     )
 
     if filtros.get("servidor_id"):
-        qs = qs.filter(autor_trabalho__id=filtros["servidor_id"])
+        qs = qs.filter(criado_por__id=filtros["servidor_id"])
     if filtros.get("data_inicio"):
         qs = qs.filter(data_enviado__gte=filtros["data_inicio"])
     if filtros.get("data_fim"):
@@ -179,13 +178,7 @@ def relatorio_producao_por_servidor(filtros):
     if filtros.get("tipo_producao_id"):
         qs = qs.filter(tipo_producao__id=filtros["tipo_producao_id"])
     if filtros.get("unidade_id"):
-        hoje = timezone.localdate()
-        qs = qs.filter(
-            autor_trabalho__vinculos_unidade__unidade_id=filtros["unidade_id"],
-        ).filter(
-            Q(autor_trabalho__vinculos_unidade__data_fim__isnull=True)
-            | Q(autor_trabalho__vinculos_unidade__data_fim__gte=hoje),
-        ).distinct()
+        qs = qs.filter(unidade_id=filtros["unidade_id"])
 
     return qs
 
@@ -200,10 +193,10 @@ def linhas_relatorio_producao(queryset):
         linhas.append(
             {
                 "autor": (
-                    producao.autor_trabalho.nome if producao.autor_trabalho else "—"
+                    producao.criado_por.nome if producao.criado_por else "—"
                 ),
                 "tipo": (
-                    producao.tipo_producao.prefixo
+                    producao.tipo_producao.label_display
                     if producao.tipo_producao
                     else "Despacho"
                 ),
@@ -218,10 +211,7 @@ def linhas_relatorio_producao(queryset):
                     else "—"
                 ),
                 "data_enviado": producao.data_enviado,
-                "homologado_por": (
-                    producao.homologado_por.nome if producao.homologado_por else "—"
-                ),
-                "unidade": _sigla_unidade_autor(producao.autor_trabalho),
+                "unidade": _sigla_unidade_producao(producao),
             },
         )
     return linhas
@@ -240,18 +230,10 @@ def _mapa_processos_principais(producoes):
     }
 
 
-def _sigla_unidade_autor(servidor):
-    if servidor is None:
-        return "—"
-    hoje = timezone.localdate()
-    vinculo = (
-        servidor.vinculos_unidade.filter(
-            Q(data_fim__isnull=True) | Q(data_fim__gte=hoje),
-        )
-        .select_related("unidade")
-        .first()
-    )
-    return vinculo.unidade.sigla if vinculo else "—"
+def _sigla_unidade_producao(producao):
+    if producao.unidade:
+        return producao.unidade.sigla
+    return "—"
 
 
 def exportar_producao_excel(queryset):
@@ -280,8 +262,7 @@ def exportar_producao_excel(queryset):
         ("OS vinculada", 18),
         ("Natureza", 20),
         ("Processo SEI", 25),
-        ("Data homologação", 18),
-        ("Homologado por", 25),
+        ("Data de envio", 18),
         ("Unidade", 10),
     ]
 
@@ -298,13 +279,13 @@ def exportar_producao_excel(queryset):
         ws.cell(
             row=row,
             column=1,
-            value=producao.autor_trabalho.nome if producao.autor_trabalho else "—",
+            value=producao.criado_por.nome if producao.criado_por else "—",
         )
         ws.cell(
             row=row,
             column=2,
             value=(
-                producao.tipo_producao.prefixo
+                producao.tipo_producao.label_display
                 if producao.tipo_producao
                 else "Despacho"
             ),
@@ -337,12 +318,7 @@ def exportar_producao_excel(queryset):
         ws.cell(
             row=row,
             column=8,
-            value=producao.homologado_por.nome if producao.homologado_por else "—",
-        )
-        ws.cell(
-            row=row,
-            column=9,
-            value=_sigla_unidade_autor(producao.autor_trabalho),
+            value=_sigla_unidade_producao(producao),
         )
 
         if row % 2 == 0:

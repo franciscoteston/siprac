@@ -7,14 +7,6 @@ from core.models import Encaminhamento, OS, OsUnidadeStatus, Producao, TarefaInt
 
 CHAVE_ENTRADA_DIVISAO = "Entrada na Divisão"
 
-STATUS_ATIVOS = [
-    Producao.STATUS_NAO_DISTRIBUIDO,
-    Producao.STATUS_DISTRIBUIDO,
-    Producao.STATUS_REVISAR,
-    Producao.STATUS_VER_AJUSTES,
-    Producao.STATUS_HOMOLOGAR,
-]
-
 
 def is_primeiro_encaminhamento(os):
     """
@@ -296,8 +288,10 @@ def timeline_os(os):
 
 
 def ativar_atendimento_interno_se_necessario(os, servidor=None):
-    """Registra ATENDIMENTO_INTERNO quando há produção ativa e ainda não está nesse estado."""
-    producoes_ativas = Producao.objects.filter(os=os, status__in=STATUS_ATIVOS)
+    """Registra ATENDIMENTO_INTERNO quando há produção não cancelada e ainda não está nesse estado."""
+    producoes_ativas = Producao.objects.filter(os=os).exclude(
+        status=Producao.STATUS_CANCELADO,
+    )
     if not producoes_ativas.exists():
         return False
     if macroetapa_atual_os(os) == "ATENDIMENTO_INTERNO":
@@ -379,58 +373,6 @@ def queryset_os_com_macroetapa(queryset=None):
             output_field=CharField(),
         ),
     )
-
-
-def contar_producoes_por_status_unidades(unidades_ids):
-    """Contagem de produções por status para OS das unidades informadas."""
-    hoje = timezone.localdate()
-    resultado = {
-        "NAO_DISTRIBUIDO": 0,
-        "DISTRIBUIDO": 0,
-        "REVISAR": 0,
-        "REVISADO": 0,
-        "VER_AJUSTES": 0,
-        "ENTREGA_AJUSTES": 0,
-        "AJUSTES_OK": 0,
-        "HOMOLOGAR": 0,
-        "ENVIADO": 0,
-        "HOMOLOGADO_MES": 0,
-    }
-
-    if not unidades_ids:
-        return resultado
-
-    os_ids_enc = set(
-        OS.objects.filter(
-            encaminhamentos__unidade_interna_destino_id__in=unidades_ids,
-        ).values_list("pk", flat=True),
-    )
-    os_ids_tarefa = set(
-        TarefaInterna.objects.filter(unidade_id__in=unidades_ids).values_list(
-            "os_id",
-            flat=True,
-        ),
-    )
-    os_ids = os_ids_enc | os_ids_tarefa
-
-    if not os_ids:
-        return resultado
-
-    queryset = Producao.objects.filter(os_id__in=os_ids).exclude(
-        status=Producao.STATUS_CANCELADO,
-    )
-
-    for item in queryset.values("status").annotate(total=Count("id")):
-        if item["status"] in resultado:
-            resultado[item["status"]] = item["total"]
-
-    resultado["HOMOLOGADO_MES"] = queryset.filter(
-        status=Producao.STATUS_ENVIADO,
-        data_enviado__year=hoje.year,
-        data_enviado__month=hoje.month,
-    ).count()
-
-    return resultado
 
 
 def _queryset_os_nao_encerradas():
@@ -553,9 +495,7 @@ def os_ativas_por_unidade():
                 "nome": nome,
                 "sigla": chave,
                 "total": 0,
-                "em_elaboracao": 0,
-                "para_revisao": 0,
-                "homologadas_mes": 0,
+                "enviadas_mes": 0,
                 "_os_ids": [],
             }
         distribuicao[chave]["total"] += 1
@@ -564,14 +504,8 @@ def os_ativas_por_unidade():
     resultado = []
     for dados in distribuicao.values():
         os_ids_grupo = dados.pop("_os_ids")
-        producoes = Producao.objects.filter(os_id__in=os_ids_grupo)
-        dados["em_elaboracao"] = producoes.filter(
-            status=Producao.STATUS_DISTRIBUIDO,
-        ).count()
-        dados["para_revisao"] = producoes.filter(
-            status=Producao.STATUS_REVISAR,
-        ).count()
-        dados["homologadas_mes"] = producoes.filter(
+        dados["enviadas_mes"] = Producao.objects.filter(
+            os_id__in=os_ids_grupo,
             status=Producao.STATUS_ENVIADO,
             data_enviado__year=hoje.year,
             data_enviado__month=hoje.month,
@@ -603,42 +537,6 @@ def os_da_unidade_atual(unidade_interna):
     return OS.objects.filter(pk__in=filtrados)
 
 
-def contar_producoes_por_os_ids(os_ids):
-    """Contagem de produções por status para as OS informadas."""
-    hoje = timezone.localdate()
-    resultado = {
-        "NAO_DISTRIBUIDO": 0,
-        "DISTRIBUIDO": 0,
-        "REVISAR": 0,
-        "REVISADO": 0,
-        "VER_AJUSTES": 0,
-        "ENTREGA_AJUSTES": 0,
-        "AJUSTES_OK": 0,
-        "HOMOLOGAR": 0,
-        "ENVIADO": 0,
-        "HOMOLOGADO_MES": 0,
-    }
-
-    if not os_ids:
-        return resultado
-
-    queryset = Producao.objects.filter(os_id__in=os_ids).exclude(
-        status=Producao.STATUS_CANCELADO,
-    )
-
-    for item in queryset.values("status").annotate(total=Count("id")):
-        if item["status"] in resultado:
-            resultado[item["status"]] = item["total"]
-
-    resultado["HOMOLOGADO_MES"] = queryset.filter(
-        status=Producao.STATUS_ENVIADO,
-        data_enviado__year=hoje.year,
-        data_enviado__month=hoje.month,
-    ).count()
-
-    return resultado
-
-
 def data_entrada_unidade(os, unidade):
     """
     Retorna a data do último encaminhamento recebido pela unidade
@@ -668,10 +566,6 @@ def itens_pendentes_usuario(servidor):
     """
     Retorna contagem de itens pendentes para o servidor logado.
     - os_novas: OSs encaminhadas para a unidade do servidor após seu último login
-    - producoes_pendentes: produções da unidade do servidor (unidade_id ou OS
-      nas unidades ativas) com status em DISTRIBUIDO, VER_AJUSTES ou REVISAR
-    - revisoes_pendentes: produções em REVISAR na unidade do servidor
-      (apenas para perfis com pode_homologar=True)
     """
     from django.utils import timezone
 
@@ -689,42 +583,7 @@ def itens_pendentes_usuario(servidor):
         data_inicio__gt=ultimo_login,
     ).count()
 
-    os_ids_unidade = set(
-        OsUnidadeStatus.objects.filter(
-            unidade_id__in=vinculos_ativos,
-        ).values_list("os_id", flat=True)
-    )
-    producoes_pendentes = (
-        Producao.objects.filter(
-            Q(unidade_id__in=vinculos_ativos) | Q(os_id__in=os_ids_unidade),
-            status__in=[
-                Producao.STATUS_DISTRIBUIDO,
-                Producao.STATUS_VER_AJUSTES,
-                Producao.STATUS_REVISAR,
-            ],
-        )
-        .distinct()
-        .count()
-    )
-
-    revisoes_pendentes = 0
-    perfil = servidor.vinculos_unidade.filter(
-        data_fim__isnull=True
-    ).select_related("perfil").first()
-
-    if perfil and perfil.perfil.pode_homologar:
-        revisoes_pendentes = Producao.objects.filter(
-            os__os_imoveis__isnull=False,
-            status="REVISAR",
-        ).filter(
-            os__encaminhamentos__unidade_interna_destino_id__in=vinculos_ativos
-        ).distinct().count()
-
-    total = os_novas + producoes_pendentes + revisoes_pendentes
-
     return {
-        "total": total,
+        "total": os_novas,
         "os_novas": os_novas,
-        "producoes_pendentes": producoes_pendentes,
-        "revisoes_pendentes": revisoes_pendentes,
     }

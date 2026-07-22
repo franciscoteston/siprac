@@ -69,7 +69,7 @@
             <th>Tipo</th>
             <th>Status</th>
             <th>Autor</th>
-            <th>Homologação</th>
+            <th>Envio</th>
           </tr>
         </thead>
         <tbody>
@@ -80,14 +80,14 @@
                 {% if producao.numero_producao %}{{ producao.numero_producao }}{% else %}#{{ producao.pk }}{% endif %}
               </a>
             </td>
-            <td>{{ producao.tipo_producao.prefixo }}</td>
+            <td>{{ producao.tipo_producao.label_display }}</td>
             <td>
               <span class="badge bg-{{ producao.status|status_producao_cor }}">
                 {{ producao.status|status_producao_display }}
               </span>
             </td>
             <td class="small">
-              {% if producao.autor_trabalho %}{{ producao.autor_trabalho.nome }}{% else %}—{% endif %}
+              {% if producao.criado_por %}{{ producao.criado_por.nome }}{% else %}—{% endif %}
             </td>
             <td class="small">
               {% if producao.data_enviado %}{{ producao.data_enviado|date:"d/m/Y" }}{% else %}—{% endif %}

@@ -5,18 +5,6 @@
 (function (window) {
   'use strict';
 
-  const STATUS_SUGESTOES = {
-    data_enviado: { de: 'HOMOLOGAR', para: 'ENVIADO', msg: 'Marcar como enviado?' },
-  };
-
-  const STATUS_LABELS = {
-    REVISAR: 'Revisar',
-    REVISADO: 'Revisado',
-    ENTREGA_AJUSTES: 'Entrega ajustes',
-    HOMOLOGAR: 'Homologar',
-    ENVIADO: 'Enviado',
-  };
-
   function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text == null ? '' : String(text);
@@ -138,57 +126,36 @@
     );
   }
 
-  function renderTransicoes(prod) {
-    if (!(prod.transicoes || []).length) return '';
-    return '<div class="d-flex gap-1 flex-wrap mb-2" id="painel-transicoes-' + prod.pk + '">' +
-      (prod.transicoes || []).map(function (t) {
-        return '<button type="button" class="btn btn-sm btn-outline-secondary"' +
-          ' style="font-size:11px;padding:2px 8px;"' +
-          ' data-transicao-prod="' + prod.pk + '" data-status="' + t.destino + '">→ ' +
-          escapeHtml(t.label) + '</button>';
-      }).join('') + '</div>';
-  }
-
   function renderProducaoAccordion(prod, data, expandido) {
     const bodyStyle = expandido ? '' : ' style="display:none;"';
     let html = '<div class="card mb-2 border" id="painel-prod-' + prod.pk + '">';
     html += '<div class="card-header p-2 d-flex align-items-center gap-2"' +
       ' style="cursor:pointer;background:#f0f4f8;" data-toggle-prod="' + prod.pk + '">';
     html += '<span style="font-size:12px;font-weight:600;color:#1a3a5c;flex:1;">' +
-      escapeHtml(prod.prefixo + ' — ' + prod.label) + '</span>';
+      escapeHtml(prod.label || '') + '</span>';
     html += '<span class="badge bg-' + prod.status_cor + '">' + escapeHtml(prod.status_label) + '</span>';
     html += '<i class="bi bi-chevron-' + (expandido ? 'up' : 'down') + '" style="font-size:10px;"></i>';
     html += '</div>';
     html += '<div class="card-body p-2" id="painel-secao-prod-' + prod.pk + '"' + bodyStyle + '>';
-    html += renderTransicoes(prod);
-    html += '<div id="painel-sugestao-' + prod.pk + '"></div>';
 
-    html += '<div class="text-muted mb-1" style="font-size:11px;font-weight:600;">Triagem</div>';
-    html += renderCampoData(prod.pk, 'prazo_interno', 'Prazo EAV', prod.prazo_eav_iso,
-      'painel-campo-prazo-eav-' + prod.pk);
-    html += renderCampoTexto(prod.pk, 'mes_cronograma', 'Cronograma', prod.mes_cronograma_iso, 'month');
-    html += renderCampoTexto(prod.pk, 'modelo_sugerido', 'Modelo sug.', prod.modelo_sugerido);
+    if (prod.pode_cancelar && data.os_editavel) {
+      html += '<div class="d-flex gap-1 flex-wrap mb-2" id="painel-transicoes-' + prod.pk + '">' +
+        '<button type="button" class="btn btn-sm btn-outline-danger"' +
+        ' style="font-size:11px;padding:2px 8px;"' +
+        ' data-cancelar-prod="' + prod.pk + '">Cancelar</button></div>';
+    }
 
-    html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Revisão</div>';
-    html += renderCampoData(prod.pk, 'prazo_rev', 'Prazo rev', prod.prazo_rev_iso);
-
-    html += '<div class="text-muted mb-1 mt-2" style="font-size:11px;font-weight:600;">Homologação</div>';
-    html += renderCampoData(prod.pk, 'data_homologar', 'Homologar', prod.data_homologar_iso);
+    html += '<div class="text-muted mb-1" style="font-size:11px;font-weight:600;">Dados</div>';
     html += renderCampoTexto(prod.pk, 'numero_producao', 'Nº trabalho', prod.numero_producao);
     html += renderCampoTexto(prod.pk, 'numero_sei', 'DOC SEI', prod.numero_sei);
-    html += renderCampoData(prod.pk, 'data_enviado', 'Envio SEI', prod.enviado_iso);
-
-    if (prod.status === 'ENVIADO' && prod.opcoes_pos_enviado && prod.opcoes_pos_enviado.length) {
-      html += '<div class="mt-2 d-flex gap-1 flex-wrap">';
-      prod.opcoes_pos_enviado.forEach(function (op) {
-        if (op.acao === 'manter') {
-          html += '<span class="text-muted" style="font-size:11px;">Manter em atendimento</span>';
-        } else if (op.url) {
-          html += '<a href="' + escapeHtml(op.url) + '" class="btn btn-sm btn-outline-primary"' +
-            ' style="font-size:11px;padding:2px 8px;">' + escapeHtml(op.label) + '</a>';
-        }
-      });
-      html += '</div>';
+    if (prod.enviado_iso) {
+      const partes = prod.enviado_iso.split('-');
+      const enviadoBr = partes.length === 3
+        ? (partes[2] + '/' + partes[1] + '/' + partes[0])
+        : prod.enviado_iso;
+      html += renderCampo('Envio SEI', '<span style="font-size:11px;">' + escapeHtml(enviadoBr) + '</span>');
+    } else {
+      html += renderCampo('Envio SEI', '<span style="font-size:11px;">—</span>');
     }
 
     html += '<button type="button" class="btn btn-link btn-sm p-0 mt-2 text-decoration-none"' +
@@ -298,19 +265,6 @@
     return { header: header, body: body };
   }
 
-  function mostrarSugestao(prodPk, campo, prod) {
-    const regra = STATUS_SUGESTOES[campo];
-    if (!regra || prod.status !== regra.de) return;
-    const el = document.getElementById('painel-sugestao-' + prodPk);
-    if (!el) return;
-    el.innerHTML = '<div class="painel-sugestao">' +
-      escapeHtml(regra.msg) +
-      ' <button type="button" class="btn-sugestao-sim" data-sugestao-prod="' + prodPk +
-      '" data-status="' + regra.para + '">→ ' + (STATUS_LABELS[regra.para] || regra.para) +
-      '</button> <button type="button" class="btn btn-link btn-sm py-0" data-dismiss-sugestao="' +
-      prodPk + '">Não</button></div>';
-  }
-
   function bindPanelEvents(data, ctx) {
     const osPk = data.os_pk;
     const root = ctx.painelRoot || ctx.painelConteudo;
@@ -376,12 +330,12 @@
       });
     });
 
-    conteudo.querySelectorAll('[data-transicao-prod]').forEach(function (btn) {
+    conteudo.querySelectorAll('[data-cancelar-prod]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        postJson('/api/producao/' + btn.dataset.transicaoProd + '/status/', {
-          status: btn.dataset.status,
-          data: hojeISO(),
+        if (!window.confirm('Cancelar esta produção?')) return;
+        postJson('/api/producao/' + btn.dataset.cancelarProd + '/status/', {
+          status: 'CANCELADO',
         }).then(function () { location.reload(); })
           .catch(function (err) { alert(err.message); });
       });
@@ -395,32 +349,12 @@
         const valor = input ? input.value : '';
         postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor)
           .then(function () {
-            const prod = (data.producoes || []).find(function (p) { return String(p.pk) === String(prodPk); });
-            if (prod && STATUS_SUGESTOES[campo]) {
-              mostrarSugestao(prodPk, campo, prod);
-            }
             if (ctx.atualizarCelula && ctx.colMap[campo]) {
               ctx.atualizarCelula(osPk, ctx.colMap[campo], escapeHtml(valor || '—'), prodPk);
             }
           })
           .catch(function (e) { alert(e.message); });
       });
-    });
-
-    conteudo.addEventListener('click', function (e) {
-      const sug = e.target.closest('[data-sugestao-prod]');
-      if (sug) {
-        postJson('/api/producao/' + sug.dataset.sugestaoProd + '/status/', {
-          status: sug.dataset.status,
-          data: hojeISO(),
-        }).then(function () { location.reload(); })
-          .catch(function (err) { alert(err.message); });
-      }
-      const dismiss = e.target.closest('[data-dismiss-sugestao]');
-      if (dismiss) {
-        const el = document.getElementById('painel-sugestao-' + dismiss.dataset.dismissSugestao);
-        if (el) el.innerHTML = '';
-      }
     });
 
     conteudo.querySelectorAll('[data-expand-coment]').forEach(function (btn) {
@@ -510,7 +444,7 @@
       etapa: 'painel-secao-etapa',
       producoes: 'painel-secao-producoes',
       comentarios: 'painel-secao-comentarios',
-      'prazo-eav': data.producao_pk_ativa ? 'painel-campo-prazo-eav-' + data.producao_pk_ativa : 'painel-secao-producoes',
+      'prazo-eav': 'painel-secao-producoes',
     };
     const id = map[secao];
     const el = id ? document.getElementById(id) : null;

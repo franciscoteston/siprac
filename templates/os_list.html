@@ -96,7 +96,6 @@
         <th scope="col">Macroetapa</th>
         <th scope="col">Etapa na unidade</th>
         <th scope="col">Prazo OS</th>
-        <th scope="col">Prazo interno</th>
         <th scope="col">Prioridade</th>
       </tr>
     </thead>
@@ -157,7 +156,6 @@
             {% endwith %}
           {% else %}—{% endif %}
         </td>
-        <td>{% if os.prazo_interno %}{{ os.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
         <td>
           {% if os.prioridade == 'URGENTE' %}
           <span class="badge badge-prioridade-urgente">{{ os.prioridade|prioridade_display }}</span>
@@ -170,7 +168,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7" class="text-muted text-center py-4">Nenhuma ordem de serviço encontrada.</td>
+        <td colspan="6" class="text-muted text-center py-4">Nenhuma ordem de serviço encontrada.</td>
       </tr>
       {% endfor %}
     </tbody>

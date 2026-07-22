@@ -345,8 +345,7 @@ body.gerencial-mode .siprac-content {
               data-status-producao="{{ linha.status_producao|default:'' }}"
               data-etapa-interna="{{ linha.etapa_interna|default:'' }}"
               data-status-unidade="{{ linha.status_unidade|default:'' }}"
-              data-etapa-choices="{{ linha.etapa_interna_choices_json|escape }}"
-              data-status-transicoes="{{ linha.status_transicoes_json|default:'[]'|escape }}">
+              data-etapa-choices="{{ linha.etapa_interna_choices_json|escape }}">
             <td class="gerencial-col-fixa">
               <div class="fw-bold">
                 <a href="{% url 'os_detalhe' linha.os_pk %}" class="text-decoration-none"
@@ -424,11 +423,7 @@ body.gerencial-mode .siprac-content {
             <td class="gerencial-col-config gerencial-cell"
                 data-col="{{ col_id }}"
                 data-os-pk="{{ linha.os_pk }}"
-                data-producao-pk="{{ linha.producao_pk|default:'' }}"
-                {% if col_id == 'prazo_eav' and linha.tem_producao and linha.os_editavel %}
-                style="cursor:pointer;"
-                onclick="abrirPainelSecao(event, 'prazo-eav')"
-                {% endif %}>
+                data-producao-pk="{{ linha.producao_pk|default:'' }}">
               {% if col_id == 'numero_imovel' and linha.numero_imovel_extra > 0 %}
                 {{ linha.numero_imovel }}
                 <span class="badge bg-secondary ms-1"
@@ -580,9 +575,9 @@ body.gerencial-mode .siprac-content {
       fecharPainel: fecharPainel,
       atualizarCelula: atualizarCelula,
       colMap: {
-        prazo_interno: 'prazo_eav', prazo_rev: 'prazo_rev',
-        mes_cronograma: 'mes_cronograma', modelo_sugerido: 'modelo_sugerido',
-        data_homologar: 'data_homologar', data_enviado: 'enviado',
+        numero_producao: 'numero_producao',
+        numero_sei: 'numero_sei',
+        data_enviado: 'enviado',
       },
     });
     if (secao) {
@@ -777,64 +772,7 @@ body.gerencial-mode .siprac-content {
     });
   };
 
-  window.abrirPopoverStatus = function (event, producaoPk, statusAtual) {
-    event.preventDefault();
-    event.stopPropagation();
-    const tr = event.target.closest('tr');
-    const disponiveis = parseAttrJson(tr, 'data-status-transicoes');
-    if (!disponiveis.length) {
-      alert('Nenhuma transição disponível.');
-      return;
-    }
-    let html = '<div class="gerencial-popover-titulo">Alterar status</div>';
-    html += '<div class="mb-2"><label class="form-label small mb-1">Data</label>';
-    html += '<input type="date" class="form-control form-control-sm" id="popoverStatusData" value="' + hojeISO() + '"></div>';
-    html += '<div class="d-flex flex-column gap-1">';
-    disponiveis.forEach(function (t) {
-      html += '<button type="button" class="btn ' + (t.botao_classe || 'btn-outline-secondary') +
-        ' text-start btn-status" data-status="' + t.destino + '">' + t.label + '</button>';
-    });
-    html += '</div>';
-    abrirPopover(event.target, html);
-
-    popoverConteudo.querySelectorAll('.btn-status').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        const data = (popoverConteudo.querySelector('#popoverStatusData') || {}).value || '';
-        postJson('/api/producao/' + producaoPk + '/status/', {
-          status: btn.dataset.status,
-          data: data,
-        }).then(function (resp) {
-          const cel = tr.querySelector('.gerencial-cel-status');
-          if (cel) {
-            cel.innerHTML = '<span class="badge bg-' + (resp.cor || 'secondary') + '">' +
-              (resp.status_label || btn.dataset.status) + '</span>';
-          }
-          tr.dataset.statusProducao = resp.status || btn.dataset.status;
-          tr.setAttribute('data-status-transicoes', JSON.stringify(resp.transicoes || []));
-          fecharPopover();
-          if (resp.opcoes_pos_enviado && resp.opcoes_pos_enviado.length) {
-            mostrarOpcoesPosEnviado(event.target, resp.opcoes_pos_enviado);
-          }
-        }).catch(function (err) { alert(err.message); });
-      });
-    });
   };
-
-  function mostrarOpcoesPosEnviado(anchor, opcoes) {
-    let html = '<div class="gerencial-popover-titulo">Após envio</div>';
-    html += '<div class="d-flex flex-column gap-1">';
-    opcoes.forEach(function (op) {
-      if (op.acao === 'manter') {
-        html += '<button type="button" class="btn btn-outline-secondary btn-pos" data-acao="manter">' + op.label + '</button>';
-      } else {
-        html += '<a class="btn btn-outline-primary" href="' + (op.url || '#') + '">' + op.label + '</a>';
-      }
-    });
-    html += '</div>';
-    abrirPopover(anchor, html);
-    const btn = popoverConteudo.querySelector('.btn-pos[data-acao="manter"]');
-    if (btn) btn.addEventListener('click', fecharPopover);
-  }
 
   window.abrirPopoverNovaProd = function (event, osPk) {
     event.preventDefault();

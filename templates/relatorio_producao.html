@@ -58,8 +58,8 @@
             <th>OS vinculada</th>
             <th>Natureza</th>
             <th>Processo SEI</th>
-            <th>Data homologação</th>
-            <th>Homologado por</th>
+            <th>Data envio</th>
+            <th>Registrado por</th>
             <th>Unidade</th>
           </tr>
         </thead>
@@ -73,7 +73,7 @@
             <td>{{ linha.natureza }}</td>
             <td>{{ linha.processo_sei }}</td>
             <td>{% if linha.data_enviado %}{{ linha.data_enviado|date:"d/m/Y" }}{% else %}—{% endif %}</td>
-            <td>{{ linha.homologado_por }}</td>
+            <td>{{ linha.autor }}</td>
             <td>{{ linha.unidade }}</td>
           </tr>
           {% endfor %}
@@ -82,7 +82,7 @@
     </div>
     {% else %}
     <p class="text-muted text-center py-4 mb-0">
-      Nenhuma produção homologada encontrada com os filtros informados.
+      Nenhuma produção enviada encontrada com os filtros informados.
     </p>
     {% endif %}
   </div>

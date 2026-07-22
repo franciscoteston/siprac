@@ -80,17 +80,7 @@
     </form>
     {% endif %}
     {% if os_editavel and request.perfil_acesso and request.perfil_acesso.pode_encerrar_os %}
-      {% if producoes_pendentes %}
-      <span class="d-inline-block" tabindex="0"
-            data-bs-toggle="tooltip" data-bs-placement="top"
-            title="Há produções pendentes">
-        <a href="{% url 'os_encerrar' os.pk %}"
-           class="btn btn-outline-secondary btn-sm disabled pe-none"
-           aria-disabled="true">Encerrar OS</a>
-      </span>
-      {% else %}
       <a href="{% url 'os_encerrar' os.pk %}" class="btn btn-outline-danger btn-sm">Encerrar OS</a>
-      {% endif %}
     {% endif %}
   </div>
 </div>
@@ -372,11 +362,11 @@
                     {% if producao.numero_producao %}
                       {{ producao.numero_producao }}
                     {% else %}
-                      {{ producao.tipo_producao.prefixo }} — {{ producao.status|status_producao_display }}
+                      {{ producao.tipo_producao.label_display }} — {{ producao.status|status_producao_display }}
                     {% endif %}
                   </a>
                 </td>
-                <td>{{ producao.tipo_producao.prefixo }}</td>
+                <td>{{ producao.tipo_producao.label_display }}</td>
                 <td>
                   <span class="badge bg-{{ producao.status|status_producao_cor }}">
                     {{ producao.status|status_producao_display }}
@@ -488,7 +478,7 @@
           {% if comentario.origem == 'OS' %}
           <span class="badge text-bg-primary">OS</span>
           {% else %}
-          <span class="badge text-bg-warning text-dark">Produção {{ comentario.producao.tipo_producao.prefixo }}</span>
+          <span class="badge text-bg-warning text-dark">{{ comentario.producao.tipo_producao.label_display }}</span>
           {% endif %}
           <span class="small fw-semibold">{{ comentario.servidor.nome }}</span>
           <span class="small text-muted">{{ comentario.data_hora|date:"d/m/Y H:i" }}</span>

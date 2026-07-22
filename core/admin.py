@@ -496,10 +496,9 @@ class ProducaoAdmin(admin.ModelAdmin):
         "os",
         "tipo_producao",
         "status",
-        "autor_trabalho",
         "ano",
         "criado_por",
-        "homologado_por",
+        "unidade",
         "data_enviado",
     )
     list_filter = ("status", "tipo_producao", "ano")
@@ -508,8 +507,6 @@ class ProducaoAdmin(admin.ModelAdmin):
         "os",
         "tipo_producao",
         "criado_por",
-        "homologado_por",
-        "autor_trabalho",
         "unidade",
     )
     inlines = (ProducaoImovelInline,)

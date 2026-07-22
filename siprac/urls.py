@@ -33,7 +33,6 @@ from core.views import (
     PreferenciaGerencialView,
     ProcessoDetailView,
     ProcessoSeiAPIView,
-    ProducaoAlterarStatusView,
     ProducaoCreateView,
     ProducaoDetailView,
     ProducaoEditarCampoView,
@@ -91,11 +90,6 @@ urlpatterns = [
     path('producoes/', ProducaoListView.as_view(), name='producao_list'),
     path('processos/<int:pk>/', ProcessoDetailView.as_view(), name='processo_detail'),
     path('producoes/<int:pk>/', ProducaoDetailView.as_view(), name='producao_detail'),
-    path(
-        'producoes/<int:pk>/status/',
-        ProducaoAlterarStatusView.as_view(),
-        name='producao_alterar_status',
-    ),
     path(
         'producoes/<int:pk>/editar-campo/',
         ProducaoEditarCampoView.as_view(),

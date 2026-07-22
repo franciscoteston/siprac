@@ -15,12 +15,12 @@
 
 {% if producao_homologada %}
 <div class="alert alert-warning" role="alert">
-  Atenção: esta produção está homologada. Alterações serão registradas em auditoria.
+  Atenção: esta produção já está enviada. Alterações serão registradas em auditoria.
 </div>
 <div class="mb-3">
   <label for="justificativa" class="form-label">Justificativa <span class="text-danger">*</span></label>
   <textarea id="justificativa" class="form-control" rows="2"
-            placeholder="Informe a justificativa para alterações nesta produção homologada"></textarea>
+            placeholder="Informe a justificativa para alterações nesta produção enviada"></textarea>
 </div>
 {% endif %}
 
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function validarJustificativa() {
     if (producaoHomologada && !obterJustificativa()) {
-      mostrarAlerta('Informe a justificativa para alterações em produção homologada.', 'warning');
+      mostrarAlerta('Informe a justificativa para alterações em produção enviada.', 'warning');
       if (justificativaEl) {
         justificativaEl.focus();
       }

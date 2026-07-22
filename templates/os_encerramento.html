@@ -6,34 +6,6 @@
 {% block content %}
 <h1 class="h3 mb-4 text-dark">Encerrar ordem de serviço</h1>
 
-{% if producoes_pendentes %}
-<div class="card border-danger mb-4">
-  <div class="card-header bg-danger text-white fw-semibold">
-    Produções pendentes
-  </div>
-  <div class="card-body">
-    <p class="mb-2">
-      Encerre ou homologue todas as produções antes de encerrar a OS.
-    </p>
-    <ul class="mb-0">
-      {% for producao in producoes_pendentes %}
-      <li>
-        {% if producao.numero_producao %}
-          <strong>{{ producao.numero_producao }}</strong>
-        {% else %}
-          <strong>{{ producao.tipo_producao.prefixo }}</strong>
-        {% endif %}
-        —
-        <span class="badge bg-{{ producao.status|status_producao_cor }}">
-          {{ producao.status|status_producao_display }}
-        </span>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-</div>
-{% endif %}
-
 <div class="card siprac-card mb-4">
   <div class="card-body">
     <p class="mb-3">
@@ -60,8 +32,7 @@
       {% endif %}
 
       <div class="d-flex gap-2 mt-3">
-        <button type="submit" class="btn btn-danger"
-                {% if producoes_pendentes %}disabled{% endif %}>
+        <button type="submit" class="btn btn-danger">
           Confirmar encerramento
         </button>
         <a href="{% url 'os_detalhe' os.pk %}" class="btn btn-outline-secondary">Cancelar</a>

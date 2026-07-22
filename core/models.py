@@ -318,11 +318,9 @@ class TipoProducao(models.Model):
     def label_display(self):
         if self.subtipo:
             return f"{self.prefixo} - {self.subtipo}"
-        return (
-            f"{self.prefixo} - {self.descricao}"
-            if self.descricao != self.prefixo
-            else self.prefixo
-        )
+        if self.descricao:
+            return f"{self.prefixo} - {self.descricao}"
+        return self.prefixo
 
 
 class TipoProducaoUnidade(models.Model):
@@ -946,15 +944,7 @@ class Producao(models.Model):
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default=STATUS_NAO_DISTRIBUIDO,
-    )
-    numero_revisao = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Nº de revisões",
-    )
-    numero_ajustes = models.PositiveIntegerField(
-        default=0,
-        verbose_name="Nº de ajustes",
+        default=STATUS_ENVIADO,
     )
     unidade = models.ForeignKey(
         "UnidadeInterna",
@@ -964,59 +954,18 @@ class Producao(models.Model):
         related_name="producoes",
         verbose_name="Unidade responsável",
     )
-    modelo_sugerido = models.CharField(
-        max_length=50,
-        null=True,
-        blank=True,
-        verbose_name="Modelo sugerido",
-    )
-    autor_trabalho = models.ForeignKey(
-        Servidor,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="producoes_autor",
-        verbose_name="Autor do trabalho",
-    )
     criado_por = models.ForeignKey(
         Servidor,
         on_delete=models.PROTECT,
         related_name="producoes_criadas",
     )
     data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data de criação")
-    homologado_por = models.ForeignKey(
-        Servidor,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="producoes_homologadas",
-    )
-    data_homologar = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Data apto à homologação",
-    )
     data_enviado = models.DateField(
         null=True,
         blank=True,
         verbose_name="Data de envio ao SEI",
     )
     observacao = models.TextField(null=True, blank=True)
-    prazo_interno = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Prazo interno",
-    )
-    prazo_rev = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Prazo do revisor",
-    )
-    mes_cronograma = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name="Mês do cronograma",
-    )
 
     class Meta:
         db_table = "PRODUCAO"

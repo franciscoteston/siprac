@@ -3,8 +3,6 @@ from core.models import Servidor
 PENDENCIAS_VAZIAS = {
     "total": 0,
     "os_novas": 0,
-    "producoes_pendentes": 0,
-    "revisoes_pendentes": 0,
 }
 
 

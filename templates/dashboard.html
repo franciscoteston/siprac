@@ -10,12 +10,6 @@
   {% if pendencias.os_novas > 0 %}
   {{ pendencias.os_novas }} nova(s) OS recebida(s).
   {% endif %}
-  {% if pendencias.producoes_pendentes > 0 %}
-  {{ pendencias.producoes_pendentes }} produção(ões) em andamento.
-  {% endif %}
-  {% if pendencias.revisoes_pendentes > 0 %}
-  {{ pendencias.revisoes_pendentes }} produção(ões) aguardando revisão.
-  {% endif %}
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
@@ -100,9 +94,7 @@
           <tr>
             <th>Unidade / situação</th>
             <th class="text-end">OSs ativas</th>
-            <th class="text-end">Em elaboração</th>
-            <th class="text-end">Para revisão</th>
-            <th class="text-end">Homologadas/mês</th>
+            <th class="text-end">Enviadas/mês</th>
           </tr>
         </thead>
         <tbody>
@@ -110,13 +102,11 @@
           <tr>
             <td class="fw-semibold">{{ linha.sigla }}</td>
             <td class="text-end">{{ linha.total }}</td>
-            <td class="text-end">{{ linha.em_elaboracao }}</td>
-            <td class="text-end">{{ linha.para_revisao }}</td>
-            <td class="text-end">{{ linha.homologadas_mes }}</td>
+            <td class="text-end">{{ linha.enviadas_mes }}</td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="text-muted text-center py-3">Nenhuma OS ativa por unidade.</td>
+            <td colspan="3" class="text-muted text-center py-3">Nenhuma OS ativa por unidade.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -165,9 +155,6 @@
   </div>
 </div>
 
-<h2 class="h5 mb-3">Fila da unidade</h2>
-{% include 'includes/fila_minha_padrao.html' %}
-
 {% elif nivel_visao == 'UNIDADE' %}
 
 <div class="row g-3 mb-4">
@@ -182,30 +169,10 @@
     </a>
   </div>
   <div class="col-sm-6 col-xl-3">
-    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body">
-          <p class="card-text text-muted mb-1">Em elaboração</p>
-          <p class="card-value mb-0">{{ card_em_elaboracao }}</p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-sm-6 col-xl-3">
-    <a href="{% url 'producao_list' %}?status=REVISAR" class="text-decoration-none text-dark">
-      <div class="card siprac-card card-laranja h-100">
-        <div class="card-body">
-          <p class="card-text text-muted mb-1">Para revisão/ajustes</p>
-          <p class="card-value mb-0">{{ card_para_revisao_ajustes }}</p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-sm-6 col-xl-3">
     <a href="{% url 'producao_list' %}?periodo=mes_atual" class="text-decoration-none text-dark">
       <div class="card siprac-card card-verde h-100">
         <div class="card-body">
-          <p class="card-text text-muted mb-1">Homologadas no mês</p>
+          <p class="card-text text-muted mb-1">Enviadas no mês</p>
           <p class="card-value mb-0">{{ card_producao_mes }}</p>
         </div>
       </div>
@@ -233,105 +200,21 @@
   </div>
 </div>
 
-<h2 class="h5 mb-3">Fila da unidade</h2>
-<div class="table-responsive mb-4">
-  <table class="table table-hover siprac-table align-middle mb-0">
-    <thead>
-      <tr>
-        <th>OS</th>
-        <th>Tipo</th>
-        <th>Status</th>
-        <th>Prazo OS</th>
-        <th>Prazo interno</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in fila_unidade %}
-      <tr>
-        <td><a href="{% url 'os_detalhe' item.os_pk %}" class="fw-semibold text-decoration-none">{{ item.numero_os }}{% if item.apelido %} ({{ item.apelido }}){% endif %}</a></td>
-        <td>{{ item.tipo }}</td>
-        <td><span class="badge bg-{{ item.status|status_producao_cor }}">{{ item.status|status_producao_display }}</span></td>
-        <td class="small">{% if item.prazo_os %}{{ item.prazo_os|date:"d/m/Y" }}{% else %}—{% endif %}</td>
-        <td class="small">{% if item.prazo_interno %}{{ item.prazo_interno|date:"d/m/Y" }}{% else %}—{% endif %}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5" class="text-muted text-center py-4">Nenhuma produção ativa na unidade.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<h2 class="h6 mb-3 text-muted">Fila da unidade</h2>
-{% include 'includes/fila_minha_padrao.html' %}
-
 {% else %}
 
 <h2 class="h5 mb-3">Produções da unidade</h2>
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=NAO_DISTRIBUIDO" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Não distribuído</p>
-          <p class="mb-0"><span class="badge bg-secondary fs-6">{{ producoes_unidade_por_status.NAO_DISTRIBUIDO }}</span></p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=DISTRIBUIDO" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Distribuídas</p>
-          <p class="mb-0"><span class="badge bg-info fs-6">{{ producoes_unidade_por_status.DISTRIBUIDO }}</span></p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=REVISAR" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Revisar</p>
-          <p class="mb-0"><span class="badge bg-warning text-dark fs-6">{{ producoes_unidade_por_status.REVISAR }}</span></p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=VER_AJUSTES" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Ver ajustes</p>
-          <p class="mb-0"><span class="badge fs-6" style="background-color: #fd7e14;">{{ producoes_unidade_por_status.VER_AJUSTES }}</span></p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-md-4 col-xl-2">
-    <a href="{% url 'producao_list' %}?status=HOMOLOGAR" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Homologar</p>
-          <p class="mb-0"><span class="badge bg-primary fs-6">{{ producoes_unidade_por_status.HOMOLOGAR }}</span></p>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-md-4 col-xl-2">
+  <div class="col-sm-6 col-xl-3">
     <a href="{% url 'producao_list' %}?periodo=mes_atual" class="text-decoration-none text-dark">
-      <div class="card siprac-card h-100">
-        <div class="card-body py-3">
-          <p class="card-text text-muted small mb-1">Homologadas no mês</p>
-          <p class="mb-0"><span class="badge bg-success fs-6">{{ producoes_unidade_por_status.HOMOLOGADO_MES }}</span></p>
+      <div class="card siprac-card card-verde h-100">
+        <div class="card-body">
+          <p class="card-text text-muted mb-1">Enviadas no mês</p>
+          <p class="card-value mb-0">{{ card_producao_mes }}</p>
         </div>
       </div>
     </a>
   </div>
 </div>
-
-<h2 class="h5 mb-3">Fila da unidade</h2>
-{% include 'includes/fila_minha_padrao.html' %}
 
 {% endif %}
 {% endblock %}
@@ -355,7 +238,7 @@
       data: {
         labels: chartData.producao_tipo.labels,
         datasets: [{
-          label: 'Homologadas',
+          label: 'Enviadas',
           data: chartData.producao_tipo.data,
           backgroundColor: chartData.producao_tipo.labels.map(function (_, i) {
             return paleta[i % paleta.length];
@@ -377,7 +260,7 @@
       data: {
         labels: chartData.producao_semana.labels,
         datasets: [{
-          label: 'Homologadas',
+          label: 'Enviadas',
           data: chartData.producao_semana.data,
           borderColor: '#1a3a5c',
           backgroundColor: 'rgba(26, 58, 92, 0.1)',
