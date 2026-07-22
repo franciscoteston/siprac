@@ -1901,6 +1901,12 @@ STATUS_GERENCIAL_CARDS = [
     Producao.STATUS_CANCELADO,
 ]
 
+STATUS_OPERACIONAIS_CHOICES = [
+    choice
+    for choice in Producao.STATUS_CHOICES
+    if choice[0] in (Producao.STATUS_ENVIADO, Producao.STATUS_CANCELADO)
+]
+
 
 def _query_string_os_list(request, **overrides):
     params = request.GET.copy()
@@ -2801,7 +2807,7 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_
         ),
         "prioridades_os": ["NORMAL", "PRIORITARIO", "URGENTE"],
         "prazo_tipo_opcoes": OS.PRAZO_TIPO_CHOICES,
-        "status_producao_opcoes_gerencial": Producao.STATUS_CHOICES,
+        "status_producao_opcoes_gerencial": STATUS_OPERACIONAIS_CHOICES,
         "os_ids_filtrados_count": len(os_ids_filtrados),
         "gerencial_modo_b": modo_b,
     }
@@ -2920,7 +2926,7 @@ class OSListView(RequerLoginMixin, ListView):
         context["filtro_prazo"] = self.request.GET.get("prazo", "")
         context["filtro_unidade"] = self.request.GET.get("unidade", "")
         context["naturezas"] = Natureza.objects.filter(ativa=True).order_by("descricao")
-        context["status_producao_opcoes"] = Producao.STATUS_CHOICES
+        context["status_producao_opcoes"] = STATUS_OPERACIONAIS_CHOICES
         context["macroetapas"] = [
             choice[0]
             for choice in Encaminhamento.TIPO_MACROETAPA_CHOICES
@@ -2986,7 +2992,7 @@ class ProducaoListView(RequerLoginMixin, ListView):
         context["filtro_tipo_producao"] = self.request.GET.get("tipo_producao", "")
         context["filtro_periodo"] = self.request.GET.get("periodo", "")
         context["filtro_unidade"] = self.request.GET.get("unidade", "")
-        context["status_opcoes"] = Producao.STATUS_CHOICES
+        context["status_opcoes"] = STATUS_OPERACIONAIS_CHOICES
         context["tipos_producao"] = TipoProducao.objects.filter(ativo=True).order_by(
             "prefixo",
         )
