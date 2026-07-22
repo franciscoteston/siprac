@@ -792,6 +792,16 @@ class OsUnidadeStatus(models.Model):
         verbose_name="Manter aberta ao encaminhar",
     )
     observacao = models.TextField(null=True, blank=True)
+    prazo_previsto = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Prazo de atendimento na unidade",
+    )
+    data_inicio_ciclo = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Início do ciclo atual na unidade",
+    )
 
     class Meta:
         db_table = "os_unidade_status"

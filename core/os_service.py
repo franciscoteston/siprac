@@ -54,6 +54,54 @@ def os_editavel_para_usuario(os, request):
         return False
 
 
+def _ativar_os_na_unidade(os, unidade, servidor, status="ABERTA"):
+    """
+    Ativa ou reativa a OS na unidade (status ABERTA ou REABERTA).
+
+    Sempre atualiza data_inicio_ciclo e aberta_por quando o status passa
+    a ABERTA/REABERTA a partir de outro estado, ou na criação do registro.
+    Se já estiver no mesmo status ativo, não reinicia o ciclo.
+    Limpa prazo_previsto ao iniciar novo ciclo.
+    """
+    if status not in ("ABERTA", "REABERTA"):
+        raise ValueError("status deve ser ABERTA ou REABERTA")
+
+    agora = timezone.now()
+    status_obj, criado = OsUnidadeStatus.objects.get_or_create(
+        os=os,
+        unidade=unidade,
+        defaults={
+            "aberta_por": servidor,
+            "status": status,
+            "data_inicio_ciclo": agora,
+            "prazo_previsto": None,
+        },
+    )
+    if criado:
+        return status_obj
+
+    ja_ativo = status_obj.status in ("ABERTA", "REABERTA")
+    mesmo_status = status_obj.status == status
+    if ja_ativo and mesmo_status and status_obj.data_inicio_ciclo:
+        return status_obj
+
+    status_obj.status = status
+    status_obj.data_inicio_ciclo = agora
+    status_obj.data_conclusao = None
+    status_obj.aberta_por = servidor
+    status_obj.prazo_previsto = None
+    status_obj.save(
+        update_fields=[
+            "status",
+            "data_inicio_ciclo",
+            "data_conclusao",
+            "aberta_por",
+            "prazo_previsto",
+        ],
+    )
+    return status_obj
+
+
 def _atualizar_status_unidade_encaminhamento(
     os,
     unidade_origem,
@@ -71,7 +119,10 @@ def _atualizar_status_unidade_encaminhamento(
         status_origem, _ = OsUnidadeStatus.objects.get_or_create(
             os=os,
             unidade=unidade_origem,
-            defaults={"aberta_por": servidor},
+            defaults={
+                "aberta_por": servidor,
+                "data_inicio_ciclo": timezone.now(),
+            },
         )
         if status_origem.status in ("ABERTA", "REABERTA"):
             status_origem.status = "CONCLUIDA"
@@ -80,31 +131,93 @@ def _atualizar_status_unidade_encaminhamento(
             status_origem.manter_aberta = False
             status_origem.save()
     elif unidade_origem and manter_aberta:
-        status_origem, _ = OsUnidadeStatus.objects.get_or_create(
-            os=os,
-            unidade=unidade_origem,
-            defaults={"aberta_por": servidor, "status": "ABERTA"},
+        status_origem = _ativar_os_na_unidade(
+            os,
+            unidade_origem,
+            servidor,
+            status="ABERTA",
         )
-        status_origem.manter_aberta = True
-        if status_origem.status not in ("ABERTA", "REABERTA"):
-            status_origem.status = "ABERTA"
-            status_origem.data_conclusao = None
-            status_origem.aberta_por = servidor
-        status_origem.save()
+        if not status_origem.manter_aberta:
+            status_origem.manter_aberta = True
+            status_origem.save(update_fields=["manter_aberta"])
 
     if unidade_destino:
-        status_destino, criado = OsUnidadeStatus.objects.get_or_create(
-            os=os,
-            unidade=unidade_destino,
-            defaults={"aberta_por": servidor, "status": "ABERTA"},
+        _ativar_os_na_unidade(
+            os,
+            unidade_destino,
+            servidor,
+            status="ABERTA",
         )
-        if not criado and status_destino.status != "ABERTA":
-            status_destino.status = "ABERTA"
-            status_destino.data_conclusao = None
-            status_destino.aberta_por = servidor
-            status_destino.save(
-                update_fields=["status", "data_conclusao", "aberta_por"],
-            )
+
+
+def inicio_ciclo_prazo_os(os):
+    """
+    Marco do ciclo vigente do prazo global da OS.
+
+    Último Encaminhamento que configura Atendimento Externo; se não houver,
+    usa a data de criação da OS.
+    """
+    ultimo_externo = (
+        Encaminhamento.objects.filter(os=os)
+        .filter(
+            Q(tipo_macroetapa=Encaminhamento.TIPO_MACROETAPA_ATENDIMENTO_EXTERNO)
+            | Q(unidade_externa_destino__isnull=False),
+        )
+        .order_by("-data_hora", "-id")
+        .first()
+    )
+    if ultimo_externo:
+        return ultimo_externo.data_hora
+    return os.data_criacao_sgbd
+
+
+def inicio_ciclo_prazo_unidade(status_unidade):
+    """Início do ciclo vigente do prazo na unidade."""
+    return status_unidade.data_inicio_ciclo or status_unidade.data_abertura
+
+
+def _prazo_preenchido_no_ciclo(entidade, entidade_id, campo, inicio_ciclo):
+    """True se já houve preenchimento (valor_novo não vazio) do campo no ciclo."""
+    from core.models import LogAuditoria
+
+    qs = LogAuditoria.objects.filter(
+        entidade=entidade,
+        entidade_id=entidade_id,
+        campo_alterado=campo,
+    ).exclude(valor_novo__isnull=True).exclude(valor_novo="")
+    if inicio_ciclo is not None:
+        qs = qs.filter(data_hora__gte=inicio_ciclo)
+    return qs.exists()
+
+
+def historico_prazo_os(os):
+    """Logs de OS.prazo_data no ciclo vigente (para exibição futura)."""
+    from core.models import LogAuditoria
+
+    inicio = inicio_ciclo_prazo_os(os)
+    qs = LogAuditoria.objects.filter(
+        entidade="OS",
+        entidade_id=os.pk,
+        campo_alterado="prazo_data",
+    )
+    if inicio is not None:
+        qs = qs.filter(data_hora__gte=inicio)
+    return qs.select_related("servidor").order_by("-data_hora")
+
+
+def historico_prazo_unidade(status_unidade):
+    """Logs de OsUnidadeStatus.prazo_previsto no ciclo vigente."""
+    from core.models import LogAuditoria
+
+    inicio = inicio_ciclo_prazo_unidade(status_unidade)
+    qs = LogAuditoria.objects.filter(
+        entidade="OsUnidadeStatus",
+        entidade_id=status_unidade.pk,
+        campo_alterado="prazo_previsto",
+    )
+    if inicio is not None:
+        qs = qs.filter(data_hora__gte=inicio)
+    return qs.select_related("servidor").order_by("-data_hora")
 
 
 def registrar_encaminhamento_automatico(os, tipo_macroetapa, servidor=None, observacao=None):

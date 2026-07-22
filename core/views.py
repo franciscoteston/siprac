@@ -60,21 +60,25 @@ from core.mixins import (
     RequerLoginMixin,
 )
 from core.os_service import (
+    _ativar_os_na_unidade,
     _atualizar_status_unidade_encaminhamento,
+    _prazo_preenchido_no_ciclo,
+    _queryset_os_nao_encerradas,
     ativar_atendimento_interno_se_necessario,
     data_entrada_unidade,
+    inicio_ciclo_prazo_os,
+    inicio_ciclo_prazo_unidade,
+    is_primeiro_encaminhamento,
     macroetapa_atual_os,
     origem_encaminhamento,
     os_ativas_por_unidade,
     os_da_unidade_atual,
-    is_primeiro_encaminhamento,
     os_editavel_para_usuario,
     queryset_os_com_macroetapa,
     registrar_em_atendimento_na_unidade,
     registrar_encaminhamento_automatico,
     timeline_os,
     unidade_atual_da_os,
-    _queryset_os_nao_encerradas,
 )
 from core import siat_index
 from core.siat_config import SIAT_ARQUIVO_PATH
@@ -3320,11 +3324,11 @@ class OSReabrirNaUnidadeView(RequerLoginMixin, View):
             )
             return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
 
-        status_unidade.status = "REABERTA"
-        status_unidade.data_conclusao = None
-        status_unidade.aberta_por = servidor
-        status_unidade.save(
-            update_fields=["status", "data_conclusao", "aberta_por"],
+        _ativar_os_na_unidade(
+            os_obj,
+            unidade,
+            servidor,
+            status="REABERTA",
         )
         messages.success(request, "OS reaberta nesta unidade.")
         return redirect(reverse("os_detalhe", kwargs={"pk": os_obj.pk}))
@@ -4479,17 +4483,69 @@ class OSEditarCampoView(RequerLoginMixin, View):
             )
 
         if campo == "prazo_data":
+            # TODO: revisar — placeholder até pode_editar_prazo_global
+            if not perfil or not perfil.pode_homologar:
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
+
+            servidor = _obter_servidor(request.user)
+            if servidor is None:
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
+
+            justificativa = (request.POST.get("justificativa") or "").strip()
+            valor_anterior = os_obj.prazo_data
             if not valor:
-                os_obj.prazo_data = None
+                valor_novo = None
             else:
                 try:
-                    os_obj.prazo_data = datetime.date.fromisoformat(valor)
+                    valor_novo = datetime.date.fromisoformat(valor)
                 except ValueError:
                     return JsonResponse(
                         {"sucesso": False, "erro": "Data inválida."},
                         status=400,
                     )
+
+            if valor_anterior == valor_novo:
+                resposta = _formatar_data_resposta_json(os_obj.prazo_data)
+                return JsonResponse({"sucesso": True, "campo": campo, **resposta})
+
+            inicio_ciclo = inicio_ciclo_prazo_os(os_obj)
+            if _prazo_preenchido_no_ciclo(
+                "OS",
+                os_obj.pk,
+                "prazo_data",
+                inicio_ciclo,
+            ) and not justificativa:
+                return JsonResponse(
+                    {
+                        "sucesso": False,
+                        "erro": (
+                            "Informe a justificativa para alterar o prazo "
+                            "global da OS neste ciclo."
+                        ),
+                    },
+                    status=400,
+                )
+
+            os_obj.prazo_data = valor_novo
             os_obj.save(update_fields=["prazo_data"])
+            LogAuditoria.objects.create(
+                servidor=servidor,
+                entidade="OS",
+                entidade_id=os_obj.pk,
+                operacao="ALTERACAO_PRAZO",
+                campo_alterado="prazo_data",
+                valor_anterior=(
+                    valor_anterior.isoformat() if valor_anterior else None
+                ),
+                valor_novo=valor_novo.isoformat() if valor_novo else None,
+                justificativa=justificativa or None,
+            )
             hoje = timezone.localdate()
             dias = (
                 (os_obj.prazo_data - hoje).days if os_obj.prazo_data else None
@@ -4501,6 +4557,126 @@ class OSEditarCampoView(RequerLoginMixin, View):
         return JsonResponse(
             {"sucesso": False, "erro": "Campo não suportado."},
             status=400,
+        )
+
+
+class OsUnidadePrazoEditarView(RequerLoginMixin, View):
+    """Edita OsUnidadeStatus.prazo_previsto com validação e auditoria."""
+
+    def post(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        perfil = getattr(request, "perfil_acesso", None)
+        # TODO: revisar — placeholder até pode_editar_prazo_unidade
+        if not perfil or not perfil.pode_homologar:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        unidade_id = (request.POST.get("unidade_id") or "").strip()
+        if unidade_id:
+            status_unidade = OsUnidadeStatus.objects.filter(
+                os=os_obj,
+                unidade_id=unidade_id,
+            ).first()
+        else:
+            unidade = _obter_unidade_principal_servidor(servidor)
+            status_unidade = (
+                OsUnidadeStatus.objects.filter(os=os_obj, unidade=unidade).first()
+                if unidade
+                else None
+            )
+
+        if status_unidade is None:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": "Status da OS nesta unidade não encontrado.",
+                },
+                status=404,
+            )
+
+        valor = (request.POST.get("valor") or "").strip()
+        justificativa = (request.POST.get("justificativa") or "").strip()
+        valor_anterior = status_unidade.prazo_previsto
+        if not valor:
+            valor_novo = None
+        else:
+            try:
+                valor_novo = datetime.date.fromisoformat(valor)
+            except ValueError:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Data inválida."},
+                    status=400,
+                )
+
+        if valor_anterior == valor_novo:
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": "prazo_previsto",
+                    **_formatar_data_resposta_json(valor_novo),
+                },
+            )
+
+        if os_obj.prazo_data and valor_novo and valor_novo > os_obj.prazo_data:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": (
+                        "O prazo na unidade não pode ser posterior ao prazo "
+                        "global da OS. Ajuste o prazo global primeiro, se "
+                        "necessário."
+                    ),
+                },
+                status=400,
+            )
+
+        inicio_ciclo = inicio_ciclo_prazo_unidade(status_unidade)
+        if _prazo_preenchido_no_ciclo(
+            "OsUnidadeStatus",
+            status_unidade.pk,
+            "prazo_previsto",
+            inicio_ciclo,
+        ) and not justificativa:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": (
+                        "Informe a justificativa para alterar o prazo na "
+                        "unidade neste ciclo."
+                    ),
+                },
+                status=400,
+            )
+
+        status_unidade.prazo_previsto = valor_novo
+        status_unidade.save(update_fields=["prazo_previsto"])
+        LogAuditoria.objects.create(
+            servidor=servidor,
+            entidade="OsUnidadeStatus",
+            entidade_id=status_unidade.pk,
+            operacao="ALTERACAO_PRAZO",
+            campo_alterado="prazo_previsto",
+            valor_anterior=(
+                valor_anterior.isoformat() if valor_anterior else None
+            ),
+            valor_novo=valor_novo.isoformat() if valor_novo else None,
+            justificativa=justificativa or None,
+        )
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "campo": "prazo_previsto",
+                **_formatar_data_resposta_json(valor_novo),
+            },
         )
 
 
