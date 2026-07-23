@@ -72,6 +72,7 @@ from core.os_service import (
     os_ativas_por_unidade,
     os_da_unidade_atual,
     os_editavel_para_usuario,
+    os_ids_filtro_unidade,
     queryset_os_com_macroetapa,
     registrar_em_atendimento_na_unidade,
     registrar_encaminhamento_automatico,
@@ -262,7 +263,7 @@ def _obter_os_prazo_proximo(os_ids=None):
     return sorted(resultado, key=lambda item: item["dias"], reverse=True)
 
 
-def _obter_os_aguardando_retorno():
+def _obter_os_aguardando_retorno(os_ids=None):
     encaminhamentos = (
         Encaminhamento.objects.filter(
             aguarda_retorno=True,
@@ -271,6 +272,10 @@ def _obter_os_aguardando_retorno():
         .select_related("os", "unidade_externa_destino")
         .order_by("data_retorno_prevista", "os__numero_os")
     )
+    if os_ids is not None:
+        if not os_ids:
+            return []
+        encaminhamentos = encaminhamentos.filter(os_id__in=os_ids)
     return [
         {
             "os_pk": enc.os_id,
@@ -386,17 +391,17 @@ def _obter_os_por_natureza(os_ids=None):
     ]
 
 
-def _contexto_dashboard_sistemica(servidor, unidades_ids, perfil):
-    os_prazo_proximo = _obter_os_prazo_proximo()
-    os_aguardando_retorno = _obter_os_aguardando_retorno()
-    producao_por_tipo_mes = _obter_producao_por_tipo_mes()
-    producao_por_semana = _obter_producao_por_semana()
-    os_por_macroetapa = _obter_os_por_macroetapa()
-    os_por_natureza = _obter_os_por_natureza()
+def _contexto_dashboard_sistemica(servidor, unidades_ids, perfil, os_ids=None):
+    os_prazo_proximo = _obter_os_prazo_proximo(os_ids=os_ids)
+    os_aguardando_retorno = _obter_os_aguardando_retorno(os_ids=os_ids)
+    producao_por_tipo_mes = _obter_producao_por_tipo_mes(os_ids=os_ids)
+    producao_por_semana = _obter_producao_por_semana(os_ids=os_ids)
+    os_por_macroetapa = _obter_os_por_macroetapa(os_ids=os_ids)
+    os_por_natureza = _obter_os_por_natureza(os_ids=os_ids)
 
     return {
-        "total_os_ativas": _contar_os_ativas(),
-        "os_por_unidade": os_ativas_por_unidade(),
+        "total_os_ativas": _contar_os_ativas(os_ids=os_ids),
+        "os_por_unidade": os_ativas_por_unidade(os_ids=os_ids),
         "os_prazo_proximo": os_prazo_proximo,
         "os_aguardando_retorno": os_aguardando_retorno,
         "producao_por_tipo_mes": producao_por_tipo_mes,
@@ -410,7 +415,7 @@ def _contexto_dashboard_sistemica(servidor, unidades_ids, perfil):
             os_por_natureza,
         ),
         "card_aguard_retorno": len(os_aguardando_retorno),
-        "card_producao_mes": _contar_producao_homologada_mes(),
+        "card_producao_mes": _contar_producao_homologada_mes(os_ids=os_ids),
         "card_prazo_proximo": len(os_prazo_proximo),
     }
 
@@ -836,12 +841,9 @@ def _aplicar_filtros_os(queryset, request):
 
     unidade_sigla = request.GET.get("unidade", "").strip()
     if unidade_sigla:
-        try:
-            unidade = UnidadeInterna.objects.get(sigla=unidade_sigla)
-            os_ids = os_da_unidade_atual(unidade).values_list("pk", flat=True)
+        os_ids = os_ids_filtro_unidade(unidade_sigla)
+        if os_ids is not None:
             queryset = queryset.filter(pk__in=os_ids)
-        except UnidadeInterna.DoesNotExist:
-            pass
 
     return queryset
 
@@ -1009,7 +1011,16 @@ class DashboardView(RequerLoginMixin, TemplateView):
         context["servidor_logado"] = servidor
 
         if nivel_visao == NIVEL_VISAO_SISTEMICA:
-            context.update(_contexto_dashboard_sistemica(servidor, unidades_ids, perfil))
+            unidade_sigla = self.request.GET.get("unidade", "").strip()
+            os_ids = os_ids_filtro_unidade(unidade_sigla)
+            context.update(
+                _contexto_dashboard_sistemica(
+                    servidor,
+                    unidades_ids,
+                    perfil,
+                    os_ids=os_ids,
+                ),
+            )
         else:
             context.update(_contexto_dashboard_unidade(servidor, unidades_ids, perfil))
 

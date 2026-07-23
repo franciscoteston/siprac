@@ -90,8 +90,24 @@
       <nav class="nav flex-column">
         <a class="nav-link{% if request.resolver_match.url_name == 'dashboard' %} active{% endif %}"
            href="{% url 'dashboard' %}">Dashboard</a>
+        {% if exibir_filtro_unidade_menu and mostrar_pills_dashboard %}
+        <div class="siprac-sidebar-pills" aria-label="Filtro por unidade — Dashboard">
+          {% for pill in pills_filtro_dashboard %}
+          <a href="{{ pill.href }}"
+             class="siprac-sidebar-pill{% if pill.ativa %} active{% endif %}">{{ pill.label }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
         <a class="nav-link{% if request.resolver_match.url_name == 'os_list' or request.resolver_match.url_name == 'os_nova' or request.resolver_match.url_name == 'os_nova_passo2' or request.resolver_match.url_name == 'os_nova_passo3' %} active{% endif %}"
            href="{% if request.visibilidade == 'DEPARTAMENTO' or request.visibilidade == 'TOTAL' %}{% url 'os_list' %}?view=gerencial{% else %}{% url 'os_list' %}{% endif %}">Ordens de serviço{% if pendencias.os_novas > 0 %}<span class="badge bg-danger rounded-pill ms-1">{{ pendencias.os_novas }}</span>{% endif %}</a>
+        {% if exibir_filtro_unidade_menu and mostrar_pills_os %}
+        <div class="siprac-sidebar-pills" aria-label="Filtro por unidade — Ordens de serviço">
+          {% for pill in pills_filtro_os %}
+          <a href="{{ pill.href }}"
+             class="siprac-sidebar-pill{% if pill.ativa %} active{% endif %}">{{ pill.label }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
         {% if request.visibilidade == 'DEPARTAMENTO' or request.visibilidade == 'TOTAL' %}
         <a class="nav-link ps-4{% if request.resolver_match.url_name == 'os_nova' or request.resolver_match.url_name == 'os_nova_passo2' or request.resolver_match.url_name == 'os_nova_passo3' %} active{% endif %}"
            href="{% url 'os_nova' %}">+ Nova OS</a>

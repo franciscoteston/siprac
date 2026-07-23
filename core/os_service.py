@@ -3,7 +3,14 @@ import datetime
 from django.db.models import Case, CharField, Count, F, OuterRef, Q, Subquery, Value, When
 from django.utils import timezone
 
-from core.models import Encaminhamento, OS, OsUnidadeStatus, Producao, TarefaInterna
+from core.models import (
+    Encaminhamento,
+    OS,
+    OsUnidadeStatus,
+    Producao,
+    TarefaInterna,
+    UnidadeInterna,
+)
 
 CHAVE_ENTRADA_DIVISAO = "Entrada na Divisão"
 
@@ -574,13 +581,18 @@ ETAPAS_INTERNAS_LABELS = {
 }
 
 
-def os_ativas_por_unidade():
+def os_ativas_por_unidade(os_ids=None):
     """
     Retorna distribuição de OSs ativas por unidade atual.
     OSs sem encaminhamento interno aparecem como 'Entrada na Divisão'.
     """
     hoje = timezone.localdate()
-    os_ids = list(_queryset_os_nao_encerradas().values_list("pk", flat=True))
+    if os_ids is not None:
+        if not os_ids:
+            return []
+        os_ids = list(os_ids)
+    else:
+        os_ids = list(_queryset_os_nao_encerradas().values_list("pk", flat=True))
     if not os_ids:
         return []
 
@@ -641,6 +653,40 @@ def os_da_unidade_atual(unidade_interna):
         and mapa_unidade[os_id].pk == unidade_interna.pk
     ]
     return OS.objects.filter(pk__in=filtrados)
+
+
+def os_entrada_divisao():
+    """
+    OSs não encerradas sem encaminhamento interno (unidade atual indefinida).
+
+    Mesmo critério da chave sintética CHAVE_ENTRADA_DIVISAO em
+    os_ativas_por_unidade / unidade_atual_da_os → None.
+    """
+    os_ids = list(_queryset_os_nao_encerradas().values_list("pk", flat=True))
+    if not os_ids:
+        return OS.objects.none()
+
+    mapa_unidade = _mapa_unidade_atual_por_os(os_ids)
+    filtrados = [os_id for os_id in os_ids if not mapa_unidade.get(os_id)]
+    return OS.objects.filter(pk__in=filtrados)
+
+
+def os_ids_filtro_unidade(unidade_sigla):
+    """
+    Resolve ?unidade= para um set de PKs de OS, ou None (= sem filtro / Todas).
+
+    DEPARTAMENTO é valor reservado: OSs na entrada da Divisão (sem
+    encaminhamento interno), não a UnidadeInterna com essa sigla.
+    """
+    if not unidade_sigla:
+        return None
+    if unidade_sigla == "DEPARTAMENTO":
+        return set(os_entrada_divisao().values_list("pk", flat=True))
+    try:
+        unidade = UnidadeInterna.objects.get(sigla=unidade_sigla)
+    except UnidadeInterna.DoesNotExist:
+        return set()
+    return set(os_da_unidade_atual(unidade).values_list("pk", flat=True))
 
 
 def data_entrada_unidade(os, unidade):

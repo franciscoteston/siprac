@@ -57,6 +57,38 @@ body {
   border-left-color: var(--laranja);
 }
 
+.siprac-sidebar-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.15rem 0.5rem 0.55rem 1.1rem;
+}
+
+.siprac-sidebar-pill {
+  display: block;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.siprac-sidebar-pill:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.siprac-sidebar-pill.active {
+  color: #fff;
+  border-color: var(--laranja);
+  background-color: rgba(232, 119, 34, 0.25);
+}
+
 .siprac-content {
   flex: 1;
   padding: 1.5rem;
