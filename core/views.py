@@ -73,11 +73,16 @@ from core.os_service import (
     os_da_unidade_atual,
     os_editavel_para_usuario,
     os_ids_filtro_unidade,
+    formatar_prazos_unidades_display,
+    historico_prazo_os,
+    historico_prazo_unidade,
     queryset_os_com_macroetapa,
     registrar_em_atendimento_na_unidade,
     registrar_encaminhamento_automatico,
+    serializar_historico_prazo,
     timeline_os,
     unidade_atual_da_os,
+    unidades_ativas_com_prazo,
 )
 from core import siat_index
 from core.siat_config import SIAT_ARQUIVO_PATH
@@ -1802,6 +1807,8 @@ COLUNAS_GERENCIAL_CONFIG = {
     "apelido": {"label": "Apelido"},
     "prioridade": {"label": "PRIORIDADE"},
     "dias_sei": {"label": "DIAS_SEI"},
+    "prazo_os": {"label": "PRAZO OS"},
+    "prazo_unidades": {"label": "PRAZO UNIDADE(S)"},
     "enviado": {"label": "ENVIADO"},
     "la_pt_ptf": {"label": "LA_PT_PTF"},
     "tipo_trabalho": {"label": "TIPO_TRABALHO"},
@@ -1841,6 +1848,8 @@ GRUPOS_COLUNAS_GERENCIAL = [
     (
         "PRAZOS",
         [
+            "prazo_os",
+            "prazo_unidades",
             "enviado",
         ],
     ),
@@ -1862,6 +1871,8 @@ COLUNAS_GERENCIAL_NOVAS = {
     "rh_valor",
     "apelido",
     "prioridade",
+    "prazo_os",
+    "prazo_unidades",
     "enviado",
     "la_pt_ptf",
     "doc_sei",
@@ -1886,6 +1897,8 @@ COLUNAS_GERENCIAL_PADRAO = [
     "bairro",
     "apelido",
     "prioridade",
+    "prazo_os",
+    "prazo_unidades",
     "enviado",
     "tipo_trabalho",
     "dias_sei",
@@ -2087,6 +2100,8 @@ def _campos_vazios_gerencial():
     return {
         "prioridade": "—",
         "dias_sei": None,
+        "prazo_os": "—",
+        "prazo_unidades": "—",
         "enviado": "—",
         "la_pt_ptf": "—",
         "tipo_trabalho": "—",
@@ -2175,6 +2190,8 @@ def _montar_cells_gerencial(linha):
         "apelido": linha.get("apelido") or "—",
         "prioridade": linha.get("prioridade", "—"),
         "dias_sei": linha.get("dias_sei"),
+        "prazo_os": linha.get("prazo_os", "—"),
+        "prazo_unidades": linha.get("prazo_unidades", "—"),
         "enviado": linha.get("enviado", "—"),
         "la_pt_ptf": linha.get("la_pt_ptf", "—"),
         "tipo_trabalho": linha.get("tipo_trabalho", "—"),
@@ -2358,6 +2375,7 @@ def _montar_panel_gerencial(
         "dias_sei": dias_sei,
         "apelido": os_obj.apelido or "",
         "modo_b": modo_b,
+        "prazos": _serializar_prazos_painel(os_obj, request, os_editavel),
     }
 
 
@@ -2396,6 +2414,45 @@ def _pode_criar_producao_gerencial(os_obj, status_unidade):
             status__in=[Producao.STATUS_ENVIADO, Producao.STATUS_CANCELADO],
         ).exists()
     )
+
+
+def _serializar_prazos_painel(os_obj, request, os_editavel):
+    """Payload de prazos (global + unidades ativas) para o painel gerencial."""
+    visibilidade = getattr(request, "visibilidade", "UNIDADE") if request else "UNIDADE"
+    vinculo = getattr(request, "vinculo_ativo", None) if request else None
+    unidade_logada_id = vinculo.unidade_id if vinculo else None
+
+    unidades_raw = unidades_ativas_com_prazo(os_obj)
+    unidades = []
+    for item in unidades_raw:
+        if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+            pode_editar = bool(os_editavel)
+        else:
+            pode_editar = bool(
+                os_editavel and unidade_logada_id == item["unidade_id"]
+            )
+        unidades.append(
+            {
+                "unidade_id": item["unidade_id"],
+                "sigla": item["sigla"],
+                "status": item["status"],
+                "prazo_previsto": (
+                    item["prazo_previsto"].isoformat()
+                    if item["prazo_previsto"]
+                    else ""
+                ),
+                "prazo_previsto_display": _formatar_data_br(item["prazo_previsto"]),
+                "pode_editar": pode_editar,
+            },
+        )
+
+    return {
+        "prazo_data": os_obj.prazo_data.isoformat() if os_obj.prazo_data else "",
+        "prazo_data_display": _formatar_data_br(os_obj.prazo_data),
+        "pode_editar_prazo_global": bool(os_editavel),
+        "unidades": unidades,
+        "prazo_unidades_display": formatar_prazos_unidades_display(unidades_raw),
+    }
 
 
 def _serializar_linhas_gerencial(
@@ -2484,6 +2541,9 @@ def _serializar_linhas_gerencial(
         os_obj.prioridade,
         os_obj.prioridade or "—",
     )
+    unidades_prazo = unidades_ativas_com_prazo(os_obj)
+    prazo_os_display = _formatar_data_br(os_obj.prazo_data)
+    prazo_unidades_display = formatar_prazos_unidades_display(unidades_prazo)
 
     dados_fixos = {
         "os_pk": os_obj.pk,
@@ -2502,6 +2562,8 @@ def _serializar_linhas_gerencial(
         "finalidade": os_obj.finalidade.descricao,
         "prioridade": prioridade_label,
         "dias_sei": dias_sei,
+        "prazo_os": prazo_os_display,
+        "prazo_unidades": prazo_unidades_display,
         "status_unidade": status_unidade,
         "os_editavel": os_editavel,
         "total_comentarios": total_comentarios,
@@ -2579,6 +2641,8 @@ def _serializar_linhas_gerencial(
                 "apelido": os_obj.apelido or "",
                 "prioridade": prioridade_label,
                 "dias_sei": dias_sei,
+                "prazo_os": prazo_os_display,
+                "prazo_unidades": prazo_unidades_display,
             },
         )
         linhas.append(finalizar_linha(linha, None, dados_imovel))
@@ -2596,6 +2660,8 @@ def _serializar_linhas_gerencial(
                 "apelido": os_obj.apelido or "",
                 "prioridade": prioridade_label,
                 "dias_sei": dias_sei,
+                "prazo_os": prazo_os_display,
+                "prazo_unidades": prazo_unidades_display,
             },
         )
         linhas.append(finalizar_linha(linha, None, dados_imovel))
@@ -2797,17 +2863,12 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_
 def _etapas_unidades_abertas(os):
     from core.os_service import ETAPAS_INTERNAS_LABELS
 
-    status_abertos = OsUnidadeStatus.objects.filter(
-        os=os,
-        status__in=("ABERTA", "REABERTA"),
-    ).select_related("unidade")
-
     resultado = []
-    for su in status_abertos:
+    for item in unidades_ativas_com_prazo(os):
         tarefa = (
             TarefaInterna.objects.filter(
                 os=os,
-                unidade=su.unidade,
+                unidade_id=item["unidade_id"],
                 status="PENDENTE",
             )
             .order_by("-data_inicio")
@@ -2824,11 +2885,26 @@ def _etapas_unidades_abertas(os):
 
         resultado.append(
             {
-                "sigla": su.unidade.sigla,
+                "unidade_id": item["unidade_id"],
+                "sigla": item["sigla"],
                 "etapa": etapa,
-                "status_unidade": su.status,
+                "status_unidade": item["status"],
+                "prazo_previsto": item["prazo_previsto"],
+                "prazo_previsto_display": _formatar_data_br(item["prazo_previsto"]),
             }
         )
+
+    prazo_unidades_display = formatar_prazos_unidades_display(
+        [
+            {
+                "sigla": u["sigla"],
+                "prazo_previsto": u["prazo_previsto"],
+            }
+            for u in resultado
+        ],
+    )
+    for item in resultado:
+        item["prazo_unidades_display"] = prazo_unidades_display
     return resultado
 
 
@@ -2837,6 +2913,11 @@ def _enriquecer_os_lista(ordens):
 
     for os_obj in ordens:
         os_obj.unidades_abertas = _etapas_unidades_abertas(os_obj)
+        os_obj.prazo_unidades_display = (
+            os_obj.unidades_abertas[0]["prazo_unidades_display"]
+            if os_obj.unidades_abertas
+            else "—"
+        )
         os_obj.macroetapa_display = MACROETAPA_LABELS.get(
             getattr(os_obj, "macroetapa_atual", None),
             getattr(os_obj, "macroetapa_atual", None) or "—",
@@ -4535,6 +4616,18 @@ class OsUnidadePrazoEditarView(RequerLoginMixin, View):
                 status=404,
             )
 
+        visibilidade = getattr(request, "visibilidade", "UNIDADE")
+        if visibilidade not in ("TOTAL", "DEPARTAMENTO"):
+            vinculo = getattr(request, "vinculo_ativo", None)
+            if (
+                vinculo is None
+                or status_unidade.unidade_id != vinculo.unidade_id
+            ):
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
+
         valor = (request.POST.get("valor") or "").strip()
         justificativa = (request.POST.get("justificativa") or "").strip()
         valor_anterior = status_unidade.prazo_previsto
@@ -4608,6 +4701,51 @@ class OsUnidadePrazoEditarView(RequerLoginMixin, View):
                 "sucesso": True,
                 "campo": "prazo_previsto",
                 **_formatar_data_resposta_json(valor_novo),
+            },
+        )
+
+
+class OSPrazoHistoricoView(RequerLoginJSONMixin, View):
+    """Histórico de prazo global (OS) ou por unidade, sob demanda."""
+
+    def get(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        unidade_id = (request.GET.get("unidade_id") or "").strip()
+
+        if unidade_id:
+            status_unidade = (
+                OsUnidadeStatus.objects.filter(
+                    os=os_obj,
+                    unidade_id=unidade_id,
+                )
+                .select_related("unidade")
+                .first()
+            )
+            if status_unidade is None:
+                return JsonResponse(
+                    {
+                        "sucesso": False,
+                        "erro": "Status da OS nesta unidade não encontrado.",
+                    },
+                    status=404,
+                )
+            logs = historico_prazo_unidade(status_unidade)
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "tipo": "unidade",
+                    "unidade_id": status_unidade.unidade_id,
+                    "sigla": status_unidade.unidade.sigla,
+                    "historico": serializar_historico_prazo(logs),
+                },
+            )
+
+        logs = historico_prazo_os(os_obj)
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "tipo": "os",
+                "historico": serializar_historico_prazo(logs),
             },
         )
 

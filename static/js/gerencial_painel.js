@@ -39,11 +39,16 @@
     });
   }
 
-  function postCampo(url, campo, valor) {
+  function postCampo(url, campo, valor, extras) {
     const formData = new FormData();
     formData.append('campo', campo);
     formData.append('valor', valor || '');
     formData.append('csrfmiddlewaretoken', window.gerencialCsrfToken);
+    if (extras) {
+      Object.keys(extras).forEach(function (k) {
+        if (extras[k] != null) formData.append(k, extras[k]);
+      });
+    }
     return fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
@@ -55,6 +60,49 @@
         return data;
       });
     });
+  }
+
+  function postForm(url, fields) {
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', window.gerencialCsrfToken);
+    Object.keys(fields || {}).forEach(function (k) {
+      if (fields[k] != null) formData.append(k, fields[k]);
+    });
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+      body: formData,
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok || !data.sucesso) throw new Error(data.erro || 'Erro ao salvar.');
+        return data;
+      });
+    });
+  }
+
+  function formatarDataIsoBr(iso) {
+    if (!iso) return '—';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[3] + '/' + m[2] + '/' + m[1];
+    return String(iso);
+  }
+
+  function renderHistoricoHtml(itens) {
+    if (!(itens || []).length) {
+      return '<em class="text-muted small">Nenhuma alteração neste ciclo.</em>';
+    }
+    return itens.map(function (h) {
+      return '<div class="border-bottom py-1" style="font-size:11px;color:#495057;">' +
+        '<div style="font-weight:600;color:#1a3a5c;font-size:10px;">' +
+        escapeHtml(h.data_hora) + ' · ' + escapeHtml(h.servidor || '—') + '</div>' +
+        '<div>' + escapeHtml(formatarDataIsoBr(h.valor_anterior) || '—') +
+        ' → ' + escapeHtml(formatarDataIsoBr(h.valor_novo) || '—') + '</div>' +
+        (h.justificativa
+          ? '<div class="text-muted" style="font-size:10px;">' + escapeHtml(h.justificativa) + '</div>'
+          : '') +
+        '</div>';
+    }).join('');
   }
 
   function getJson(url) {
@@ -227,6 +275,54 @@
     }
     body += '</div>';
 
+    const prazos = data.prazos || {};
+    body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-prazos">';
+    body += secaoTitulo('Prazos');
+    body += '<div class="mb-2" style="font-size:12px;">';
+    body += '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">';
+    body += '<div><span class="text-muted">Prazo OS:</span> ';
+    body += '<strong id="painelPrazoOsDisplay">' +
+      escapeHtml(prazos.prazo_data_display || '—') + '</strong></div>';
+    body += '<div class="d-flex gap-1">';
+    if (prazos.pode_editar_prazo_global) {
+      body += '<input type="date" class="form-control form-control-sm" id="painelPrazoOsInput"' +
+        ' value="' + escapeHtml(prazos.prazo_data || '') +
+        '" style="width:140px;font-size:11px;">';
+      body += '<button type="button" class="btn btn-sm btn-outline-primary" id="painelPrazoOsSalvar"' +
+        ' style="font-size:11px;padding:2px 8px;">Salvar</button>';
+    }
+    body += '<button type="button" class="btn btn-sm btn-outline-secondary" id="painelPrazoOsHist"' +
+      ' style="font-size:11px;padding:2px 8px;">Histórico</button>';
+    body += '</div></div>';
+    body += '<div id="painelPrazoOsHistLista" class="mt-2" style="display:none;"></div>';
+    body += '</div>';
+
+    if (!(prazos.unidades || []).length) {
+      body += '<p class="small text-muted mb-0">Nenhuma unidade ativa.</p>';
+    }
+    (prazos.unidades || []).forEach(function (u) {
+      body += '<div class="border rounded p-2 mb-2" style="font-size:12px;"' +
+        ' data-unidade-id="' + u.unidade_id + '">';
+      body += '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">';
+      body += '<div><span class="badge bg-secondary me-1">' + escapeHtml(u.sigla) + '</span>';
+      body += '<strong class="painel-prazo-unid-display">' +
+        escapeHtml(u.prazo_previsto_display || '—') + '</strong></div>';
+      body += '<div class="d-flex gap-1">';
+      if (u.pode_editar) {
+        body += '<input type="date" class="form-control form-control-sm painel-prazo-unid-input"' +
+          ' value="' + escapeHtml(u.prazo_previsto || '') +
+          '" style="width:140px;font-size:11px;">';
+        body += '<button type="button" class="btn btn-sm btn-outline-primary painel-prazo-unid-salvar"' +
+          ' style="font-size:11px;padding:2px 8px;">Salvar</button>';
+      }
+      body += '<button type="button" class="btn btn-sm btn-outline-secondary painel-prazo-unid-hist"' +
+        ' style="font-size:11px;padding:2px 8px;">Histórico</button>';
+      body += '</div></div>';
+      body += '<div class="painel-prazo-unid-hist-lista mt-2" style="display:none;"></div>';
+      body += '</div>';
+    });
+    body += '</div>';
+
     body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-producoes">';
     body += '<div class="d-flex justify-content-between align-items-center mb-2">';
     body += secaoTitulo('② Produções');
@@ -313,6 +409,92 @@
           })
           .catch(function (e) { alert(e.message); });
       });
+    });
+
+    const prazoOsSalvar = conteudo.querySelector('#painelPrazoOsSalvar');
+    if (prazoOsSalvar) {
+      prazoOsSalvar.addEventListener('click', function () {
+        const input = conteudo.querySelector('#painelPrazoOsInput');
+        const valor = input ? input.value : '';
+        const justificativa = window.prompt(
+          'Justificativa (obrigatória se já houver prazo neste ciclo):',
+          '',
+        );
+        if (justificativa === null) return;
+        postCampo('/os/' + osPk + '/editar-campo/', 'prazo_data', valor, {
+          justificativa: justificativa || '',
+        }).then(function (resp) {
+          const display = conteudo.querySelector('#painelPrazoOsDisplay');
+          if (display) display.textContent = resp.valor_display || '—';
+        }).catch(function (e) { alert(e.message); });
+      });
+    }
+
+    const prazoOsHist = conteudo.querySelector('#painelPrazoOsHist');
+    if (prazoOsHist) {
+      prazoOsHist.addEventListener('click', function () {
+        const lista = conteudo.querySelector('#painelPrazoOsHistLista');
+        if (!lista) return;
+        if (lista.style.display !== 'none' && lista.dataset.loaded === '1') {
+          lista.style.display = 'none';
+          return;
+        }
+        lista.style.display = 'block';
+        lista.innerHTML = '<em class="text-muted small">Carregando…</em>';
+        getJson('/os/' + osPk + '/prazo-historico/')
+          .then(function (resp) {
+            lista.dataset.loaded = '1';
+            lista.innerHTML = renderHistoricoHtml(resp.historico);
+          })
+          .catch(function (e) {
+            lista.innerHTML = '<em class="text-danger small">' + escapeHtml(e.message) + '</em>';
+          });
+      });
+    }
+
+    conteudo.querySelectorAll('[data-unidade-id]').forEach(function (box) {
+      const unidadeId = box.getAttribute('data-unidade-id');
+      const btnSalvar = box.querySelector('.painel-prazo-unid-salvar');
+      if (btnSalvar) {
+        btnSalvar.addEventListener('click', function () {
+          const input = box.querySelector('.painel-prazo-unid-input');
+          const valor = input ? input.value : '';
+          const justificativa = window.prompt(
+            'Justificativa (obrigatória se já houver prazo neste ciclo):',
+            '',
+          );
+          if (justificativa === null) return;
+          postForm('/os/' + osPk + '/prazo-unidade/', {
+            unidade_id: unidadeId,
+            valor: valor,
+            justificativa: justificativa || '',
+          }).then(function (resp) {
+            const display = box.querySelector('.painel-prazo-unid-display');
+            if (display) display.textContent = resp.valor_display || '—';
+          }).catch(function (e) { alert(e.message); });
+        });
+      }
+      const btnHist = box.querySelector('.painel-prazo-unid-hist');
+      if (btnHist) {
+        btnHist.addEventListener('click', function () {
+          const lista = box.querySelector('.painel-prazo-unid-hist-lista');
+          if (!lista) return;
+          if (lista.style.display !== 'none' && lista.dataset.loaded === '1') {
+            lista.style.display = 'none';
+            return;
+          }
+          lista.style.display = 'block';
+          lista.innerHTML = '<em class="text-muted small">Carregando…</em>';
+          getJson('/os/' + osPk + '/prazo-historico/?unidade_id=' + encodeURIComponent(unidadeId))
+            .then(function (resp) {
+              lista.dataset.loaded = '1';
+              lista.innerHTML = renderHistoricoHtml(resp.historico);
+            })
+            .catch(function (e) {
+              lista.innerHTML = '<em class="text-danger small">' + escapeHtml(e.message) + '</em>';
+            });
+        });
+      }
     });
 
     conteudo.querySelectorAll('[data-toggle-prod]').forEach(function (hdr) {
@@ -442,9 +624,10 @@
     }
     const map = {
       etapa: 'painel-secao-etapa',
+      prazos: 'painel-secao-prazos',
       producoes: 'painel-secao-producoes',
       comentarios: 'painel-secao-comentarios',
-      'prazo-eav': 'painel-secao-producoes',
+      'prazo-eav': 'painel-secao-prazos',
     };
     const id = map[secao];
     const el = id ? document.getElementById(id) : null;

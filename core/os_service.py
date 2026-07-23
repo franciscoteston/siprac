@@ -220,6 +220,63 @@ def historico_prazo_unidade(status_unidade):
     return qs.select_related("servidor").order_by("-data_hora")
 
 
+def unidades_ativas_com_prazo(os):
+    """
+    Unidades com OsUnidadeStatus ABERTA/REABERTA e respectivo prazo_previsto.
+
+    Retorna lista de dicts:
+    unidade_id, sigla, status, prazo_previsto (date|None).
+    """
+    status_abertos = (
+        OsUnidadeStatus.objects.filter(
+            os=os,
+            status__in=("ABERTA", "REABERTA"),
+        )
+        .select_related("unidade")
+        .order_by("unidade__sigla")
+    )
+    return [
+        {
+            "unidade_id": su.unidade_id,
+            "sigla": su.unidade.sigla,
+            "status": su.status,
+            "prazo_previsto": su.prazo_previsto,
+        }
+        for su in status_abertos
+    ]
+
+
+def formatar_prazos_unidades_display(unidades):
+    """
+    Monta string 'EAV 15/05/2026; EPGV 18/05/2026' a partir de
+    unidades_ativas_com_prazo. Sem prazo definido em nenhuma → '—'.
+    """
+    partes = []
+    for item in unidades or []:
+        prazo = item.get("prazo_previsto")
+        if not prazo:
+            continue
+        partes.append(f"{item['sigla']} {prazo.strftime('%d/%m/%Y')}")
+    return "; ".join(partes) if partes else "—"
+
+
+def serializar_log_prazo(log):
+    """Serializa LogAuditoria de prazo para JSON (histórico sob demanda)."""
+    from django.utils import timezone as dj_tz
+
+    return {
+        "data_hora": dj_tz.localtime(log.data_hora).strftime("%d/%m/%Y %H:%M"),
+        "valor_anterior": log.valor_anterior or "",
+        "valor_novo": log.valor_novo or "",
+        "servidor": log.servidor.nome if log.servidor else "—",
+        "justificativa": log.justificativa or "",
+    }
+
+
+def serializar_historico_prazo(queryset):
+    return [serializar_log_prazo(log) for log in queryset]
+
+
 def registrar_encaminhamento_automatico(os, tipo_macroetapa, servidor=None, observacao=None):
     """
     Registra um encaminhamento automático no lugar de MacroetapaLog.

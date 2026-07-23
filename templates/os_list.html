@@ -96,6 +96,7 @@
         <th scope="col">Macroetapa</th>
         <th scope="col">Etapa na unidade</th>
         <th scope="col">Prazo OS</th>
+        <th scope="col">Prazo Unidade(s)</th>
         <th scope="col">Prioridade</th>
       </tr>
     </thead>
@@ -155,6 +156,20 @@
             <div class="small {{ dias|cor_prazo }}">{{ dias|label_prazo }}</div>
             {% endwith %}
           {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if os.prazo_unidades_display and os.prazo_unidades_display != "—" %}
+            {% for uu in os.unidades_abertas %}
+              {% if uu.prazo_previsto %}
+              <div class="small">
+                <span class="text-muted">{{ uu.sigla }}:</span>
+                {{ uu.prazo_previsto_display }}
+              </div>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+          <span class="text-muted">—</span>
+          {% endif %}
         </td>
         <td>
           {% if os.prioridade == 'URGENTE' %}
