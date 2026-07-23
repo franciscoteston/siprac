@@ -57,36 +57,45 @@ body {
   border-left-color: var(--laranja);
 }
 
-.siprac-sidebar-pills {
+/* Filtro por unidade (subitens do Dashboard / Ordens de serviço) */
+.siprac-sidebar .siprac-pills-unidade {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.15rem 0.5rem 0.55rem 1.1rem;
+  align-items: stretch;
+  gap: 3px;
+  padding: 0.15rem 0.75rem 0.45rem 1.5rem;
 }
 
-.siprac-sidebar-pill {
+.siprac-sidebar a.siprac-pill-unidade {
   display: block;
-  color: rgba(255, 255, 255, 0.7);
+  width: 100%;
+  box-sizing: border-box;
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
-  font-size: 0.75rem;
-  line-height: 1.2;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  width: fit-content;
-  max-width: 100%;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.25;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
 }
 
-.siprac-sidebar-pill:hover {
+.siprac-sidebar a.siprac-pill-unidade:hover,
+.siprac-sidebar a.siprac-pill-unidade:focus {
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.45);
+  text-decoration: none;
   background-color: rgba(255, 255, 255, 0.08);
 }
 
-.siprac-sidebar-pill.active {
+.siprac-sidebar a.siprac-pill-unidade.active {
   color: #fff;
-  border-color: var(--laranja);
-  background-color: rgba(232, 119, 34, 0.25);
+  font-weight: 600;
+  text-decoration: none;
+  background-color: rgba(255, 255, 255, 0.12);
+  border-left: 3px solid var(--laranja);
+  padding-left: 7px;
 }
 
 .siprac-content {
