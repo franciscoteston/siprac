@@ -82,7 +82,7 @@ from core.os_service import (
     serializar_historico_prazo,
     timeline_os,
     unidade_atual_da_os,
-    unidades_ativas_com_prazo,
+    unidades_ativas_visiveis,
 )
 from core import siat_index
 from core.siat_config import SIAT_ARQUIVO_PATH
@@ -2417,12 +2417,12 @@ def _pode_criar_producao_gerencial(os_obj, status_unidade):
 
 
 def _serializar_prazos_painel(os_obj, request, os_editavel):
-    """Payload de prazos (global + unidades ativas) para o painel gerencial."""
+    """Payload de prazos (global + unidades no escopo de visibilidade)."""
     visibilidade = getattr(request, "visibilidade", "UNIDADE") if request else "UNIDADE"
     vinculo = getattr(request, "vinculo_ativo", None) if request else None
     unidade_logada_id = vinculo.unidade_id if vinculo else None
 
-    unidades_raw = unidades_ativas_com_prazo(os_obj)
+    unidades_raw = unidades_ativas_visiveis(os_obj, request)
     unidades = []
     for item in unidades_raw:
         if visibilidade in ("TOTAL", "DEPARTAMENTO"):
@@ -2541,9 +2541,24 @@ def _serializar_linhas_gerencial(
         os_obj.prioridade,
         os_obj.prioridade or "—",
     )
-    unidades_prazo = unidades_ativas_com_prazo(os_obj)
+    visibilidade = (
+        getattr(request, "visibilidade", "UNIDADE") if request else "UNIDADE"
+    )
+    mostrar_lista_unidades = visibilidade in ("TOTAL", "DEPARTAMENTO")
+    unidades_prazo = unidades_ativas_visiveis(os_obj, request)
     prazo_os_display = _formatar_data_br(os_obj.prazo_data)
     prazo_unidades_display = formatar_prazos_unidades_display(unidades_prazo)
+    prazo_unidades_itens = [
+        {
+            "sigla": item["sigla"],
+            "prazo_previsto_display": _formatar_data_br(item["prazo_previsto"]),
+        }
+        for item in unidades_prazo
+        if item.get("prazo_previsto")
+    ]
+    etapas_unidades = (
+        _etapas_unidades_abertas(os_obj, request) if mostrar_lista_unidades else []
+    )
 
     dados_fixos = {
         "os_pk": os_obj.pk,
@@ -2556,6 +2571,8 @@ def _serializar_linhas_gerencial(
         "etapa_interna": etapa_interna,
         "etapa_interna_label": etapa_interna_label or etapa_interna or "",
         "etapa_interna_choices": etapa_interna_choices,
+        "mostrar_lista_unidades": mostrar_lista_unidades,
+        "etapas_unidades": etapas_unidades,
         "entrada_dai": _formatar_data_br(entrada_dai),
         "entrada_eav": entrada_eav,
         "requerimento": os_obj.tipo_demanda.descricao,
@@ -2564,6 +2581,7 @@ def _serializar_linhas_gerencial(
         "dias_sei": dias_sei,
         "prazo_os": prazo_os_display,
         "prazo_unidades": prazo_unidades_display,
+        "prazo_unidades_itens": prazo_unidades_itens,
         "status_unidade": status_unidade,
         "os_editavel": os_editavel,
         "total_comentarios": total_comentarios,
@@ -2860,11 +2878,11 @@ def _contexto_gerencial_os_list(request, queryset_completo, linhas_pagina, modo_
     }
 
 
-def _etapas_unidades_abertas(os):
+def _etapas_unidades_abertas(os, request=None):
     from core.os_service import ETAPAS_INTERNAS_LABELS
 
     resultado = []
-    for item in unidades_ativas_com_prazo(os):
+    for item in unidades_ativas_visiveis(os, request):
         tarefa = (
             TarefaInterna.objects.filter(
                 os=os,
@@ -2908,11 +2926,11 @@ def _etapas_unidades_abertas(os):
     return resultado
 
 
-def _enriquecer_os_lista(ordens):
+def _enriquecer_os_lista(ordens, request=None):
     from core.templatetags.siprac_filters import MACROETAPA_LABELS
 
     for os_obj in ordens:
-        os_obj.unidades_abertas = _etapas_unidades_abertas(os_obj)
+        os_obj.unidades_abertas = _etapas_unidades_abertas(os_obj, request)
         os_obj.prazo_unidades_display = (
             os_obj.unidades_abertas[0]["prazo_unidades_display"]
             if os_obj.unidades_abertas
@@ -3024,7 +3042,7 @@ class OSListView(RequerLoginMixin, ListView):
                 ),
             )
         else:
-            _enriquecer_os_lista(context["ordens"])
+            _enriquecer_os_lista(context["ordens"], self.request)
         return context
 
 

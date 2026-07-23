@@ -346,6 +346,11 @@ body.gerencial-mode .siprac-content {
     background: white;
 }
 
+.gerencial-tabela tbody td.gerencial-cel-wrap,
+.gerencial-tabela tbody td .gerencial-cel-wrap {
+    white-space: normal;
+}
+
 /* Hover e seleção */
 .gerencial-tabela tbody tr:hover td {
     background: #f0f4f8 !important;

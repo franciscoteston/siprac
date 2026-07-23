@@ -246,6 +246,25 @@ def unidades_ativas_com_prazo(os):
     ]
 
 
+def unidades_ativas_visiveis(os, request=None):
+    """
+    Unidades ativas no escopo de visibilidade do request.
+
+    TOTAL/DEPARTAMENTO (ou sem request): todas ABERTA/REABERTA.
+    UNIDADE: somente a unidade do vínculo ativo.
+    """
+    unidades = unidades_ativas_com_prazo(os)
+    if request is None:
+        return unidades
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+        return unidades
+    vinculo = getattr(request, "vinculo_ativo", None)
+    if not vinculo:
+        return []
+    return [u for u in unidades if u["unidade_id"] == vinculo.unidade_id]
+
+
 def formatar_prazos_unidades_display(unidades):
     """
     Monta string 'EAV 15/05/2026; EPGV 18/05/2026' a partir de

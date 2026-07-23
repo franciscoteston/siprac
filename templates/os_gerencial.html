@@ -386,13 +386,22 @@ body.gerencial-mode .siprac-content {
               </small>
               {% endif %}
             </td>
-            <td class="gerencial-col-fixa gerencial-cel-etapa"
+            <td class="gerencial-col-fixa gerencial-cel-etapa gerencial-cel-wrap"
                 {% if linha.os_editavel %}
                 style="cursor:pointer;"
                 onclick="abrirPainelSecao(event, 'etapa')"
                 {% endif %}>
               <div>{{ linha.macroetapa_label }}</div>
-              {% if linha.etapa_interna and linha.status_unidade != 'CONCLUIDA' %}
+              {% if linha.mostrar_lista_unidades %}
+                {% for uu in linha.etapas_unidades %}
+                <div class="ms-2 small">
+                  <span class="text-muted">{{ uu.sigla }}:</span>
+                  {{ uu.etapa|default:"—" }}
+                </div>
+                {% empty %}
+                <div class="ms-2 small text-muted">—</div>
+                {% endfor %}
+              {% elif linha.etapa_interna and linha.status_unidade != 'CONCLUIDA' %}
               <div class="ms-2 small text-primary" style="text-decoration:underline dotted;">
                 {{ linha.etapa_interna_label|default:linha.etapa_interna }}
               </div>
@@ -437,6 +446,19 @@ body.gerencial-mode .siprac-content {
                   <span class="{{ dias|cor_prazo }}">{{ dias|label_prazo }}</span>
                   {% else %}—{% endif %}
                 {% endwith %}
+              {% elif col_id == 'prazo_unidades' %}
+                <div class="gerencial-cel-wrap">
+                {% if linha.prazo_unidades_itens %}
+                  {% for item in linha.prazo_unidades_itens %}
+                  <div class="small">
+                    <span class="text-muted">{{ item.sigla }}:</span>
+                    {{ item.prazo_previsto_display }}
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  —
+                {% endif %}
+                </div>
               {% else %}
                 {{ linha.cells|get_item:col_id }}
               {% endif %}
