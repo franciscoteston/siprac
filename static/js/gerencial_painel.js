@@ -465,6 +465,9 @@
             const badge = conteudo.querySelector('#painelEtapaBadge');
             if (badge) badge.textContent = resp.etapa_label || btn.dataset.etapa;
             btn.closest('#painelEtapaTransicoes')?.removeChild(btn);
+            if (ctx.aplicarAtualizacoesPainel) {
+              ctx.aplicarAtualizacoesPainel(osPk, resp);
+            }
           })
           .catch(function (e) { alert(e.message); });
       });
@@ -485,6 +488,9 @@
           if (!resp) return;
           const display = conteudo.querySelector('#painelPrazoOsDisplay');
           if (display) display.textContent = resp.valor_display || '—';
+          if (ctx.aplicarAtualizacoesPainel) {
+            ctx.aplicarAtualizacoesPainel(osPk, resp);
+          }
         }).catch(function (e) { alert(e.message); });
       });
     }
@@ -528,6 +534,9 @@
             if (!resp) return;
             const display = box.querySelector('.painel-prazo-unid-display');
             if (display) display.textContent = resp.valor_display || '—';
+            if (ctx.aplicarAtualizacoesPainel) {
+              ctx.aplicarAtualizacoesPainel(osPk, resp);
+            }
           }).catch(function (e) { alert(e.message); });
         });
       }
@@ -587,9 +596,9 @@
         const input = conteudo.querySelector('[data-prod="' + prodPk + '"][data-campo="' + campo + '"]');
         const valor = input ? input.value : '';
         postCampo('/producoes/' + prodPk + '/editar-campo/', campo, valor)
-          .then(function () {
-            if (ctx.atualizarCelula && ctx.colMap[campo]) {
-              ctx.atualizarCelula(osPk, ctx.colMap[campo], escapeHtml(valor || '—'), prodPk);
+          .then(function (resp) {
+            if (ctx.aplicarAtualizacoesPainel) {
+              ctx.aplicarAtualizacoesPainel(osPk, resp, prodPk);
             }
           })
           .catch(function (e) { alert(e.message); });
@@ -625,6 +634,9 @@
                 box.innerHTML += '<div class="mb-1"><strong>' + escapeHtml(c.servidor) +
                   '</strong> ' + escapeHtml(c.data_hora) + '<div>' + escapeHtml(c.texto) + '</div></div>';
               });
+              if (ctx.aplicarAtualizacoesPainel) {
+                ctx.aplicarAtualizacoesPainel(osPk, r);
+              }
             }).catch(function (e) { alert(e.message); });
           });
         }).catch(function (e) { box.textContent = e.message; });
@@ -667,6 +679,9 @@
             }).join('') || '<em class="text-muted small">Nenhum comentário.</em>';
           }
           conteudo.querySelector('#painelComentarioOsTexto').value = '';
+          if (ctx.aplicarAtualizacoesPainel) {
+            ctx.aplicarAtualizacoesPainel(osPk, resp);
+          }
         })
         .catch(function (e) { alert(e.message); });
     });

@@ -387,6 +387,7 @@ body.gerencial-mode .siprac-content {
               {% endif %}
             </td>
             <td class="gerencial-col-fixa gerencial-cel-etapa gerencial-cel-wrap"
+                data-os-pk="{{ linha.os_pk }}"
                 {% if linha.os_editavel %}
                 style="cursor:pointer;"
                 onclick="abrirPainelSecao(event, 'etapa')"
@@ -573,6 +574,44 @@ body.gerencial-mode .siprac-content {
     document.querySelectorAll(seletor).forEach(function (td) { td.innerHTML = html; });
   }
 
+  function atualizarBadgeComentarios(osPk, total) {
+    document.querySelectorAll('tr[data-os-pk="' + osPk + '"] a[title="Comentários"]').forEach(function (a) {
+      var badge = a.querySelector('.badge');
+      var n = parseInt(total, 10) || 0;
+      if (n > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'badge bg-secondary';
+          badge.style.fontSize = '9px';
+          a.appendChild(document.createTextNode(' '));
+          a.appendChild(badge);
+        }
+        badge.textContent = String(n);
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+  }
+
+  function aplicarAtualizacoesPainel(osPk, response, producaoPk) {
+    if (!response) return;
+    if (response.celulas && typeof response.celulas === 'object') {
+      Object.keys(response.celulas).forEach(function (colId) {
+        atualizarCelula(osPk, colId, response.celulas[colId], producaoPk);
+      });
+    }
+    if (response.etapa_html != null) {
+      document.querySelectorAll(
+        '.gerencial-cel-etapa[data-os-pk="' + osPk + '"]'
+      ).forEach(function (cel) {
+        cel.innerHTML = response.etapa_html;
+      });
+    }
+    if (response.total_comentarios_os != null) {
+      atualizarBadgeComentarios(osPk, response.total_comentarios_os);
+    }
+  }
+
   function fecharPainel() {
     painel.classList.remove('aberto');
     if (linhaSelecionada) {
@@ -595,11 +634,7 @@ body.gerencial-mode .siprac-content {
       painelConteudo: painelConteudo,
       fecharPainel: fecharPainel,
       atualizarCelula: atualizarCelula,
-      colMap: {
-        numero_producao: 'la_pt_ptf',
-        numero_sei: 'doc_sei',
-        data_enviado: 'enviado',
-      },
+      aplicarAtualizacoesPainel: aplicarAtualizacoesPainel,
     });
     if (secao) {
       setTimeout(function () {
@@ -776,23 +811,13 @@ body.gerencial-mode .siprac-content {
       btn.addEventListener('click', function () {
         postJson('/api/os/' + osPk + '/etapa/', { etapa_interna: btn.dataset.etapa })
           .then(function (data) {
-            const cel = tr.querySelector('.gerencial-cel-etapa');
-            if (cel) {
-              let inner = '<div>' + (cel.querySelector('div') ? cel.querySelector('div').textContent : '') + '</div>';
-              const first = cel.querySelector('div');
-              const macro = first ? first.textContent : '';
-              cel.innerHTML = '<div>' + macro + '</div>' +
-                '<div class="ms-2 small text-primary" style="text-decoration:underline dotted;">' +
-                (data.etapa_label || btn.dataset.etapa) + '</div>';
-            }
+            aplicarAtualizacoesPainel(osPk, data);
             tr.dataset.etapaInterna = btn.dataset.etapa;
             fecharPopover();
           })
           .catch(function (err) { alert(err.message); });
       });
     });
-  };
-
   };
 
   window.abrirPopoverNovaProd = function (event, osPk) {
@@ -858,6 +883,7 @@ body.gerencial-mode .siprac-content {
         .then(function (data) {
           popoverConteudo.querySelector('#popoverComentTexto').value = '';
           renderComents(data);
+          aplicarAtualizacoesPainel(osPk, data);
         })
         .catch(function (err) { alert(err.message); });
     });

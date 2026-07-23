@@ -4372,6 +4372,141 @@ def _formatar_data_resposta_json(data):
     }
 
 
+def _html_escape_celula(valor):
+    from django.utils.html import escape
+
+    if valor is None or valor == "":
+        return "—"
+    return escape(str(valor))
+
+
+def _html_celula_dias_sei(dias):
+    """Espelha filtros cor_prazo / label_prazo do template gerencial."""
+    from django.utils.html import escape
+
+    if dias is None:
+        return "—"
+    if dias < 0:
+        css = "text-danger fw-bold"
+        label = f"Vencido há {abs(dias)} dia(s)"
+    elif dias == 0:
+        css = "text-danger"
+        label = "Vence hoje"
+    elif dias <= 7:
+        css = "text-danger"
+        label = f"{dias} dia(s)"
+    elif dias <= 15:
+        css = "text-warning"
+        label = f"{dias} dia(s)"
+    else:
+        css = "text-success"
+        label = f"{dias} dia(s)"
+    return f'<span class="{css}">{escape(label)}</span>'
+
+
+def _html_celula_prazo_unidades(os_obj, request):
+    """HTML da coluna prazo_unidades (mesmo desenho do template Gerencial)."""
+    from django.utils.html import escape
+
+    itens = [
+        {
+            "sigla": item["sigla"],
+            "prazo_previsto_display": _formatar_data_br(item["prazo_previsto"]),
+        }
+        for item in unidades_ativas_visiveis(os_obj, request)
+        if item.get("prazo_previsto")
+    ]
+    if not itens:
+        return '<div class="gerencial-cel-wrap">—</div>'
+    partes = ['<div class="gerencial-cel-wrap">']
+    for item in itens:
+        partes.append(
+            '<div class="small"><span class="text-muted">'
+            f'{escape(item["sigla"])}:</span> '
+            f'{escape(item["prazo_previsto_display"])}</div>'
+        )
+    partes.append("</div>")
+    return "".join(partes)
+
+
+def _html_celula_etapa_gerencial(os_obj, request, unidade_logada=None):
+    """
+    HTML interno de .gerencial-cel-etapa (macro + etapa(s)),
+    mesma lógica de visibilidade da serialização de linha.
+    """
+    from django.utils.html import escape
+
+    from core.os_service import ETAPAS_INTERNAS_LABELS
+
+    macro = _label_macroetapa_gerencial(macroetapa_atual_os(os_obj))
+    html = f"<div>{escape(macro)}</div>"
+
+    visibilidade = getattr(request, "visibilidade", "UNIDADE") if request else "UNIDADE"
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+        etapas = _etapas_unidades_abertas(os_obj, request)
+        if not etapas:
+            html += '<div class="ms-2 small text-muted">—</div>'
+        else:
+            for uu in etapas:
+                html += (
+                    '<div class="ms-2 small">'
+                    f'<span class="text-muted">{escape(uu["sigla"])}:</span> '
+                    f'{escape(uu.get("etapa") or "—")}</div>'
+                )
+        return html
+
+    status_unidade = None
+    etapa_interna = None
+    etapa_label = None
+    if unidade_logada:
+        status_unidade = (
+            OsUnidadeStatus.objects.filter(
+                os=os_obj,
+                unidade=unidade_logada,
+            )
+            .values_list("status", flat=True)
+            .first()
+        )
+        if status_unidade in ("ABERTA", "REABERTA"):
+            tarefa = (
+                TarefaInterna.objects.filter(
+                    os=os_obj,
+                    unidade=unidade_logada,
+                )
+                .order_by("-data_inicio")
+                .first()
+            )
+            if tarefa:
+                etapa_interna = tarefa.etapa_interna
+                etapa_label = ETAPAS_INTERNAS_LABELS.get(
+                    etapa_interna,
+                    etapa_interna,
+                )
+
+    if etapa_interna and status_unidade != "CONCLUIDA":
+        html += (
+            '<div class="ms-2 small text-primary" '
+            'style="text-decoration:underline dotted;">'
+            f"{escape(etapa_label or etapa_interna)}</div>"
+        )
+    elif status_unidade == "CONCLUIDA":
+        html += '<div class="ms-2 small text-secondary">● Concluída</div>'
+    elif status_unidade == "ABERTA":
+        html += (
+            '<div class="ms-2 small"><span class="text-success">● Aberta</span></div>'
+        )
+    elif status_unidade == "REABERTA":
+        html += (
+            '<div class="ms-2 small"><span class="text-warning">● Reaberta</span></div>'
+        )
+    elif status_unidade == "SOMENTE_LEITURA":
+        html += (
+            '<div class="ms-2 small">'
+            '<span class="text-muted">● Somente leitura</span></div>'
+        )
+    return html
+
+
 class ProducaoEditarCampoView(RequerLoginMixin, View):
     def post(self, request, pk):
         producao = get_object_or_404(Producao, pk=pk)
@@ -4392,13 +4527,20 @@ class ProducaoEditarCampoView(RequerLoginMixin, View):
         if campo in ("numero_producao", "numero_sei", "observacao"):
             setattr(producao, campo, valor or None)
             producao.save(update_fields=[campo])
-            return JsonResponse(
-                {
-                    "sucesso": True,
-                    "campo": campo,
-                    "valor": getattr(producao, campo) or "",
-                },
-            )
+            resposta = {
+                "sucesso": True,
+                "campo": campo,
+                "valor": getattr(producao, campo) or "",
+            }
+            if campo == "numero_producao":
+                resposta["celulas"] = {
+                    "la_pt_ptf": _html_escape_celula(getattr(producao, campo) or "—"),
+                }
+            elif campo == "numero_sei":
+                resposta["celulas"] = {
+                    "doc_sei": _html_escape_celula(getattr(producao, campo) or "—"),
+                }
+            return JsonResponse(resposta)
 
         return JsonResponse(
             {"sucesso": False, "erro": "Campo não permitido."},
@@ -4451,6 +4593,9 @@ class OSEditarCampoView(RequerLoginMixin, View):
                     "sucesso": True,
                     "campo": campo,
                     **_formatar_data_resposta_json(data_valor),
+                    "celulas": {
+                        "entrada_dai": _formatar_data_br(data_valor),
+                    },
                 },
             )
 
@@ -4492,7 +4637,14 @@ class OSEditarCampoView(RequerLoginMixin, View):
             os_obj.apelido = valor or None
             os_obj.save(update_fields=["apelido"])
             return JsonResponse(
-                {"sucesso": True, "campo": campo, "valor": os_obj.apelido or ""},
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": os_obj.apelido or "",
+                    "celulas": {
+                        "apelido": _html_escape_celula(os_obj.apelido or "—"),
+                    },
+                },
             )
 
         if campo == "prioridade":
@@ -4503,7 +4655,17 @@ class OSEditarCampoView(RequerLoginMixin, View):
                 )
             os_obj.prioridade = valor
             os_obj.save(update_fields=["prioridade"])
-            return JsonResponse({"sucesso": True, "campo": campo, "valor": valor})
+            label = PRIORIDADE_OS_LABELS.get(valor, valor)
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    "campo": campo,
+                    "valor": valor,
+                    "celulas": {
+                        "prioridade": _html_escape_celula(label),
+                    },
+                },
+            )
 
         if campo == "prazo_tipo":
             tipos = {item[0] for item in OS.PRAZO_TIPO_CHOICES}
@@ -4545,7 +4707,23 @@ class OSEditarCampoView(RequerLoginMixin, View):
 
             if valor_anterior == valor_novo:
                 resposta = _formatar_data_resposta_json(os_obj.prazo_data)
-                return JsonResponse({"sucesso": True, "campo": campo, **resposta})
+                dias = (
+                    (os_obj.prazo_data - timezone.localdate()).days
+                    if os_obj.prazo_data
+                    else None
+                )
+                return JsonResponse(
+                    {
+                        "sucesso": True,
+                        "campo": campo,
+                        **resposta,
+                        "dias_sei": dias,
+                        "celulas": {
+                            "prazo_os": _formatar_data_br(os_obj.prazo_data),
+                            "dias_sei": _html_celula_dias_sei(dias),
+                        },
+                    },
+                )
 
             inicio_ciclo = inicio_ciclo_prazo_os(os_obj)
             if _prazo_preenchido_no_ciclo(
@@ -4585,6 +4763,10 @@ class OSEditarCampoView(RequerLoginMixin, View):
             )
             resposta = _formatar_data_resposta_json(os_obj.prazo_data)
             resposta["dias_sei"] = dias
+            resposta["celulas"] = {
+                "prazo_os": _formatar_data_br(os_obj.prazo_data),
+                "dias_sei": _html_celula_dias_sei(dias),
+            }
             return JsonResponse({"sucesso": True, "campo": campo, **resposta})
 
         return JsonResponse(
@@ -4666,6 +4848,9 @@ class OsUnidadePrazoEditarView(RequerLoginMixin, View):
                     "sucesso": True,
                     "campo": "prazo_previsto",
                     **_formatar_data_resposta_json(valor_novo),
+                    "celulas": {
+                        "prazo_unidades": _html_celula_prazo_unidades(os_obj, request),
+                    },
                 },
             )
 
@@ -4719,6 +4904,9 @@ class OsUnidadePrazoEditarView(RequerLoginMixin, View):
                 "sucesso": True,
                 "campo": "prazo_previsto",
                 **_formatar_data_resposta_json(valor_novo),
+                "celulas": {
+                    "prazo_unidades": _html_celula_prazo_unidades(os_obj, request),
+                },
             },
         )
 
@@ -4972,6 +5160,11 @@ class OSEtapaAPIView(RequerLoginJSONMixin, View):
                 "sucesso": True,
                 "etapa_label": ETAPAS_INTERNAS_LABELS.get(etapa, etapa),
                 "etapa_interna": etapa,
+                "etapa_html": _html_celula_etapa_gerencial(
+                    os_obj,
+                    request,
+                    unidade_logada=unidade,
+                ),
             },
         )
 
@@ -5114,6 +5307,7 @@ class OSComentariosAPIView(RequerLoginJSONMixin, View):
                     _serializar_comentario(c) for c in qs[:5]
                 ],
                 "total": qs.count(),
+                "total_comentarios_os": Comentario.objects.filter(os=os_obj).count(),
             },
         )
 
