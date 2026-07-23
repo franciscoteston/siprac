@@ -81,6 +81,65 @@
     });
   }
 
+  /** Resposta sem throw — para fluxo de prazo com retry de justificativa. */
+  function postFormResult(url, fields) {
+    const formData = new FormData();
+    formData.append('csrfmiddlewaretoken', window.gerencialCsrfToken);
+    Object.keys(fields || {}).forEach(function (k) {
+      if (fields[k] != null) formData.append(k, fields[k]);
+    });
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+      body: formData,
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        return {
+          ok: r.ok && data.sucesso !== false,
+          status: r.status,
+          data: data,
+          erro: data.erro || 'Erro ao salvar.',
+        };
+      });
+    });
+  }
+
+  /**
+   * Backend (400): "Informe a justificativa para alterar o prazo …"
+   * Outros 400 (data inválida, prazo unidade > global) não casam.
+   */
+  function isErroFaltaJustificativa(result) {
+    return result &&
+      result.status === 400 &&
+      /informe a justificativa/i.test(result.erro || '');
+  }
+
+  /**
+   * Tenta salvar sem justificativa; se o backend exigir, pede via prompt e reenvia.
+   * tentarSalvar(justificativa) → Promise<{ok,status,data,erro}>
+   */
+  function salvarPrazoComJustificativaSeNecessario(tentarSalvar) {
+    return tentarSalvar('').then(function (result) {
+      if (result.ok) return result.data;
+      if (!isErroFaltaJustificativa(result)) {
+        throw new Error(result.erro);
+      }
+      const justificativa = window.prompt(
+        'Justificativa obrigatória para alterar o prazo neste ciclo:',
+        '',
+      );
+      if (justificativa === null) return null;
+      if (!(justificativa || '').trim()) {
+        throw new Error('Justificativa obrigatória.');
+      }
+      return tentarSalvar(justificativa.trim()).then(function (result2) {
+        if (result2.ok) return result2.data;
+        throw new Error(result2.erro);
+      });
+    });
+  }
+
   function formatarDataIsoBr(iso) {
     if (!iso) return '—';
     const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -416,14 +475,14 @@
       prazoOsSalvar.addEventListener('click', function () {
         const input = conteudo.querySelector('#painelPrazoOsInput');
         const valor = input ? input.value : '';
-        const justificativa = window.prompt(
-          'Justificativa (obrigatória se já houver prazo neste ciclo):',
-          '',
-        );
-        if (justificativa === null) return;
-        postCampo('/os/' + osPk + '/editar-campo/', 'prazo_data', valor, {
-          justificativa: justificativa || '',
+        salvarPrazoComJustificativaSeNecessario(function (justificativa) {
+          return postFormResult('/os/' + osPk + '/editar-campo/', {
+            campo: 'prazo_data',
+            valor: valor,
+            justificativa: justificativa || '',
+          });
         }).then(function (resp) {
+          if (!resp) return;
           const display = conteudo.querySelector('#painelPrazoOsDisplay');
           if (display) display.textContent = resp.valor_display || '—';
         }).catch(function (e) { alert(e.message); });
@@ -459,16 +518,14 @@
         btnSalvar.addEventListener('click', function () {
           const input = box.querySelector('.painel-prazo-unid-input');
           const valor = input ? input.value : '';
-          const justificativa = window.prompt(
-            'Justificativa (obrigatória se já houver prazo neste ciclo):',
-            '',
-          );
-          if (justificativa === null) return;
-          postForm('/os/' + osPk + '/prazo-unidade/', {
-            unidade_id: unidadeId,
-            valor: valor,
-            justificativa: justificativa || '',
+          salvarPrazoComJustificativaSeNecessario(function (justificativa) {
+            return postFormResult('/os/' + osPk + '/prazo-unidade/', {
+              unidade_id: unidadeId,
+              valor: valor,
+              justificativa: justificativa || '',
+            });
           }).then(function (resp) {
+            if (!resp) return;
             const display = box.querySelector('.painel-prazo-unid-display');
             if (display) display.textContent = resp.valor_display || '—';
           }).catch(function (e) { alert(e.message); });
