@@ -382,6 +382,67 @@
     });
     body += '</div>';
 
+    const entradasUnidade = data.entradas_unidade || {};
+    body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-entrada-unidade">';
+    body += secaoTitulo('Entrada na unidade');
+    if (!(entradasUnidade.processos || []).length) {
+      body += '<p class="small text-muted mb-0">Nenhum processo vinculado.</p>';
+    }
+    (entradasUnidade.processos || []).forEach(function (proc) {
+      body += '<div class="border rounded p-2 mb-2" style="font-size:12px;"' +
+        ' data-processo-sei-id="' + proc.processo_sei_id + '">';
+      body += '<div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap">';
+      body += '<div><strong style="font-size:11px;color:#1a3a5c;">' +
+        escapeHtml(proc.numero_processo) + '</strong>';
+      if (proc.tipo_vinculo === 'RELACIONADO') {
+        body += ' <span class="badge bg-info" style="font-size:9px;">Rel.</span>';
+      }
+      body += '</div>';
+      body += '<button type="button" class="btn btn-sm btn-outline-secondary painel-entrada-hist"' +
+        ' style="font-size:11px;padding:2px 8px;">Histórico</button>';
+      body += '</div>';
+      body += '<div class="painel-entrada-hist-lista mb-2" style="display:none;"></div>';
+
+      if (!(proc.entradas || []).length) {
+        body += '<p class="small text-muted mb-1">Sem entrada ativa nesta visão.</p>';
+      }
+      (proc.entradas || []).forEach(function (e) {
+        body += '<div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap"' +
+          ' data-historico-id="' + e.historico_id + '">';
+        body += '<div><span class="badge bg-secondary me-1">' + escapeHtml(e.sigla) + '</span>';
+        body += '<strong class="painel-entrada-display">' +
+          escapeHtml(e.data_entrada_display || '—') + '</strong></div>';
+        body += '<div class="d-flex gap-1">';
+        if (e.pode_editar) {
+          body += '<input type="date" class="form-control form-control-sm painel-entrada-input"' +
+            ' value="' + escapeHtml(e.data_entrada || '') +
+            '" style="width:140px;font-size:11px;">';
+          body += '<button type="button" class="btn btn-sm btn-outline-primary painel-entrada-salvar"' +
+            ' style="font-size:11px;padding:2px 8px;">Salvar</button>';
+          body += '<button type="button" class="btn btn-sm btn-outline-danger painel-entrada-saida"' +
+            ' style="font-size:11px;padding:2px 8px;">Saída</button>';
+        }
+        body += '</div></div>';
+      });
+
+      if (proc.pode_criar && (entradasUnidade.unidades_opcoes || []).length) {
+        body += '<div class="d-flex gap-1 flex-wrap align-items-center mt-2 painel-entrada-nova">';
+        body += '<select class="form-select form-select-sm painel-entrada-nova-unidade"' +
+          ' style="width:90px;font-size:11px;">';
+        (entradasUnidade.unidades_opcoes || []).forEach(function (u) {
+          body += '<option value="' + u.id + '">' + escapeHtml(u.sigla) + '</option>';
+        });
+        body += '</select>';
+        body += '<input type="date" class="form-control form-control-sm painel-entrada-nova-data"' +
+          ' value="' + hojeISO() + '" style="width:140px;font-size:11px;">';
+        body += '<button type="button" class="btn btn-sm btn-outline-success painel-entrada-nova-salvar"' +
+          ' style="font-size:11px;padding:2px 8px;">+ Entrada</button>';
+        body += '</div>';
+      }
+      body += '</div>';
+    });
+    body += '</div>';
+
     body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-producoes">';
     body += '<div class="d-flex justify-content-between align-items-center mb-2">';
     body += secaoTitulo('② Produções');
@@ -563,6 +624,118 @@
       }
     });
 
+    function aplicarEntradasPainelLocal(resp) {
+      if (ctx.aplicarAtualizacoesPainel) {
+        ctx.aplicarAtualizacoesPainel(osPk, resp);
+      }
+    }
+
+    conteudo.querySelectorAll('[data-processo-sei-id]').forEach(function (box) {
+      const processoId = box.getAttribute('data-processo-sei-id');
+      const btnHist = box.querySelector('.painel-entrada-hist');
+      if (btnHist) {
+        btnHist.addEventListener('click', function () {
+          const lista = box.querySelector('.painel-entrada-hist-lista');
+          if (!lista) return;
+          if (lista.style.display !== 'none' && lista.dataset.loaded === '1') {
+            lista.style.display = 'none';
+            return;
+          }
+          lista.style.display = 'block';
+          lista.innerHTML = '<em class="text-muted small">Carregando…</em>';
+          getJson(
+            '/os/' + osPk + '/entrada-unidade-historico/?processo_sei_id=' +
+            encodeURIComponent(processoId),
+          ).then(function (resp) {
+            lista.dataset.loaded = '1';
+            let html = '';
+            (resp.registros || []).forEach(function (r) {
+              html += '<div class="border-bottom py-1" style="font-size:11px;">' +
+                '<strong>' + escapeHtml(r.sigla) + '</strong> ' +
+                escapeHtml(r.data_entrada) +
+                (r.ativo ? ' <span class="text-success">(ativa)</span>' :
+                  ' → ' + escapeHtml(r.data_saida || '—') +
+                  ' <span class="text-muted">(encerrada)</span>') +
+                '</div>';
+            });
+            if (resp.historico && resp.historico.length) {
+              html += '<div class="mt-2 text-muted" style="font-size:10px;">Auditoria</div>';
+              html += renderHistoricoHtml(resp.historico);
+            }
+            lista.innerHTML = html || '<em class="text-muted small">Sem registros.</em>';
+          }).catch(function (e) {
+            lista.innerHTML = '<em class="text-danger small">' + escapeHtml(e.message) + '</em>';
+          });
+        });
+      }
+
+      box.querySelectorAll('[data-historico-id]').forEach(function (row) {
+        const histId = row.getAttribute('data-historico-id');
+        const btnSalvar = row.querySelector('.painel-entrada-salvar');
+        if (btnSalvar) {
+          btnSalvar.addEventListener('click', function () {
+            const input = row.querySelector('.painel-entrada-input');
+            const valor = input ? input.value : '';
+            salvarPrazoComJustificativaSeNecessario(function (justificativa) {
+              return postFormResult(
+                '/os/' + osPk + '/entrada-unidade/' + histId + '/editar/',
+                {
+                  data_entrada: valor,
+                  justificativa: justificativa || '',
+                },
+              );
+            }).then(function (resp) {
+              if (!resp) return;
+              const display = row.querySelector('.painel-entrada-display');
+              if (display) display.textContent = resp.valor_display || '—';
+              aplicarEntradasPainelLocal(resp);
+            }).catch(function (e) { alert(e.message); });
+          });
+        }
+        const btnSaida = row.querySelector('.painel-entrada-saida');
+        if (btnSaida) {
+          btnSaida.addEventListener('click', function () {
+            if (!window.confirm('Registrar saída desta unidade?')) return;
+            postForm('/os/' + osPk + '/entrada-unidade/' + histId + '/saida/', {})
+              .then(function (resp) {
+                row.remove();
+                aplicarEntradasPainelLocal(resp);
+              })
+              .catch(function (e) { alert(e.message); });
+          });
+        }
+      });
+
+      const btnNova = box.querySelector('.painel-entrada-nova-salvar');
+      if (btnNova) {
+        btnNova.addEventListener('click', function () {
+          const sel = box.querySelector('.painel-entrada-nova-unidade');
+          const input = box.querySelector('.painel-entrada-nova-data');
+          postForm('/os/' + osPk + '/entrada-unidade/', {
+            processo_sei_id: processoId,
+            unidade_id: sel ? sel.value : '',
+            data_entrada: input ? input.value : '',
+          }).then(function (resp) {
+            aplicarEntradasPainelLocal(resp);
+            const sigla = sel && sel.options[sel.selectedIndex]
+              ? sel.options[sel.selectedIndex].text
+              : '';
+            const dataBr = resp.valor_display || '—';
+            const nova = document.createElement('div');
+            nova.className = 'd-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap';
+            nova.setAttribute('data-historico-id', resp.historico_id || '');
+            nova.innerHTML =
+              '<div><span class="badge bg-secondary me-1">' + escapeHtml(sigla) +
+              '</span><strong class="painel-entrada-display">' + escapeHtml(dataBr) +
+              '</strong></div>';
+            const formNova = box.querySelector('.painel-entrada-nova');
+            if (formNova) box.insertBefore(nova, formNova);
+            else box.appendChild(nova);
+          }).catch(function (e) { alert(e.message); });
+        });
+      }
+    });
+
     conteudo.querySelectorAll('[data-toggle-prod]').forEach(function (hdr) {
       hdr.addEventListener('click', function () {
         const pk = hdr.dataset.toggleProd;
@@ -697,9 +870,10 @@
     const map = {
       etapa: 'painel-secao-etapa',
       prazos: 'painel-secao-prazos',
+      'entrada-unidade': 'painel-secao-entrada-unidade',
       producoes: 'painel-secao-producoes',
       comentarios: 'painel-secao-comentarios',
-      'prazo-eav': 'painel-secao-prazos',
+      'prazo-eav': 'painel-secao-entrada-unidade',
     };
     const id = map[secao];
     const el = id ? document.getElementById(id) : null;

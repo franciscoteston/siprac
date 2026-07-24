@@ -279,6 +279,105 @@ def formatar_prazos_unidades_display(unidades):
     return "; ".join(partes) if partes else "—"
 
 
+def entradas_unidade_ativas_processos_os(os, request=None):
+    """
+    Entradas ativas (ProcessoUnidadeHistorico) dos processos vinculados à OS,
+    filtradas por visibilidade do request.
+
+    Retorna lista de dicts:
+    historico_id, processo_sei_id, numero_processo, unidade_id, sigla,
+    data_entrada (date).
+    """
+    from core.models import ProcessoUnidadeHistorico
+
+    processo_ids = list(
+        os.processos_vinculados.values_list("processo_sei_id", flat=True),
+    )
+    if not processo_ids:
+        return []
+
+    qs = (
+        ProcessoUnidadeHistorico.objects.filter(
+            processo_sei_id__in=processo_ids,
+            ativo=True,
+        )
+        .select_related("processo_sei", "unidade")
+        .order_by("processo_sei__numero_processo", "unidade__sigla")
+    )
+
+    if request is not None:
+        visibilidade = getattr(request, "visibilidade", "UNIDADE")
+        if visibilidade not in ("TOTAL", "DEPARTAMENTO"):
+            vinculo = getattr(request, "vinculo_ativo", None)
+            if not vinculo:
+                return []
+            qs = qs.filter(unidade_id=vinculo.unidade_id)
+
+    return [
+        {
+            "historico_id": h.pk,
+            "processo_sei_id": h.processo_sei_id,
+            "numero_processo": h.processo_sei.numero_processo,
+            "unidade_id": h.unidade_id,
+            "sigla": h.unidade.sigla,
+            "data_entrada": h.data_entrada,
+        }
+        for h in qs
+    ]
+
+
+def formatar_entradas_unidade_display(itens):
+    """String 'NUM · SIGLA dd/mm/aaaa; …' ou '—'."""
+    partes = []
+    for item in itens or []:
+        data = item.get("data_entrada")
+        if not data:
+            continue
+        partes.append(
+            f"{item['numero_processo']} · {item['sigla']} "
+            f"{data.strftime('%d/%m/%Y')}"
+        )
+    return "; ".join(partes) if partes else "—"
+
+
+def entrada_unidade_ja_preenchida_no_registro(historico):
+    """True se já houve LogAuditoria de data_entrada neste registro."""
+    from core.models import LogAuditoria
+
+    return (
+        LogAuditoria.objects.filter(
+            entidade="ProcessoUnidadeHistorico",
+            entidade_id=historico.pk,
+            campo_alterado="data_entrada",
+        )
+        .exclude(valor_novo__isnull=True)
+        .exclude(valor_novo="")
+        .exists()
+    )
+
+
+def historico_entrada_unidade_processo(processo_sei):
+    """Logs de data_entrada de todas as entradas do processo (sob demanda)."""
+    from core.models import LogAuditoria, ProcessoUnidadeHistorico
+
+    ids = list(
+        ProcessoUnidadeHistorico.objects.filter(
+            processo_sei=processo_sei,
+        ).values_list("pk", flat=True),
+    )
+    if not ids:
+        return LogAuditoria.objects.none()
+    return (
+        LogAuditoria.objects.filter(
+            entidade="ProcessoUnidadeHistorico",
+            entidade_id__in=ids,
+            campo_alterado="data_entrada",
+        )
+        .select_related("servidor")
+        .order_by("-data_hora")
+    )
+
+
 def serializar_log_prazo(log):
     """Serializa LogAuditoria de prazo para JSON (histórico sob demanda)."""
     from django.utils import timezone as dj_tz

@@ -366,6 +366,49 @@ class ProcessoSei(models.Model):
         return self.numero_processo
 
 
+class ProcessoUnidadeHistorico(models.Model):
+    """
+    Histórico de entrada de um processo SEI em unidades operacionais.
+    Um processo pode ter vários registros ativos em unidades diferentes.
+    """
+
+    processo_sei = models.ForeignKey(
+        ProcessoSei,
+        on_delete=models.CASCADE,
+        related_name="entradas_unidade",
+        verbose_name="Processo SEI",
+    )
+    unidade = models.ForeignKey(
+        UnidadeInterna,
+        on_delete=models.PROTECT,
+        related_name="entradas_processo",
+        verbose_name="Unidade",
+    )
+    data_entrada = models.DateField(verbose_name="Data de entrada na unidade")
+    data_saida = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Data de saída da unidade",
+    )
+    ativo = models.BooleanField(
+        default=True,
+        verbose_name="Entrada ativa nesta unidade",
+    )
+
+    class Meta:
+        db_table = "processo_unidade_historico"
+        verbose_name = "entrada de processo na unidade"
+        verbose_name_plural = "entradas de processo na unidade"
+        ordering = ["-data_entrada", "unidade__sigla"]
+
+    def __str__(self):
+        status = "ativa" if self.ativo else "encerrada"
+        return (
+            f"{self.processo_sei} — {self.unidade.sigla} "
+            f"({self.data_entrada:%d/%m/%Y}, {status})"
+        )
+
+
 # ---------------------------------------------------------------------------
 # OS e ciclo de vida
 # ---------------------------------------------------------------------------

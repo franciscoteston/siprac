@@ -16,6 +16,7 @@ from core.models import (
     PerfilAcesso,
     PermissaoEspecial,
     ProcessoSei,
+    ProcessoUnidadeHistorico,
     Producao,
     ProducaoAtributo,
     ProducaoImovel,
@@ -360,6 +361,21 @@ class ProcessoSeiAdmin(admin.ModelAdmin):
     search_fields = ("numero_processo",)
     ordering = ("numero_processo",)
     date_hierarchy = "data_abertura_sei"
+
+
+@admin.register(ProcessoUnidadeHistorico)
+class ProcessoUnidadeHistoricoAdmin(admin.ModelAdmin):
+    list_display = (
+        "processo_sei",
+        "unidade",
+        "data_entrada",
+        "data_saida",
+        "ativo",
+    )
+    list_filter = ("ativo", "unidade")
+    search_fields = ("processo_sei__numero_processo", "unidade__sigla")
+    autocomplete_fields = ("processo_sei", "unidade")
+    ordering = ("-data_entrada",)
 
 
 @admin.register(OsProcesso)

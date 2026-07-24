@@ -74,6 +74,10 @@ from core.os_service import (
     os_editavel_para_usuario,
     os_ids_filtro_unidade,
     formatar_prazos_unidades_display,
+    formatar_entradas_unidade_display,
+    entradas_unidade_ativas_processos_os,
+    entrada_unidade_ja_preenchida_no_registro,
+    historico_entrada_unidade_processo,
     historico_prazo_os,
     historico_prazo_unidade,
     queryset_os_com_macroetapa,
@@ -111,6 +115,7 @@ from core.models import (
     OsUnidadeStatus,
     PreferenciaGerencial,
     ProcessoSei,
+    ProcessoUnidadeHistorico,
     LogAuditoria,
     Producao,
     ProducaoImovel,
@@ -1790,7 +1795,7 @@ class ProcessoSeiAPIView(RequerLoginJSONMixin, View):
 
 COLUNAS_GERENCIAL_CONFIG = {
     "entrada_dai": {"label": "Entrada DAI"},
-    "entrada_eav": {"label": "Entrada EAV"},
+    "entrada_unidade": {"label": "ENTRADA UNIDADE"},
     "requerimento": {"label": "Requerimento"},
     "finalidade": {"label": "Finalidade"},
     "ctm": {"label": "CTM"},
@@ -1819,7 +1824,7 @@ COLUNAS_GERENCIAL_CONFIG = {
 GRUPOS_COLUNAS_GERENCIAL = [
     (
         "INFORMAÇÕES DE ENTRADA",
-        ["entrada_dai", "entrada_eav", "requerimento", "finalidade"],
+        ["entrada_dai", "entrada_unidade", "requerimento", "finalidade"],
     ),
     (
         "INFORMAÇÕES DO IMÓVEL",
@@ -1860,7 +1865,7 @@ GRUPOS_COLUNAS_GERENCIAL = [
 ]
 
 COLUNAS_GERENCIAL_NOVAS = {
-    "entrada_eav",
+    "entrada_unidade",
     "num_endereco",
     "num_unidade",
     "num_bloco",
@@ -1881,7 +1886,7 @@ COLUNAS_GERENCIAL_NOVAS = {
 
 COLUNAS_GERENCIAL_PADRAO = [
     "entrada_dai",
-    "entrada_eav",
+    "entrada_unidade",
     "requerimento",
     "finalidade",
     "ctm",
@@ -1965,6 +1970,13 @@ def _colunas_visiveis_gerencial(servidor):
             preferencia = servidor.preferencia_gerencial
             colunas = preferencia.colunas_visiveis or []
             if colunas:
+                if "entrada_eav" in colunas:
+                    colunas = [
+                        "entrada_unidade" if c == "entrada_eav" else c
+                        for c in colunas
+                    ]
+                    preferencia.colunas_visiveis = colunas
+                    preferencia.save(update_fields=["colunas_visiveis"])
                 colunas_salvas = set(colunas)
                 if not colunas_salvas.intersection(COLUNAS_GERENCIAL_NOVAS):
                     preferencia.colunas_visiveis = list(COLUNAS_GERENCIAL_PADRAO)
@@ -2102,6 +2114,7 @@ def _campos_vazios_gerencial():
         "dias_sei": None,
         "prazo_os": "—",
         "prazo_unidades": "—",
+        "entrada_unidade": "—",
         "enviado": "—",
         "la_pt_ptf": "—",
         "tipo_trabalho": "—",
@@ -2173,7 +2186,7 @@ def _montar_cells_gerencial(linha):
     """Monta dict cells a partir dos campos flat da linha."""
     return {
         "entrada_dai": linha.get("entrada_dai", "—"),
-        "entrada_eav": linha.get("entrada_eav", "—"),
+        "entrada_unidade": linha.get("entrada_unidade", "—"),
         "requerimento": linha.get("requerimento", "—"),
         "finalidade": linha.get("finalidade", "—"),
         "ctm": linha.get("ctm", "—"),
@@ -2294,7 +2307,6 @@ def _montar_panel_gerencial(
     unidade,
     dados_imovel,
     entrada_dai,
-    entrada_eav,
     *,
     request=None,
     servidor_logado=None,
@@ -2371,11 +2383,15 @@ def _montar_panel_gerencial(
             _serializar_comentario(c) for c in comentarios_os_qs[:5]
         ],
         "total_comentarios_os": comentarios_os_qs.count(),
-        "entrada_eav": entrada_eav,
         "dias_sei": dias_sei,
         "apelido": os_obj.apelido or "",
         "modo_b": modo_b,
         "prazos": _serializar_prazos_painel(os_obj, request, os_editavel),
+        "entradas_unidade": _serializar_entradas_unidade_painel(
+            os_obj,
+            request,
+            os_editavel,
+        ),
     }
 
 
@@ -2455,6 +2471,86 @@ def _serializar_prazos_painel(os_obj, request, os_editavel):
     }
 
 
+def _serializar_entradas_unidade_painel(os_obj, request, os_editavel):
+    """Payload de entradas por processo/unidade para o painel gerencial."""
+    visibilidade = getattr(request, "visibilidade", "UNIDADE") if request else "UNIDADE"
+    vinculo = getattr(request, "vinculo_ativo", None) if request else None
+    unidade_logada_id = vinculo.unidade_id if vinculo else None
+
+    processos = list(
+        os_obj.processos_vinculados.select_related("processo_sei").order_by(
+            "tipo_vinculo",
+            "processo_sei__numero_processo",
+        ),
+    )
+    resultado = []
+    for op in processos:
+        qs = (
+            ProcessoUnidadeHistorico.objects.filter(
+                processo_sei=op.processo_sei,
+                ativo=True,
+            )
+            .select_related("unidade")
+            .order_by("unidade__sigla")
+        )
+        if visibilidade not in ("TOTAL", "DEPARTAMENTO"):
+            if not unidade_logada_id:
+                qs = qs.none()
+            else:
+                qs = qs.filter(unidade_id=unidade_logada_id)
+
+        entradas = []
+        for h in qs:
+            if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+                pode_editar = bool(os_editavel)
+            else:
+                pode_editar = bool(
+                    os_editavel and unidade_logada_id == h.unidade_id
+                )
+            entradas.append(
+                {
+                    "historico_id": h.pk,
+                    "unidade_id": h.unidade_id,
+                    "sigla": h.unidade.sigla,
+                    "data_entrada": h.data_entrada.isoformat(),
+                    "data_entrada_display": _formatar_data_br(h.data_entrada),
+                    "pode_editar": pode_editar,
+                },
+            )
+
+        pode_criar = bool(os_editavel)
+        if visibilidade not in ("TOTAL", "DEPARTAMENTO"):
+            pode_criar = bool(os_editavel and unidade_logada_id)
+
+        resultado.append(
+            {
+                "processo_sei_id": op.processo_sei_id,
+                "numero_processo": op.processo_sei.numero_processo,
+                "tipo_vinculo": op.tipo_vinculo,
+                "entradas": entradas,
+                "pode_criar": pode_criar,
+            },
+        )
+
+    unidades_opcoes = []
+    if os_editavel:
+        if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+            unidades_opcoes = [
+                {"id": u.pk, "sigla": u.sigla}
+                for u in UnidadeInterna.objects.order_by("sigla")
+            ]
+        elif unidade_logada_id and vinculo:
+            unidades_opcoes = [
+                {"id": vinculo.unidade_id, "sigla": vinculo.unidade.sigla},
+            ]
+
+    return {
+        "processos": resultado,
+        "unidades_opcoes": unidades_opcoes,
+        "pode_editar": bool(os_editavel),
+    }
+
+
 def _serializar_linhas_gerencial(
     os_obj,
     unidade_logada=None,
@@ -2528,14 +2624,8 @@ def _serializar_linhas_gerencial(
         entrada_dai = processo_principal.data_entrada_divisao
     else:
         entrada_dai = os_obj.data_entrada_divisao
-    entrada_unidade = (
-        data_entrada_unidade(os_obj, unidade_logada) if unidade_logada else None
-    )
-    entrada_eav = (
-        timezone.localtime(entrada_unidade).strftime("%d/%m/%Y %H:%M")
-        if entrada_unidade
-        else "—"
-    )
+    entradas_unidade_itens = entradas_unidade_ativas_processos_os(os_obj, request)
+    entrada_unidade_display = formatar_entradas_unidade_display(entradas_unidade_itens)
     dias_sei = _calcular_dias_sei_gerencial(os_obj)
     prioridade_label = PRIORIDADE_OS_LABELS.get(
         os_obj.prioridade,
@@ -2574,7 +2664,15 @@ def _serializar_linhas_gerencial(
         "mostrar_lista_unidades": mostrar_lista_unidades,
         "etapas_unidades": etapas_unidades,
         "entrada_dai": _formatar_data_br(entrada_dai),
-        "entrada_eav": entrada_eav,
+        "entrada_unidade": entrada_unidade_display,
+        "entrada_unidade_itens": [
+            {
+                "numero_processo": item["numero_processo"],
+                "sigla": item["sigla"],
+                "data_entrada_display": _formatar_data_br(item["data_entrada"]),
+            }
+            for item in entradas_unidade_itens
+        ],
         "requerimento": os_obj.tipo_demanda.descricao,
         "finalidade": os_obj.finalidade.descricao,
         "prioridade": prioridade_label,
@@ -2632,7 +2730,6 @@ def _serializar_linhas_gerencial(
             unidade_logada,
             imovel,
             entrada_dai,
-            entrada_eav,
             request=request,
             servidor_logado=servidor_logado,
             modo_b=modo_b,
@@ -2661,6 +2758,7 @@ def _serializar_linhas_gerencial(
                 "dias_sei": dias_sei,
                 "prazo_os": prazo_os_display,
                 "prazo_unidades": prazo_unidades_display,
+                "entrada_unidade": entrada_unidade_display,
             },
         )
         linhas.append(finalizar_linha(linha, None, dados_imovel))
@@ -2680,6 +2778,7 @@ def _serializar_linhas_gerencial(
                 "dias_sei": dias_sei,
                 "prazo_os": prazo_os_display,
                 "prazo_unidades": prazo_unidades_display,
+                "entrada_unidade": entrada_unidade_display,
             },
         )
         linhas.append(finalizar_linha(linha, None, dados_imovel))
@@ -4429,6 +4528,25 @@ def _html_celula_prazo_unidades(os_obj, request):
     return "".join(partes)
 
 
+def _html_celula_entrada_unidade(os_obj, request):
+    """HTML da coluna ENTRADA UNIDADE (mesmo desenho do template Gerencial)."""
+    from django.utils.html import escape
+
+    itens = entradas_unidade_ativas_processos_os(os_obj, request)
+    if not itens:
+        return '<div class="gerencial-cel-wrap">—</div>'
+    partes = ['<div class="gerencial-cel-wrap">']
+    for item in itens:
+        data_br = _formatar_data_br(item["data_entrada"])
+        partes.append(
+            '<div class="small">'
+            f'<span class="text-muted">{escape(item["numero_processo"])}:</span> '
+            f'{escape(item["sigla"])} {escape(data_br)}</div>'
+        )
+    partes.append("</div>")
+    return "".join(partes)
+
+
 def _html_celula_etapa_gerencial(os_obj, request, unidade_logada=None):
     """
     HTML interno de .gerencial-cel-etapa (macro + etapa(s)),
@@ -4951,6 +5069,363 @@ class OSPrazoHistoricoView(RequerLoginJSONMixin, View):
             {
                 "sucesso": True,
                 "tipo": "os",
+                "historico": serializar_historico_prazo(logs),
+            },
+        )
+
+
+def _processo_vinculado_a_os(os_obj, processo_sei_id):
+    return OsProcesso.objects.filter(
+        os=os_obj,
+        processo_sei_id=processo_sei_id,
+    ).exists()
+
+
+def _pode_editar_entrada_unidade_registro(request, historico, os_editavel):
+    if not os_editavel:
+        return False
+    visibilidade = getattr(request, "visibilidade", "UNIDADE")
+    if visibilidade in ("TOTAL", "DEPARTAMENTO"):
+        return True
+    vinculo = getattr(request, "vinculo_ativo", None)
+    return bool(vinculo and vinculo.unidade_id == historico.unidade_id)
+
+
+class OSEntradaUnidadeCriarView(RequerLoginMixin, View):
+    """Registra nova entrada de processo em uma unidade."""
+
+    def post(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        if not os_editavel_para_usuario(os_obj, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        processo_sei_id = (request.POST.get("processo_sei_id") or "").strip()
+        unidade_id = (request.POST.get("unidade_id") or "").strip()
+        valor = (request.POST.get("data_entrada") or request.POST.get("valor") or "").strip()
+        justificativa = (request.POST.get("justificativa") or "").strip()
+
+        if not processo_sei_id or not _processo_vinculado_a_os(os_obj, processo_sei_id):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Processo não vinculado a esta OS."},
+                status=400,
+            )
+
+        visibilidade = getattr(request, "visibilidade", "UNIDADE")
+        vinculo = getattr(request, "vinculo_ativo", None)
+        if visibilidade not in ("TOTAL", "DEPARTAMENTO"):
+            if not vinculo:
+                return JsonResponse(
+                    {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                    status=403,
+                )
+            unidade_id = str(vinculo.unidade_id)
+
+        if not unidade_id:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Informe a unidade."},
+                status=400,
+            )
+        unidade = UnidadeInterna.objects.filter(pk=unidade_id).first()
+        if unidade is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Unidade inválida."},
+                status=400,
+            )
+
+        if not valor:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Informe a data de entrada."},
+                status=400,
+            )
+        try:
+            data_entrada = datetime.date.fromisoformat(valor)
+        except ValueError:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Data inválida."},
+                status=400,
+            )
+
+        if ProcessoUnidadeHistorico.objects.filter(
+            processo_sei_id=processo_sei_id,
+            unidade=unidade,
+            ativo=True,
+        ).exists():
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": (
+                        "Já existe entrada ativa deste processo nesta unidade. "
+                        "Edite a data ou registre a saída antes."
+                    ),
+                },
+                status=400,
+            )
+
+        historico = ProcessoUnidadeHistorico.objects.create(
+            processo_sei_id=processo_sei_id,
+            unidade=unidade,
+            data_entrada=data_entrada,
+            ativo=True,
+        )
+        LogAuditoria.objects.create(
+            servidor=servidor,
+            entidade="ProcessoUnidadeHistorico",
+            entidade_id=historico.pk,
+            operacao="ENTRADA_UNIDADE",
+            campo_alterado="data_entrada",
+            valor_anterior=None,
+            valor_novo=data_entrada.isoformat(),
+            justificativa=justificativa or None,
+        )
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "historico_id": historico.pk,
+                **_formatar_data_resposta_json(data_entrada),
+                "celulas": {
+                    "entrada_unidade": _html_celula_entrada_unidade(os_obj, request),
+                },
+                "entradas_unidade": _serializar_entradas_unidade_painel(
+                    os_obj,
+                    request,
+                    True,
+                ),
+            },
+        )
+
+
+class OSEntradaUnidadeEditarView(RequerLoginMixin, View):
+    """Edita data_entrada de um registro existente."""
+
+    def post(self, request, pk, historico_id):
+        os_obj = get_object_or_404(OS, pk=pk)
+        if not os_editavel_para_usuario(os_obj, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        historico = get_object_or_404(ProcessoUnidadeHistorico, pk=historico_id)
+        if not _processo_vinculado_a_os(os_obj, historico.processo_sei_id):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Processo não vinculado a esta OS."},
+                status=400,
+            )
+        if not _pode_editar_entrada_unidade_registro(request, historico, True):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        valor = (request.POST.get("data_entrada") or request.POST.get("valor") or "").strip()
+        justificativa = (request.POST.get("justificativa") or "").strip()
+        if not valor:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Informe a data de entrada."},
+                status=400,
+            )
+        try:
+            valor_novo = datetime.date.fromisoformat(valor)
+        except ValueError:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Data inválida."},
+                status=400,
+            )
+
+        valor_anterior = historico.data_entrada
+        if valor_anterior == valor_novo:
+            return JsonResponse(
+                {
+                    "sucesso": True,
+                    **_formatar_data_resposta_json(valor_novo),
+                    "celulas": {
+                        "entrada_unidade": _html_celula_entrada_unidade(os_obj, request),
+                    },
+                },
+            )
+
+        if entrada_unidade_ja_preenchida_no_registro(historico) and not justificativa:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": (
+                        "Informe a justificativa para alterar a data de "
+                        "entrada neste registro."
+                    ),
+                },
+                status=400,
+            )
+
+        historico.data_entrada = valor_novo
+        historico.save(update_fields=["data_entrada"])
+        LogAuditoria.objects.create(
+            servidor=servidor,
+            entidade="ProcessoUnidadeHistorico",
+            entidade_id=historico.pk,
+            operacao="ALTERACAO_ENTRADA_UNIDADE",
+            campo_alterado="data_entrada",
+            valor_anterior=valor_anterior.isoformat() if valor_anterior else None,
+            valor_novo=valor_novo.isoformat(),
+            justificativa=justificativa or None,
+        )
+        return JsonResponse(
+            {
+                "sucesso": True,
+                **_formatar_data_resposta_json(valor_novo),
+                "celulas": {
+                    "entrada_unidade": _html_celula_entrada_unidade(os_obj, request),
+                },
+                "entradas_unidade": _serializar_entradas_unidade_painel(
+                    os_obj,
+                    request,
+                    True,
+                ),
+            },
+        )
+
+
+class OSEntradaUnidadeSaidaView(RequerLoginMixin, View):
+    """Marca saída: data_saida + ativo=False."""
+
+    def post(self, request, pk, historico_id):
+        os_obj = get_object_or_404(OS, pk=pk)
+        if not os_editavel_para_usuario(os_obj, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        historico = get_object_or_404(ProcessoUnidadeHistorico, pk=historico_id)
+        if not _processo_vinculado_a_os(os_obj, historico.processo_sei_id):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Processo não vinculado a esta OS."},
+                status=400,
+            )
+        if not _pode_editar_entrada_unidade_registro(request, historico, True):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+        if not historico.ativo:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Esta entrada já está encerrada."},
+                status=400,
+            )
+
+        valor = (request.POST.get("data_saida") or request.POST.get("valor") or "").strip()
+        if valor:
+            try:
+                data_saida = datetime.date.fromisoformat(valor)
+            except ValueError:
+                return JsonResponse(
+                    {"sucesso": False, "erro": "Data de saída inválida."},
+                    status=400,
+                )
+        else:
+            data_saida = timezone.localdate()
+
+        if data_saida < historico.data_entrada:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": "A data de saída não pode ser anterior à entrada.",
+                },
+                status=400,
+            )
+
+        historico.data_saida = data_saida
+        historico.ativo = False
+        historico.save(update_fields=["data_saida", "ativo"])
+        LogAuditoria.objects.create(
+            servidor=servidor,
+            entidade="ProcessoUnidadeHistorico",
+            entidade_id=historico.pk,
+            operacao="SAIDA_UNIDADE",
+            campo_alterado="data_saida",
+            valor_anterior=None,
+            valor_novo=data_saida.isoformat(),
+            justificativa=(request.POST.get("justificativa") or "").strip() or None,
+        )
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "data_saida": data_saida.isoformat(),
+                "celulas": {
+                    "entrada_unidade": _html_celula_entrada_unidade(os_obj, request),
+                },
+                "entradas_unidade": _serializar_entradas_unidade_painel(
+                    os_obj,
+                    request,
+                    True,
+                ),
+            },
+        )
+
+
+class OSEntradaUnidadeHistoricoView(RequerLoginJSONMixin, View):
+    """Histórico completo (ativas + inativas) sob demanda, por processo."""
+
+    def get(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        processo_sei_id = (request.GET.get("processo_sei_id") or "").strip()
+        if not processo_sei_id or not _processo_vinculado_a_os(os_obj, processo_sei_id):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Processo não vinculado a esta OS."},
+                status=400,
+            )
+
+        processo = get_object_or_404(ProcessoSei, pk=processo_sei_id)
+        qs = (
+            ProcessoUnidadeHistorico.objects.filter(processo_sei=processo)
+            .select_related("unidade")
+            .order_by("-data_entrada", "unidade__sigla")
+        )
+        visibilidade = getattr(request, "visibilidade", "UNIDADE")
+        if visibilidade not in ("TOTAL", "DEPARTAMENTO"):
+            vinculo = getattr(request, "vinculo_ativo", None)
+            if not vinculo:
+                qs = qs.none()
+            else:
+                qs = qs.filter(unidade_id=vinculo.unidade_id)
+
+        registros = [
+            {
+                "historico_id": h.pk,
+                "sigla": h.unidade.sigla,
+                "data_entrada": _formatar_data_br(h.data_entrada),
+                "data_saida": _formatar_data_br(h.data_saida) if h.data_saida else "—",
+                "ativo": h.ativo,
+            }
+            for h in qs
+        ]
+        logs = historico_entrada_unidade_processo(processo)
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "processo_sei_id": processo.pk,
+                "numero_processo": processo.numero_processo,
+                "registros": registros,
                 "historico": serializar_historico_prazo(logs),
             },
         )

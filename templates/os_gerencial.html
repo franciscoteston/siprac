@@ -460,6 +460,19 @@ body.gerencial-mode .siprac-content {
                   —
                 {% endif %}
                 </div>
+              {% elif col_id == 'entrada_unidade' %}
+                <div class="gerencial-cel-wrap">
+                {% if linha.entrada_unidade_itens %}
+                  {% for item in linha.entrada_unidade_itens %}
+                  <div class="small">
+                    <span class="text-muted">{{ item.numero_processo }}:</span>
+                    {{ item.sigla }} {{ item.data_entrada_display }}
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  —
+                {% endif %}
+                </div>
               {% else %}
                 {{ linha.cells|get_item:col_id }}
               {% endif %}
