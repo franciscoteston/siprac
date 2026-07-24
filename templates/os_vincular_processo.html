@@ -21,6 +21,12 @@
     <div class="col-md-3">
       {{ form.data_entrada_divisao|as_crispy_field }}
     </div>
+    <div class="col-md-6">
+      {{ form.unidade_destino|as_crispy_field }}
+    </div>
+    <div class="col-md-3">
+      {{ form.data_entrada_unidade|as_crispy_field }}
+    </div>
   </div>
 
   {% if form.non_field_errors %}

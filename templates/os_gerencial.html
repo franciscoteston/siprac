@@ -549,10 +549,12 @@ body.gerencial-mode .siprac-content {
   });
 
   let painelDados = {};
+  window.painelDados = painelDados;
   const panelsDataEl = document.getElementById('gerencial-panels-data');
   if (panelsDataEl) {
     try {
       painelDados = JSON.parse(panelsDataEl.textContent);
+      window.painelDados = painelDados;
     } catch (err) {
       console.error('Erro ao carregar dados do painel gerencial:', err);
     }
@@ -644,6 +646,7 @@ body.gerencial-mode .siprac-content {
     painel.classList.add('aberto');
     window.GerencialPainel.bindPanelEvents(dados, {
       painelRoot: painel,
+      painelHeader: painelHeader,
       painelConteudo: painelConteudo,
       fecharPainel: fecharPainel,
       atualizarCelula: atualizarCelula,

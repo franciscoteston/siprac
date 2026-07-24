@@ -1471,6 +1471,7 @@ class OSWizardPasso2View(RequerLoginMixin, FormView):
             "numero_processo",
             "data_abertura_sei",
             "data_entrada_divisao",
+            "data_entrada_unidade",
             "prioridade",
             "observacao",
             "apelido",
@@ -1479,6 +1480,8 @@ class OSWizardPasso2View(RequerLoginMixin, FormView):
         ):
             if dados.get(campo) not in (None, ""):
                 initial[campo] = dados[campo]
+        if self.os_relacionada and dados.get("unidade_destino"):
+            initial["unidade_destino"] = dados["unidade_destino"]
         if not self.os_relacionada:
             for campo in ("natureza", "tipo_demanda", "finalidade"):
                 if dados.get(campo):
@@ -1505,6 +1508,10 @@ class OSWizardPasso2View(RequerLoginMixin, FormView):
         }
         if self.os_relacionada:
             dados["relacionado_os_pk"] = self.os_relacionada.pk
+            dados["unidade_destino"] = cleaned["unidade_destino"].pk
+            dados["data_entrada_unidade"] = cleaned[
+                "data_entrada_unidade"
+            ].isoformat()
         else:
             dados.update(
                 {
@@ -1631,12 +1638,48 @@ class OSWizardPasso3View(RequerLoginMixin, FormView):
 
             if relacionado_pk:
                 os_obj = get_object_or_404(OS, pk=relacionado_pk)
+                unidade_destino_id = dados.get("unidade_destino")
+                data_entrada_unidade_raw = dados.get("data_entrada_unidade")
+                if not unidade_destino_id or not data_entrada_unidade_raw:
+                    messages.error(
+                        request,
+                        "Informe a unidade de destino e a data de entrada "
+                        "na unidade no passo 2.",
+                    )
+                    return redirect("os_nova_passo2")
+                try:
+                    data_entrada_unidade = datetime.date.fromisoformat(
+                        data_entrada_unidade_raw,
+                    )
+                except (TypeError, ValueError):
+                    messages.error(request, "Data de entrada na unidade inválida.")
+                    return redirect("os_nova_passo2")
+                unidade_destino = get_object_or_404(
+                    UnidadeInterna,
+                    pk=unidade_destino_id,
+                )
                 OsProcesso.objects.create(
                     os=os_obj,
                     processo_sei=processo_sei,
                     tipo_vinculo="RELACIONADO",
                     data_entrada_divisao=data_entrada,
                     registrado_por=servidor,
+                )
+                historico = ProcessoUnidadeHistorico.objects.create(
+                    processo_sei=processo_sei,
+                    unidade=unidade_destino,
+                    data_entrada=data_entrada_unidade,
+                    ativo=True,
+                )
+                LogAuditoria.objects.create(
+                    servidor=servidor,
+                    entidade="ProcessoUnidadeHistorico",
+                    entidade_id=historico.pk,
+                    operacao="ENTRADA_UNIDADE",
+                    campo_alterado="data_entrada",
+                    valor_anterior=None,
+                    valor_novo=data_entrada_unidade.isoformat(),
+                    justificativa=None,
                 )
             else:
                 natureza = get_object_or_404(Natureza, pk=dados["natureza"])
@@ -2544,10 +2587,18 @@ def _serializar_entradas_unidade_painel(os_obj, request, os_editavel):
                 {"id": vinculo.unidade_id, "sigla": vinculo.unidade.sigla},
             ]
 
+    unidade_ids = {
+        e["unidade_id"]
+        for proc in resultado
+        for e in proc["entradas"]
+    }
+    divergencia_unidade = len(unidade_ids) >= 2
+
     return {
         "processos": resultado,
         "unidades_opcoes": unidades_opcoes,
         "pode_editar": bool(os_editavel),
+        "divergencia_unidade": divergencia_unidade,
     }
 
 
@@ -2626,6 +2677,9 @@ def _serializar_linhas_gerencial(
         entrada_dai = os_obj.data_entrada_divisao
     entradas_unidade_itens = entradas_unidade_ativas_processos_os(os_obj, request)
     entrada_unidade_display = formatar_entradas_unidade_display(entradas_unidade_itens)
+    divergencia_unidade = (
+        len({item["unidade_id"] for item in entradas_unidade_itens}) >= 2
+    )
     dias_sei = _calcular_dias_sei_gerencial(os_obj)
     prioridade_label = PRIORIDADE_OS_LABELS.get(
         os_obj.prioridade,
@@ -2673,6 +2727,7 @@ def _serializar_linhas_gerencial(
             }
             for item in entradas_unidade_itens
         ],
+        "divergencia_unidade": divergencia_unidade,
         "requerimento": os_obj.tipo_demanda.descricao,
         "finalidade": os_obj.finalidade.descricao,
         "prioridade": prioridade_label,
@@ -3662,6 +3717,8 @@ class OSVincularProcessoView(RequerLoginMixin, FormView):
         numero = form.cleaned_data["numero_processo"]
         data_criacao_sei = form.cleaned_data["data_criacao_sei"]
         data_entrada_divisao = form.cleaned_data["data_entrada_divisao"]
+        unidade_destino = form.cleaned_data["unidade_destino"]
+        data_entrada_unidade = form.cleaned_data["data_entrada_unidade"]
 
         processo_sei, created = ProcessoSei.objects.get_or_create(
             numero_processo=numero,
@@ -3701,6 +3758,23 @@ class OSVincularProcessoView(RequerLoginMixin, FormView):
                 Encaminhamento.TIPO_MACROETAPA_INCLUSAO_PROCESSO,
                 servidor=servidor,
                 observacao=f"Processo {numero} incluído como relacionado.",
+            )
+
+            historico = ProcessoUnidadeHistorico.objects.create(
+                processo_sei=processo_sei,
+                unidade=unidade_destino,
+                data_entrada=data_entrada_unidade,
+                ativo=True,
+            )
+            LogAuditoria.objects.create(
+                servidor=servidor,
+                entidade="ProcessoUnidadeHistorico",
+                entidade_id=historico.pk,
+                operacao="ENTRADA_UNIDADE",
+                campo_alterado="data_entrada",
+                valor_anterior=None,
+                valor_novo=data_entrada_unidade.isoformat(),
+                justificativa=None,
             )
 
             unidade_atual = unidade_atual_da_os(self.os_obj)
@@ -5427,6 +5501,160 @@ class OSEntradaUnidadeHistoricoView(RequerLoginJSONMixin, View):
                 "numero_processo": processo.numero_processo,
                 "registros": registros,
                 "historico": serializar_historico_prazo(logs),
+            },
+        )
+
+
+class OSUnificarEntradaUnidadeView(RequerLoginMixin, View):
+    """
+    Move a entrada ativa de um processo para a unidade de outro processo
+    da mesma OS (unifica atendimento). Justificativa sempre obrigatória.
+    """
+
+    def post(self, request, pk):
+        os_obj = get_object_or_404(OS, pk=pk)
+        if not os_editavel_para_usuario(os_obj, request):
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_OS_SOMENTE_LEITURA},
+                status=403,
+            )
+        servidor = _obter_servidor(request.user)
+        if servidor is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": MSG_SEM_PERMISSAO},
+                status=403,
+            )
+
+        processo_origem_id = (
+            request.POST.get("processo_sei_id_origem") or ""
+        ).strip()
+        unidade_destino_id = (request.POST.get("unidade_destino_id") or "").strip()
+        justificativa = (request.POST.get("justificativa") or "").strip()
+
+        if not justificativa:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": "Informe a justificativa para unificar o atendimento.",
+                },
+                status=400,
+            )
+        if not processo_origem_id or not _processo_vinculado_a_os(
+            os_obj,
+            processo_origem_id,
+        ):
+            return JsonResponse(
+                {"sucesso": False, "erro": "Processo de origem inválido."},
+                status=400,
+            )
+        if not unidade_destino_id:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Informe a unidade de destino."},
+                status=400,
+            )
+
+        unidade_destino = UnidadeInterna.objects.filter(pk=unidade_destino_id).first()
+        if unidade_destino is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Unidade de destino inválida."},
+                status=400,
+            )
+
+        entradas_ativas = entradas_unidade_ativas_processos_os(os_obj, None)
+        unidades_ativas_os = {item["unidade_id"] for item in entradas_ativas}
+        if unidade_destino.pk not in unidades_ativas_os:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": (
+                        "A unidade de destino deve ser uma das unidades "
+                        "já ativas nos processos desta OS."
+                    ),
+                },
+                status=400,
+            )
+
+        entrada_origem = (
+            ProcessoUnidadeHistorico.objects.filter(
+                processo_sei_id=processo_origem_id,
+                ativo=True,
+            )
+            .exclude(unidade_id=unidade_destino.pk)
+            .select_related("unidade")
+            .order_by("-data_entrada", "-id")
+            .first()
+        )
+        if entrada_origem is None:
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": "O processo de origem não possui entrada ativa "
+                    "fora da unidade de destino.",
+                },
+                status=400,
+            )
+        if ProcessoUnidadeHistorico.objects.filter(
+            processo_sei_id=processo_origem_id,
+            unidade=unidade_destino,
+            ativo=True,
+        ).exists():
+            return JsonResponse(
+                {
+                    "sucesso": False,
+                    "erro": (
+                        "Já existe entrada ativa deste processo na unidade "
+                        "de destino."
+                    ),
+                },
+                status=400,
+            )
+
+        hoje = timezone.localdate()
+        with transaction.atomic():
+            entrada_origem.data_saida = hoje
+            entrada_origem.ativo = False
+            entrada_origem.save(update_fields=["data_saida", "ativo"])
+            LogAuditoria.objects.create(
+                servidor=servidor,
+                entidade="ProcessoUnidadeHistorico",
+                entidade_id=entrada_origem.pk,
+                operacao="SAIDA_UNIDADE",
+                campo_alterado="data_saida",
+                valor_anterior=None,
+                valor_novo=hoje.isoformat(),
+                justificativa=justificativa,
+            )
+
+            nova = ProcessoUnidadeHistorico.objects.create(
+                processo_sei_id=processo_origem_id,
+                unidade=unidade_destino,
+                data_entrada=hoje,
+                ativo=True,
+            )
+            LogAuditoria.objects.create(
+                servidor=servidor,
+                entidade="ProcessoUnidadeHistorico",
+                entidade_id=nova.pk,
+                operacao="ENTRADA_UNIDADE",
+                campo_alterado="data_entrada",
+                valor_anterior=None,
+                valor_novo=hoje.isoformat(),
+                justificativa=justificativa,
+            )
+
+        return JsonResponse(
+            {
+                "sucesso": True,
+                "historico_id": nova.pk,
+                **_formatar_data_resposta_json(hoje),
+                "celulas": {
+                    "entrada_unidade": _html_celula_entrada_unidade(os_obj, request),
+                },
+                "entradas_unidade": _serializar_entradas_unidade_painel(
+                    os_obj,
+                    request,
+                    os_editavel_para_usuario(os_obj, request),
+                ),
             },
         )
 

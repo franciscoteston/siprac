@@ -11,13 +11,6 @@
     return div.innerHTML;
   }
 
-  function hojeISO() {
-    const d = new Date();
-    return d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
-
   function postJson(url, payload) {
     return fetch(url, {
       method: 'POST',
@@ -385,6 +378,22 @@
     const entradasUnidade = data.entradas_unidade || {};
     body += '<div class="p-3 border-bottom bg-white mt-1" id="painel-secao-entrada-unidade">';
     body += secaoTitulo('Entrada na unidade');
+
+    if (entradasUnidade.divergencia_unidade) {
+      body += '<div class="alert alert-warning py-2 px-3 mb-2" style="font-size:11px;">';
+      body += '<strong>Divergência de unidades:</strong> os processos desta OS ' +
+        'possuem entradas ativas em unidades diferentes.';
+      if (data.os_editavel) {
+        body += '<div class="mt-2">';
+        body += '<button type="button" class="btn btn-sm btn-warning" ' +
+          'id="painelBtnUnificarEntrada" style="font-size:11px;padding:2px 8px;">' +
+          'Unificar atendimento</button>';
+        body += '</div>';
+        body += '<div id="painelUnificarForm" class="mt-2" style="display:none;"></div>';
+      }
+      body += '</div>';
+    }
+
     if (!(entradasUnidade.processos || []).length) {
       body += '<p class="small text-muted mb-0">Nenhum processo vinculado.</p>';
     }
@@ -398,8 +407,8 @@
         body += ' <span class="badge bg-info" style="font-size:9px;">Rel.</span>';
       }
       body += '</div>';
-      body += '<button type="button" class="btn btn-sm btn-outline-secondary painel-entrada-hist"' +
-        ' style="font-size:11px;padding:2px 8px;">Histórico</button>';
+      body += '<button type="button" class="btn btn-sm btn-link p-0 painel-entrada-hist"' +
+        ' style="font-size:11px;text-decoration:none;">Ver histórico completo</button>';
       body += '</div>';
       body += '<div class="painel-entrada-hist-lista mb-2" style="display:none;"></div>';
 
@@ -407,13 +416,20 @@
         body += '<p class="small text-muted mb-1">Sem entrada ativa nesta visão.</p>';
       }
       (proc.entradas || []).forEach(function (e) {
-        body += '<div class="d-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap"' +
-          ' data-historico-id="' + e.historico_id + '">';
-        body += '<div><span class="badge bg-secondary me-1">' + escapeHtml(e.sigla) + '</span>';
-        body += '<strong class="painel-entrada-display">' +
-          escapeHtml(e.data_entrada_display || '—') + '</strong></div>';
-        body += '<div class="d-flex gap-1">';
+        body += '<div class="mb-1" data-historico-id="' + e.historico_id + '">';
+        body += '<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">';
+        body += '<div class="painel-entrada-leitura">' +
+          escapeHtml(e.sigla) + ' — desde ' +
+          escapeHtml(e.data_entrada_display || '—') + '</div>';
         if (e.pode_editar) {
+          body += '<button type="button" class="btn btn-sm btn-link p-0 painel-entrada-editar-toggle"' +
+            ' title="Editar" style="font-size:12px;line-height:1;" aria-label="Editar entrada">' +
+            '<i class="bi bi-pencil"></i></button>';
+        }
+        body += '</div>';
+        if (e.pode_editar) {
+          body += '<div class="painel-entrada-edicao d-none mt-1">';
+          body += '<div class="d-flex gap-1 flex-wrap align-items-center">';
           body += '<input type="date" class="form-control form-control-sm painel-entrada-input"' +
             ' value="' + escapeHtml(e.data_entrada || '') +
             '" style="width:140px;font-size:11px;">';
@@ -421,12 +437,17 @@
             ' style="font-size:11px;padding:2px 8px;">Salvar</button>';
           body += '<button type="button" class="btn btn-sm btn-outline-danger painel-entrada-saida"' +
             ' style="font-size:11px;padding:2px 8px;">Saída</button>';
+          body += '<button type="button" class="btn btn-sm btn-outline-secondary painel-entrada-editar-cancelar"' +
+            ' style="font-size:11px;padding:2px 8px;">Cancelar</button>';
+          body += '</div></div>';
         }
-        body += '</div></div>';
+        body += '</div>';
       });
 
       if (proc.pode_criar && (entradasUnidade.unidades_opcoes || []).length) {
-        body += '<div class="d-flex gap-1 flex-wrap align-items-center mt-2 painel-entrada-nova">';
+        body += '<button type="button" class="btn btn-sm btn-link p-0 mt-1 painel-entrada-nova-toggle"' +
+          ' style="font-size:11px;text-decoration:none;">+ Entrada</button>';
+        body += '<div class="d-none d-flex gap-1 flex-wrap align-items-center mt-2 painel-entrada-nova">';
         body += '<select class="form-select form-select-sm painel-entrada-nova-unidade"' +
           ' style="width:90px;font-size:11px;">';
         (entradasUnidade.unidades_opcoes || []).forEach(function (u) {
@@ -434,9 +455,9 @@
         });
         body += '</select>';
         body += '<input type="date" class="form-control form-control-sm painel-entrada-nova-data"' +
-          ' value="' + hojeISO() + '" style="width:140px;font-size:11px;">';
+          ' style="width:140px;font-size:11px;">';
         body += '<button type="button" class="btn btn-sm btn-outline-success painel-entrada-nova-salvar"' +
-          ' style="font-size:11px;padding:2px 8px;">+ Entrada</button>';
+          ' style="font-size:11px;padding:2px 8px;">Salvar</button>';
         body += '</div>';
       }
       body += '</div>';
@@ -624,10 +645,112 @@
       }
     });
 
+    function reabrirPainelComEntradas(resp) {
+      aplicarEntradasPainelLocal(resp);
+      if (!resp || !resp.entradas_unidade) return;
+      const painelData = Object.assign({}, data, {
+        entradas_unidade: resp.entradas_unidade,
+      });
+      // Atualiza cache da linha, se existir
+      if (window.painelDados) {
+        Object.keys(window.painelDados).forEach(function (key) {
+          const d = window.painelDados[key];
+          if (d && String(d.os_pk) === String(osPk)) {
+            d.entradas_unidade = resp.entradas_unidade;
+          }
+        });
+      }
+      const htmlParts = renderPanel(painelData);
+      if (ctx.painelHeader) ctx.painelHeader.innerHTML = htmlParts.header;
+      conteudo.innerHTML = htmlParts.body;
+      bindPanelEvents(painelData, ctx);
+    }
+
     function aplicarEntradasPainelLocal(resp) {
       if (ctx.aplicarAtualizacoesPainel) {
         ctx.aplicarAtualizacoesPainel(osPk, resp);
       }
+    }
+
+    const btnUnificar = conteudo.querySelector('#painelBtnUnificarEntrada');
+    if (btnUnificar) {
+      btnUnificar.addEventListener('click', function () {
+        const formBox = conteudo.querySelector('#painelUnificarForm');
+        if (!formBox) return;
+        if (formBox.style.display !== 'none' && formBox.dataset.built === '1') {
+          formBox.style.display = 'none';
+          return;
+        }
+        const procs = (data.entradas_unidade && data.entradas_unidade.processos) || [];
+        const opcoesOrigem = [];
+        const unidadesDestinoMap = {};
+        procs.forEach(function (p) {
+          (p.entradas || []).forEach(function (e) {
+            opcoesOrigem.push({
+              processo_sei_id: p.processo_sei_id,
+              numero_processo: p.numero_processo,
+              unidade_id: e.unidade_id,
+              sigla: e.sigla,
+            });
+            unidadesDestinoMap[e.unidade_id] = e.sigla;
+          });
+        });
+
+        let html = '<label class="form-label small mb-0">Processo a mover</label>';
+        html += '<select class="form-select form-select-sm mb-2" id="painelUnificarOrigem">';
+        opcoesOrigem.forEach(function (o) {
+          html += '<option value="' + o.processo_sei_id + '"' +
+            ' data-unidade-atual="' + o.unidade_id + '">' +
+            escapeHtml(o.numero_processo) + ' (' + escapeHtml(o.sigla) + ')' +
+            '</option>';
+        });
+        html += '</select>';
+        html += '<label class="form-label small mb-0">Unidade de destino</label>';
+        html += '<select class="form-select form-select-sm mb-2" id="painelUnificarDestino"></select>';
+        html += '<label class="form-label small mb-0">Justificativa</label>';
+        html += '<textarea class="form-control form-control-sm mb-2" id="painelUnificarJust" rows="2"' +
+          ' style="font-size:11px;"></textarea>';
+        html += '<button type="button" class="btn btn-sm btn-warning me-1" id="painelUnificarSalvar"' +
+          ' style="font-size:11px;">Confirmar unificação</button>';
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary" id="painelUnificarCancelar"' +
+          ' style="font-size:11px;">Cancelar</button>';
+        formBox.innerHTML = html;
+        formBox.style.display = 'block';
+        formBox.dataset.built = '1';
+
+        function atualizarDestinos() {
+          const selOrigem = formBox.querySelector('#painelUnificarOrigem');
+          const selDest = formBox.querySelector('#painelUnificarDestino');
+          if (!selOrigem || !selDest) return;
+          const opt = selOrigem.options[selOrigem.selectedIndex];
+          const unidadeAtual = opt ? opt.getAttribute('data-unidade-atual') : '';
+          let opts = '';
+          Object.keys(unidadesDestinoMap).forEach(function (uid) {
+            if (String(uid) === String(unidadeAtual)) return;
+            opts += '<option value="' + uid + '">' +
+              escapeHtml(unidadesDestinoMap[uid]) + '</option>';
+          });
+          selDest.innerHTML = opts || '<option value="">—</option>';
+        }
+        atualizarDestinos();
+        formBox.querySelector('#painelUnificarOrigem')
+          .addEventListener('change', atualizarDestinos);
+        formBox.querySelector('#painelUnificarCancelar').addEventListener('click', function () {
+          formBox.style.display = 'none';
+        });
+        formBox.querySelector('#painelUnificarSalvar').addEventListener('click', function () {
+          const origem = formBox.querySelector('#painelUnificarOrigem');
+          const destino = formBox.querySelector('#painelUnificarDestino');
+          const just = formBox.querySelector('#painelUnificarJust');
+          postForm('/os/' + osPk + '/unificar-entrada-unidade/', {
+            processo_sei_id_origem: origem ? origem.value : '',
+            unidade_destino_id: destino ? destino.value : '',
+            justificativa: just ? just.value : '',
+          }).then(function (resp) {
+            reabrirPainelComEntradas(resp);
+          }).catch(function (e) { alert(e.message); });
+        });
+      });
     }
 
     conteudo.querySelectorAll('[data-processo-sei-id]').forEach(function (box) {
@@ -671,6 +794,19 @@
 
       box.querySelectorAll('[data-historico-id]').forEach(function (row) {
         const histId = row.getAttribute('data-historico-id');
+        const btnToggle = row.querySelector('.painel-entrada-editar-toggle');
+        const edicao = row.querySelector('.painel-entrada-edicao');
+        if (btnToggle && edicao) {
+          btnToggle.addEventListener('click', function () {
+            edicao.classList.toggle('d-none');
+          });
+        }
+        const btnCancel = row.querySelector('.painel-entrada-editar-cancelar');
+        if (btnCancel && edicao) {
+          btnCancel.addEventListener('click', function () {
+            edicao.classList.add('d-none');
+          });
+        }
         const btnSalvar = row.querySelector('.painel-entrada-salvar');
         if (btnSalvar) {
           btnSalvar.addEventListener('click', function () {
@@ -686,8 +822,13 @@
               );
             }).then(function (resp) {
               if (!resp) return;
-              const display = row.querySelector('.painel-entrada-display');
-              if (display) display.textContent = resp.valor_display || '—';
+              const leitura = row.querySelector('.painel-entrada-leitura');
+              if (leitura && resp.valor_display) {
+                const texto = leitura.textContent || '';
+                const sigla = texto.split(' — ')[0] || '';
+                leitura.textContent = sigla + ' — desde ' + (resp.valor_display || '—');
+              }
+              if (edicao) edicao.classList.add('d-none');
               aplicarEntradasPainelLocal(resp);
             }).catch(function (e) { alert(e.message); });
           });
@@ -698,13 +839,21 @@
             if (!window.confirm('Registrar saída desta unidade?')) return;
             postForm('/os/' + osPk + '/entrada-unidade/' + histId + '/saida/', {})
               .then(function (resp) {
-                row.remove();
-                aplicarEntradasPainelLocal(resp);
+                reabrirPainelComEntradas(resp);
               })
               .catch(function (e) { alert(e.message); });
           });
         }
       });
+
+      const btnNovaToggle = box.querySelector('.painel-entrada-nova-toggle');
+      const formNova = box.querySelector('.painel-entrada-nova');
+      if (btnNovaToggle && formNova) {
+        btnNovaToggle.addEventListener('click', function () {
+          formNova.classList.toggle('d-none');
+          formNova.classList.toggle('d-flex');
+        });
+      }
 
       const btnNova = box.querySelector('.painel-entrada-nova-salvar');
       if (btnNova) {
@@ -716,21 +865,7 @@
             unidade_id: sel ? sel.value : '',
             data_entrada: input ? input.value : '',
           }).then(function (resp) {
-            aplicarEntradasPainelLocal(resp);
-            const sigla = sel && sel.options[sel.selectedIndex]
-              ? sel.options[sel.selectedIndex].text
-              : '';
-            const dataBr = resp.valor_display || '—';
-            const nova = document.createElement('div');
-            nova.className = 'd-flex justify-content-between align-items-center gap-2 mb-1 flex-wrap';
-            nova.setAttribute('data-historico-id', resp.historico_id || '');
-            nova.innerHTML =
-              '<div><span class="badge bg-secondary me-1">' + escapeHtml(sigla) +
-              '</span><strong class="painel-entrada-display">' + escapeHtml(dataBr) +
-              '</strong></div>';
-            const formNova = box.querySelector('.painel-entrada-nova');
-            if (formNova) box.insertBefore(nova, formNova);
-            else box.appendChild(nova);
+            reabrirPainelComEntradas(resp);
           }).catch(function (e) { alert(e.message); });
         });
       }

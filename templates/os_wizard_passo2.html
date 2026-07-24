@@ -51,6 +51,15 @@
       {{ form.data_entrada_divisao|as_crispy_field }}
     </div>
 
+    {% if modo_relacionado %}
+    <div class="col-md-6">
+      {{ form.unidade_destino|as_crispy_field }}
+    </div>
+    <div class="col-md-3">
+      {{ form.data_entrada_unidade|as_crispy_field }}
+    </div>
+    {% endif %}
+
     {% if not modo_relacionado %}
     <div class="col-md-4">
       {{ form.natureza|as_crispy_field }}

@@ -161,6 +161,17 @@ class OSVincularProcessoForm(forms.Form):
         label="Data de entrada na Divisão",
         required=True,
     )
+    unidade_destino = forms.ModelChoiceField(
+        label="Unidade de destino",
+        queryset=UnidadeInterna.objects.order_by("sigla"),
+        required=True,
+        empty_label="---------",
+    )
+    data_entrada_unidade = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de entrada na unidade",
+        required=True,
+    )
 
     def clean_numero_processo(self):
         numero = self.cleaned_data.get("numero_processo", "").strip()
@@ -174,6 +185,18 @@ class OSVincularProcessoForm(forms.Form):
                     "002.078002.16.8.00000 (21 dígitos).",
                 )
         return numero
+
+    def clean_unidade_destino(self):
+        unidade = self.cleaned_data.get("unidade_destino")
+        if not unidade:
+            raise ValidationError("Selecione a unidade de destino.")
+        return unidade
+
+    def clean_data_entrada_unidade(self):
+        data = self.cleaned_data.get("data_entrada_unidade")
+        if not data:
+            raise ValidationError("Informe a data de entrada na unidade.")
+        return data
 
 
 class OSWizardPasso2Form(forms.Form):
@@ -309,6 +332,17 @@ class OSWizardPasso2RelacionadoForm(forms.Form):
         label="Data de entrada na Divisão",
         required=True,
     )
+    unidade_destino = forms.ModelChoiceField(
+        label="Unidade de destino",
+        queryset=UnidadeInterna.objects.order_by("sigla"),
+        required=True,
+        empty_label="---------",
+    )
+    data_entrada_unidade = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data de entrada na unidade",
+        required=True,
+    )
 
     def clean_numero_processo(self):
         numero = self.cleaned_data.get("numero_processo", "").strip()
@@ -322,6 +356,18 @@ class OSWizardPasso2RelacionadoForm(forms.Form):
                     "002.078002.16.8.00000 (21 dígitos).",
                 )
         return numero
+
+    def clean_unidade_destino(self):
+        unidade = self.cleaned_data.get("unidade_destino")
+        if not unidade:
+            raise ValidationError("Selecione a unidade de destino.")
+        return unidade
+
+    def clean_data_entrada_unidade(self):
+        data = self.cleaned_data.get("data_entrada_unidade")
+        if not data:
+            raise ValidationError("Informe a data de entrada na unidade.")
+        return data
 
 
 class OSWizardPasso3Form(forms.Form):
